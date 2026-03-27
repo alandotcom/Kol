@@ -5,6 +5,7 @@
 //  Created by Kit Langton on 1/24/25.
 //
 
+import Carbon
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
@@ -350,8 +351,13 @@ private extension TranscriptionFeature {
     // Otherwise, proceed to transcription
     state.isTranscribing = true
     state.error = nil
-    let model = state.hexSettings.selectedModel
-    let language = state.hexSettings.outputLanguage
+
+    // Auto-switch model based on keyboard input source:
+    // Hebrew keyboard → Caspi (Hebrew ASR), otherwise → selected model (Parakeet/Whisper)
+    let (model, language) = Self.resolveModelAndLanguage(
+      selectedModel: state.hexSettings.selectedModel,
+      selectedLanguage: state.hexSettings.outputLanguage
+    )
 
     state.isPrewarming = true
 
@@ -384,6 +390,31 @@ private extension TranscriptionFeature {
       }
     }
     .cancellable(id: CancelID.transcription)
+  }
+
+  /// Checks the current macOS keyboard input source and routes to the appropriate model.
+  /// Hebrew keyboard → Caspi + Hebrew language; otherwise → user's selected model + language.
+  private static func resolveModelAndLanguage(
+    selectedModel: String,
+    selectedLanguage: String?
+  ) -> (model: String, language: String?) {
+    if isHebrewKeyboardActive() {
+      transcriptionFeatureLogger.notice("Hebrew keyboard detected — using Caspi")
+      return (QwenModel.caspiHebrew.identifier, "he")
+    }
+    // If Caspi is selected but keyboard is not Hebrew, use Parakeet for speed
+    if QwenModel(rawValue: selectedModel) != nil {
+      transcriptionFeatureLogger.notice("Non-Hebrew keyboard with Caspi selected — falling back to Parakeet")
+      return (ParakeetModel.multilingualV3.identifier, selectedLanguage)
+    }
+    return (selectedModel, selectedLanguage)
+  }
+
+  private static func isHebrewKeyboardActive() -> Bool {
+    guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else { return false }
+    guard let idRef = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return false }
+    let inputSourceID = Unmanaged<CFString>.fromOpaque(idRef).takeUnretainedValue() as String
+    return inputSourceID.lowercased().contains("hebrew")
   }
 }
 
