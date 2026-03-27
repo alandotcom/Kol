@@ -4,23 +4,57 @@ This file provides guidance for coding agents working in this repo.
 
 ## Project Overview
 
-Hex is a macOS menu bar application for on‑device voice‑to‑text. It supports Whisper (Core ML via WhisperKit) and Parakeet TDT v3 (Core ML via FluidAudio). Users activate transcription with hotkeys; text can be auto‑pasted into the active app.
+Hex is a macOS menu bar application for on‑device voice‑to‑text. This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added Hebrew ASR and LLM post-processing. It supports Whisper (Core ML via WhisperKit), Parakeet TDT v3 (Core ML via FluidAudio), and Caspi 1.7B (Hebrew, Core ML via Qwen3-ASR). Users activate transcription with hotkeys; text can be auto‑pasted into the active app.
+
+## Fork-Specific Features
+
+### Caspi 1.7B Hebrew ASR
+- **Model**: [alandotcom/caspi-1.7b-coreml](https://huggingface.co/alandotcom/caspi-1.7b-coreml) — Hebrew fine-tune of Qwen3-ASR-1.7B
+- **FluidAudio fork**: [alandotcom/FluidAudio](https://github.com/alandotcom/FluidAudio/tree/caspi-1.7b-compat) — adds Qwen3-ASR 1.7B config + Caspi repo
+- **Conversion scripts**: [alandotcom/caspi-hebrew-asr](https://github.com/alandotcom/caspi-hebrew-asr) — CoreML conversion from PyTorch
+- **Key files**: `QwenModel.swift`, `QwenClient.swift`
+- **Model dispatch**: `TranscriptionClient.isQwen()` routes to `QwenClient`, same pattern as `isParakeet()`
+
+### Automatic Language Switching
+- Checks macOS keyboard input source via `TISCopyCurrentKeyboardInputSource()` (Carbon)
+- Hebrew keyboard → Caspi model + `language: "he"`
+- Any other keyboard → Parakeet (fast English/multilingual)
+- Logic in `TranscriptionFeature.resolveModelAndLanguage()`
+
+### LLM Post-Processing
+- Optional cleanup of transcriptions via OpenAI-compatible API (Groq, Cerebras, or custom)
+- **Composable prompt architecture** — NOT a monolithic system prompt:
+  - `PromptLayers.core` — always present (punctuation, filler removal)
+  - `PromptLayers.hebrew` / `.english` — language-specific, selected based on detected language
+  - `PromptLayers.appContext(for:)` — adapts to target app (code editor, messaging, docs)
+  - Custom rules — user-provided facts (name, company, common terms)
+  - `PromptAssembler.systemPrompt()` composes applicable layers
+- **Key files**: `LLMPostProcessing.swift` (HexCore), `LLMPostProcessingClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
+- **Insertion point**: `TranscriptionFeature.handleTranscriptionResult()`, after word removals/remappings, before `finalizeRecordingAndStoreTranscript()`
+- **Graceful fallback**: on any LLM error, original text is pasted
+- **API key**: stored in macOS Keychain via `KeychainClient`, NOT in settings JSON
+- **Tests**: `PromptAssemblerTests.swift` (17 tests for prompt composition)
 
 ## Build & Development Commands
 
 ```bash
-# Build the app
-xcodebuild -scheme Hex -configuration Release
+# Build + sign + install (recommended for dev)
+./scripts/build-install.sh
+
+# Or manually:
+xcodebuild build -scheme Hex -configuration Release -skipMacroValidation CODE_SIGNING_ALLOWED=NO
+codesign --deep --force --sign "Apple Development: alan.mit@gmail.com (97Y8HW2AB7)" \
+  ~/Library/Developer/Xcode/DerivedData/Hex-*/Build/Products/Release/Hex.app
+rsync -a --delete ~/Library/Developer/Xcode/DerivedData/Hex-*/Build/Products/Release/Hex.app/ /Applications/Hex.app/
 
 # Run tests (must be run from HexCore directory for unit tests)
 cd HexCore && swift test
 
-# Or run all tests via Xcode
-xcodebuild test -scheme Hex
-
 # Open in Xcode (recommended for development)
 open Hex.xcodeproj
 ```
+
+**Signing note**: Use `codesign` post-build with a stable identity so macOS permissions (accessibility, input monitoring, microphone) persist between installs. Ad-hoc signing (`-`) resets permissions every build.
 
 ## Architecture
 
@@ -33,18 +67,22 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 - `HistoryFeature`: Transcription history management
 
 ### Dependency Clients
-- `TranscriptionClient`: WhisperKit integration for ML transcription
+- `TranscriptionClient`: Routes to WhisperKit, ParakeetClient, or QwenClient based on model
+- `ParakeetClient`: FluidAudio ASR for Parakeet models
+- `QwenClient`: FluidAudio Qwen3AsrManager for Caspi Hebrew model
+- `LLMPostProcessingClient`: OpenAI-compatible API for transcription cleanup
+- `KeychainClient`: macOS Keychain for API key storage
 - `RecordingClient`: AVAudioRecorder wrapper for audio capture
 - `PasteboardClient`: Clipboard operations
 - `KeyEventMonitorClient`: Global hotkey monitoring via Sauce framework
 
 ### Key Dependencies
 - **WhisperKit**: Core ML transcription (tracking main branch)
-- **FluidAudio (Parakeet)**: Core ML ASR (multilingual) default model
+- **FluidAudio**: Core ML ASR — Parakeet (multilingual) + Qwen3-ASR/Caspi (Hebrew). Uses [alandotcom/FluidAudio](https://github.com/alandotcom/FluidAudio) fork (`caspi-1.7b-compat` branch)
 - **Sauce**: Keyboard event monitoring
 - **Sparkle**: Auto-updates (feed: https://hex-updates.s3.amazonaws.com/appcast.xml)
 - **Swift Composable Architecture**: State management
-- **Inject** Hot Reloading for SwiftUI
+- **Inject**: Hot Reloading for SwiftUI
 
 ## Important Implementation Details
 
@@ -54,7 +92,7 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
    - Mouse clicks and extra modifiers are discarded within threshold, ignored after
    - Only ESC cancels recordings after the threshold
 
-2. **Model Management**: Models are managed by `ModelDownloadFeature`. Curated defaults live in `Hex/Resources/Data/models.json`. The Settings UI shows a compact opinionated list (Parakeet + three Whisper sizes). No dropdowns.
+2. **Model Management**: Models are managed by `ModelDownloadFeature`. Curated defaults live in `Hex/Resources/Data/models.json`. The Settings UI shows Parakeet, Caspi, and Whisper models. Caspi auto-downloads from HuggingFace on first use.
 
 3. **Sound Effects**: Audio feedback is provided via `SoundEffect.swift` using files in `Resources/Audio/`
 
@@ -64,11 +102,13 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 
 6. **Logging**: All diagnostics should use the unified logging helper `HexLog` (`HexCore/Sources/HexCore/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
 
-## Models (2025‑11)
+## Models
 
-- Default: Parakeet TDT v3 (multilingual) via FluidAudio
-- Additional curated: Whisper Small (Tiny), Whisper Medium (Base), Whisper Large v3
+- Default: Parakeet TDT v3 (multilingual, ~650MB) via FluidAudio
+- **Caspi 1.7B** (Hebrew, ~2.8GB int8) via FluidAudio Qwen3AsrManager — auto-downloads from [HuggingFace](https://huggingface.co/alandotcom/caspi-1.7b-coreml)
+- Whisper Small (Tiny), Whisper Medium (Base), Whisper Large v3
 - Note: Distil‑Whisper is English‑only and not shown by default
+- Model dispatch: `TranscriptionClient` checks `isParakeet()` then `isQwen()` then falls through to WhisperKit
 
 ### Storage Locations
 
@@ -92,7 +132,7 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 ### Packages
 
 - WhisperKit: `https://github.com/argmaxinc/WhisperKit`
-- FluidAudio: `https://github.com/FluidInference/FluidAudio.git` (link `FluidAudio` to Hex target)
+- FluidAudio: `https://github.com/alandotcom/FluidAudio.git` branch `caspi-1.7b-compat` (fork with Qwen3-ASR 1.7B support)
 
 ### Entitlements (Sandbox)
 
