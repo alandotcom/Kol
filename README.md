@@ -1,17 +1,33 @@
-# Hex — Voice → Text
+# Hex — Voice → Text (with Hebrew/Caspi support)
+
+This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added support for **Hebrew speech recognition** via [Caspi-1.7B](https://huggingface.co/OzLabs/Caspi-1.7B), a Hebrew-optimized fine-tune of Qwen3-ASR running on CoreML.
+
+<img width="812" alt="Hex with Caspi Hebrew model" src="https://github.com/user-attachments/assets/38f7acf0-fcb9-4bed-9a5b-1abc9beb4417" />
+
+## What's added
+
+- **Caspi 1.7B (Hebrew)** model option — on-device Hebrew ASR via CoreML on Apple Silicon
+- Auto-downloads model from [HuggingFace](https://huggingface.co/alandotcom/caspi-1.7b-coreml) on first use (~2.8 GB)
+- Language picker enabled for Qwen3 models (set to Hebrew for best results)
+- Uses [alandotcom/FluidAudio](https://github.com/alandotcom/FluidAudio/tree/caspi-1.7b-compat) fork with Qwen3-ASR 1.7B support
+
+## Performance
+
+- ~2x real-time on Apple Silicon (M-series)
+- ~5% WER on Hebrew benchmarks
+- ~6 GB peak memory (int8 quantized)
+
+---
+
+*Original README below:*
 
 Press-and-hold a hotkey to transcribe your voice and paste the result wherever you're typing.
 
-**[Download Hex for macOS](https://hex-updates.s3.us-east-1.amazonaws.com/hex-latest.dmg)**
+**[Download Hex for macOS](https://hex-updates.s3.us-east-1.amazonaws.com/hex-latest.dmg)** (original, without Caspi)
 
 > **Note:** Hex is currently only available for **Apple Silicon** Macs.
 
-Or download via homebrew:
-```bash
-brew install --cask kitlangton-hex
-```
-
-I've opened-sourced the project in the hopes that others will find it useful! Hex supports both [Parakeet TDT v3](https://github.com/FluidInference/FluidAudio) via the awesome [FluidAudio](https://github.com/FluidInference/FluidAudio) (the default—it's frickin' unbelievable: fast, multilingual, and cloud-optimized) and the awesome [WhisperKit](https://github.com/argmaxinc/WhisperKit) for on-device transcription. We use the incredible [Swift Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture) for structuring the app. Please open issues with any questions or feedback! ❤️
+Hex supports [Parakeet TDT v3](https://github.com/FluidInference/FluidAudio) via the awesome [FluidAudio](https://github.com/FluidInference/FluidAudio) (the default—it's frickin' unbelievable: fast, multilingual, and cloud-optimized), [WhisperKit](https://github.com/argmaxinc/WhisperKit) for on-device transcription, and now **Caspi-1.7B** for Hebrew. We use the incredible [Swift Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture) for structuring the app.
 
 ## Instructions
 
