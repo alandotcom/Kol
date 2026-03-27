@@ -74,12 +74,14 @@ public enum LLMProviderPreset: String, CaseIterable, Codable, Sendable {
 /// Composed by `PromptAssembler` — not concatenated by callers.
 public enum PromptLayers {
 	public static let core = """
-	Clean up this speech-to-text transcription. \
+	You are a text post-processor. You receive raw speech-to-text output and return ONLY the cleaned version. \
 	Fix punctuation (periods, commas, question marks). \
 	Remove filler words (um, uh, like, you know). \
 	Fix obvious ASR misrecognitions. \
 	Do NOT change meaning, translate, summarize, or add commentary. \
-	Output ONLY the cleaned text.
+	Do NOT include any preamble, explanation, or acknowledgment. \
+	Do NOT say "here is" or "sure" or anything similar. \
+	Your entire response must be the cleaned transcription text and nothing else.
 	"""
 
 	public static let hebrew = """
@@ -102,8 +104,8 @@ public enum PromptLayers {
 	"""
 
 	public static let appContextMessaging = """
-	The text is being typed into a messaging app. \
-	Keep the tone casual and conversational. Do not add bullet points.
+	The text will be pasted into a messaging app. \
+	Do not formalize the tone. Do not add bullet points or structured formatting.
 	"""
 
 	public static let appContextDocument = """
@@ -178,7 +180,7 @@ public enum PromptAssembler {
 		}
 
 		if let rules = customRules, !rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-			parts.append("Additional context from the user:\n\(rules)")
+			parts.append("Facts about the speaker (use to correct ASR errors, do not mention these in output):\n\(rules)")
 		}
 
 		return parts.joined(separator: "\n\n")

@@ -8,7 +8,12 @@ This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added
 
 - **Caspi 1.7B (Hebrew)** model option — on-device Hebrew ASR via CoreML on Apple Silicon
 - Auto-downloads model from [HuggingFace](https://huggingface.co/alandotcom/caspi-1.7b-coreml) on first use (~2.8 GB)
-- Language picker enabled for Qwen3 models (set to Hebrew for best results)
+- **Auto language switching** — Hebrew keyboard active? Uses Caspi. Otherwise uses Parakeet. No manual switching needed.
+- **AI post-processing** — optional LLM cleanup via [Groq](https://groq.com), [Cerebras](https://cerebras.ai), or any OpenAI-compatible API (~80ms latency):
+  - Fixes punctuation, removes filler words, corrects ASR errors
+  - Formats lists as bullet points in docs, keeps casual tone in messaging
+  - Adapts to the target app (Terminal, Slack, Notes, etc.)
+  - Composable prompt architecture: core rules + language-specific + app-context + your custom rules
 - Uses [alandotcom/FluidAudio](https://github.com/alandotcom/FluidAudio/tree/caspi-1.7b-compat) fork with Qwen3-ASR 1.7B support
 
 ## Performance
@@ -16,6 +21,7 @@ This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added
 - ~2x real-time on Apple Silicon (M-series)
 - ~5% WER on Hebrew benchmarks
 - ~6 GB peak memory (int8 quantized)
+- ~80ms LLM post-processing (Groq)
 
 ## Building from source
 
