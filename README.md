@@ -17,6 +17,29 @@ This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added
 - ~5% WER on Hebrew benchmarks
 - ~6 GB peak memory (int8 quantized)
 
+## Building from source
+
+Requires macOS 15+, Xcode 16+, Apple Silicon.
+
+```bash
+git clone https://github.com/alandotcom/Hex.git
+cd Hex
+xcodebuild build \
+  -scheme Hex \
+  -configuration Release \
+  -skipMacroValidation \
+  CODE_SIGN_IDENTITY=- \
+  CODE_SIGN_STYLE=Manual
+
+# Find and install the built app
+cp -R ~/Library/Developer/Xcode/DerivedData/Hex-*/Build/Products/Release/Hex.app /Applications/
+open /Applications/Hex.app
+```
+
+Or open `Hex.xcodeproj` in Xcode, set your signing team under Signing & Capabilities, and hit Cmd+R.
+
+On first launch, grant microphone and accessibility permissions. Select **Caspi 1.7B (Hebrew)** in Settings — the model downloads automatically (~2.8 GB).
+
 ---
 
 *Original README below:*
