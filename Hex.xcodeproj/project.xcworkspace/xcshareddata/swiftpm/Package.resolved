@@ -1,5 +1,5 @@
 {
-  "originHash" : "f44bfcb7633bb4f97f421fc010835f104416ee5f9ddbd6fb9f265665f4fc1c4d",
+  "originHash" : "7a3a3c330930d5854e0ca1d5f458412fb380177186bbe796efd26b006a40f7d0",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/alandotcom/FluidAudio",
       "state" : {
-        "branch" : "caspi-1.7b",
-        "revision" : "f70b2cc5e931a15970351b5e7dcad2197741849d"
+        "branch" : "caspi-1.7b-compat",
+        "revision" : "7549f0af0fed2bead314382865996fe590073362"
       }
     },
     {

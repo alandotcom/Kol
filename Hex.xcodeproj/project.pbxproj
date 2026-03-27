@@ -648,7 +648,7 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/alandotcom/FluidAudio";
 			requirement = {
-				branch = caspi-1.7b;
+				branch = caspi-1.7b-compat;
 				kind = branch;
 			};
 		};

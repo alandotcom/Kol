@@ -35,20 +35,32 @@ actor QwenClient {
 		p.completedUnitCount = 5
 		progress(p)
 
-		guard let modelDir = findModelDirectory(model) else {
-			throw NSError(
-				domain: "Qwen3",
-				code: -5,
-				userInfo: [NSLocalizedDescriptionKey: "Caspi model not found. Place converted CoreML models in ~/Library/Application Support/FluidAudio/Models/\(model.identifier)/"]
-			)
+		var modelDir = findModelDirectory(model)
+		if modelDir == nil {
+			// Download from HuggingFace
+			logger.notice("Caspi model not found locally, downloading from HuggingFace...")
+			let fm = FileManager.default
+			let support = try fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+			let modelsRoot = support.appendingPathComponent("FluidAudio/Models", isDirectory: true)
+			try fm.createDirectory(at: modelsRoot, withIntermediateDirectories: true)
+			try await DownloadUtils.downloadRepo(.caspiAsr, to: modelsRoot)
+			modelDir = findModelDirectory(model)
+			guard modelDir != nil else {
+				throw NSError(
+					domain: "Qwen3",
+					code: -5,
+					userInfo: [NSLocalizedDescriptionKey: "Failed to download Caspi model from HuggingFace"]
+				)
+			}
 		}
-		logger.notice("Loading Qwen3 models from \(modelDir.path)")
-		p.completedUnitCount = 20
+		let resolvedDir = modelDir!
+		logger.notice("Loading Qwen3 models from \(resolvedDir.path)")
+		p.completedUnitCount = 80
 		progress(p)
 
 		do {
 			let manager = Qwen3AsrManager()
-			try await manager.loadModels(from: modelDir)
+			try await manager.loadModels(from: resolvedDir)
 			self.asr = manager
 			self.currentModel = model
 		} catch {
