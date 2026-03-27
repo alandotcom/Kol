@@ -39,6 +39,7 @@ struct SettingsView: View {
 
 			SoundSectionView(store: store)
 			GeneralSectionView(store: store)
+			LLMSectionView(store: store)
 			HistorySectionView(store: store)
 		}
 		.formStyle(.grouped)

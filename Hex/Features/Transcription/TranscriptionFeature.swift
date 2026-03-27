@@ -28,6 +28,7 @@ struct TranscriptionFeature {
     var meter: Meter = .init(averagePower: 0, peakPower: 0)
     var sourceAppBundleID: String?
     var sourceAppName: String?
+    var resolvedLanguage: String?
     @Shared(.hexSettings) var hexSettings: HexSettings
     @Shared(.isRemappingScratchpadFocused) var isRemappingScratchpadFocused: Bool = false
     @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
@@ -72,6 +73,8 @@ struct TranscriptionFeature {
   @Dependency(\.sleepManagement) var sleepManagement
   @Dependency(\.date.now) var now
   @Dependency(\.transcriptPersistence) var transcriptPersistence
+  @Dependency(\.llmPostProcessing) var llmPostProcessing
+  @Dependency(\.keychain) var keychain
 
   var body: some ReducerOf<Self> {
     Reduce { state, action in
@@ -358,6 +361,7 @@ private extension TranscriptionFeature {
       selectedModel: state.hexSettings.selectedModel,
       selectedLanguage: state.hexSettings.outputLanguage
     )
+    state.resolvedLanguage = language
 
     state.isPrewarming = true
 
@@ -479,11 +483,41 @@ private extension TranscriptionFeature {
     let sourceAppBundleID = state.sourceAppBundleID
     let sourceAppName = state.sourceAppName
     let transcriptionHistory = state.$transcriptionHistory
+    let llmEnabled = state.hexSettings.llmPostProcessingEnabled
+    let llmConfig = LLMProviderConfig(
+      baseURL: state.hexSettings.llmProviderBaseURL,
+      modelName: state.hexSettings.llmModelName
+    )
+    let llmCustomRules = state.hexSettings.llmCustomRules
+    let resolvedLanguage = state.resolvedLanguage
 
-    return .run { send in
+    return .run { [llmPostProcessing, keychain] send in
       do {
+        var finalText = modifiedResult
+
+        if llmEnabled {
+          if let apiKey = await keychain.load("llmApiKey"), !apiKey.isEmpty {
+            let context = PostProcessingContext(
+              text: finalText,
+              inputLanguage: resolvedLanguage,
+              sourceApp: sourceAppName ?? sourceAppBundleID,
+              customRules: llmCustomRules.isEmpty ? nil : llmCustomRules
+            )
+            let startTime = Date()
+            do {
+              finalText = try await llmPostProcessing.process(context, llmConfig, apiKey)
+              let elapsed = Date().timeIntervalSince(startTime)
+              transcriptionFeatureLogger.info("LLM post-processing took \(String(format: "%.0f", elapsed * 1000))ms")
+            } catch {
+              transcriptionFeatureLogger.error("LLM post-processing failed, using original: \(error.localizedDescription)")
+            }
+          } else {
+            transcriptionFeatureLogger.notice("LLM enabled but no API key, skipping post-processing")
+          }
+        }
+
         try await finalizeRecordingAndStoreTranscript(
-          result: modifiedResult,
+          result: finalText,
           duration: duration,
           sourceAppBundleID: sourceAppBundleID,
           sourceAppName: sourceAppName,

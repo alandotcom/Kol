@@ -47,6 +47,11 @@ public struct HexSettings: Codable, Equatable, Sendable {
 	public var wordRemovalsEnabled: Bool
 	public var wordRemovals: [WordRemoval]
 	public var wordRemappings: [WordRemapping]
+	public var llmPostProcessingEnabled: Bool
+	public var llmProviderPreset: String
+	public var llmProviderBaseURL: String
+	public var llmModelName: String
+	public var llmCustomRules: String
 
 	private mutating func normalizeDoubleTapSettings() {
 		if !doubleTapLockEnabled {
@@ -78,7 +83,12 @@ public struct HexSettings: Codable, Equatable, Sendable {
 		hasCompletedStorageMigration: Bool = false,
 		wordRemovalsEnabled: Bool = false,
 		wordRemovals: [WordRemoval] = HexSettings.defaultWordRemovals,
-		wordRemappings: [WordRemapping] = []
+		wordRemappings: [WordRemapping] = [],
+		llmPostProcessingEnabled: Bool = false,
+		llmProviderPreset: String = LLMProviderPreset.groq.rawValue,
+		llmProviderBaseURL: String = LLMProviderPreset.groq.defaultConfig.baseURL,
+		llmModelName: String = LLMProviderPreset.groq.defaultConfig.modelName,
+		llmCustomRules: String = ""
 	) {
 		self.soundEffectsEnabled = soundEffectsEnabled
 		self.soundEffectsVolume = soundEffectsVolume
@@ -104,6 +114,11 @@ public struct HexSettings: Codable, Equatable, Sendable {
 		self.wordRemovalsEnabled = wordRemovalsEnabled
 		self.wordRemovals = wordRemovals
 		self.wordRemappings = wordRemappings
+		self.llmPostProcessingEnabled = llmPostProcessingEnabled
+		self.llmProviderPreset = llmProviderPreset
+		self.llmProviderBaseURL = llmProviderBaseURL
+		self.llmModelName = llmModelName
+		self.llmCustomRules = llmCustomRules
 		normalizeDoubleTapSettings()
 	}
 
@@ -152,6 +167,11 @@ private enum HexSettingKey: String, CodingKey, CaseIterable {
 	case wordRemovalsEnabled
 	case wordRemovals
 	case wordRemappings
+	case llmPostProcessingEnabled
+	case llmProviderPreset
+	case llmProviderBaseURL
+	case llmModelName
+	case llmCustomRules
 }
 
 private struct SettingsField<Value: Codable & Sendable> {
@@ -284,6 +304,11 @@ private enum HexSettingsSchema {
 			.wordRemappings,
 			keyPath: \.wordRemappings,
 			default: defaults.wordRemappings
-		).eraseToAny()
+		).eraseToAny(),
+		SettingsField(.llmPostProcessingEnabled, keyPath: \.llmPostProcessingEnabled, default: defaults.llmPostProcessingEnabled).eraseToAny(),
+		SettingsField(.llmProviderPreset, keyPath: \.llmProviderPreset, default: defaults.llmProviderPreset).eraseToAny(),
+		SettingsField(.llmProviderBaseURL, keyPath: \.llmProviderBaseURL, default: defaults.llmProviderBaseURL).eraseToAny(),
+		SettingsField(.llmModelName, keyPath: \.llmModelName, default: defaults.llmModelName).eraseToAny(),
+		SettingsField(.llmCustomRules, keyPath: \.llmCustomRules, default: defaults.llmCustomRules).eraseToAny(),
 	]
 }

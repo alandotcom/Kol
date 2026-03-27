@@ -59,6 +59,9 @@ struct SettingsFeature {
     var modelDownload = ModelDownloadFeature.State()
     var shouldFlashModelSection = false
 
+    // LLM Post-Processing
+    var llmApiKey: String = ""
+    var isLLMApiKeyLoaded: Bool = false
   }
 
   enum Action: BindableAction {
@@ -113,6 +116,16 @@ struct SettingsFeature {
     case updateWordRemapping(WordRemapping)
     case removeWordRemapping(UUID)
     case setRemappingScratchpadFocused(Bool)
+
+    // LLM Post-Processing
+    case setLLMEnabled(Bool)
+    case setLLMPreset(String)
+    case setLLMBaseURL(String)
+    case setLLMModelName(String)
+    case setLLMCustomRules(String)
+    case setLLMApiKey(String)
+    case loadLLMApiKey
+    case llmApiKeyLoaded(String?)
   }
 
   @Dependency(\.keyEventMonitor) var keyEventMonitor
@@ -121,6 +134,7 @@ struct SettingsFeature {
   @Dependency(\.recording) var recording
   @Dependency(\.permissions) var permissions
   @Dependency(\.transcriptPersistence) var transcriptPersistence
+  @Dependency(\.keychain) var keychain
 
   private func deleteAudioEffect(for transcripts: [Transcript]) -> Effect<Action> {
     .run { [transcriptPersistence] _ in
@@ -257,6 +271,7 @@ struct SettingsFeature {
 
           await send(.modelDownload(.fetchModels))
           await send(.loadAvailableInputDevices)
+          await send(.loadLLMApiKey)
 
           // Set up periodic refresh of available devices (every 120 seconds)
           // Using a longer interval to reduce resource usage
@@ -579,6 +594,55 @@ struct SettingsFeature {
 
       case let .setWordRemovalsEnabled(enabled):
         state.$hexSettings.withLock { $0.wordRemovalsEnabled = enabled }
+        return .none
+
+      // MARK: - LLM Post-Processing
+
+      case let .setLLMEnabled(enabled):
+        state.$hexSettings.withLock { $0.llmPostProcessingEnabled = enabled }
+        return .none
+
+      case let .setLLMPreset(preset):
+        state.$hexSettings.withLock { settings in
+          settings.llmProviderPreset = preset
+          if let p = LLMProviderPreset(rawValue: preset), p != .custom {
+            settings.llmProviderBaseURL = p.defaultConfig.baseURL
+            settings.llmModelName = p.defaultConfig.modelName
+          }
+        }
+        return .none
+
+      case let .setLLMBaseURL(url):
+        state.$hexSettings.withLock { $0.llmProviderBaseURL = url }
+        return .none
+
+      case let .setLLMModelName(name):
+        state.$hexSettings.withLock { $0.llmModelName = name }
+        return .none
+
+      case let .setLLMCustomRules(rules):
+        state.$hexSettings.withLock { $0.llmCustomRules = rules }
+        return .none
+
+      case let .setLLMApiKey(key):
+        state.llmApiKey = key
+        return .run { [keychain] _ in
+          if key.isEmpty {
+            try? await keychain.delete("llmApiKey")
+          } else {
+            try? await keychain.save("llmApiKey", key)
+          }
+        }
+
+      case .loadLLMApiKey:
+        return .run { [keychain] send in
+          let key = await keychain.load("llmApiKey")
+          await send(.llmApiKeyLoaded(key))
+        }
+
+      case let .llmApiKeyLoaded(key):
+        state.llmApiKey = key ?? ""
+        state.isLLMApiKeyLoaded = true
         return .none
 
       }
