@@ -21,7 +21,8 @@ extension LLMPostProcessingClient: DependencyKey {
 				let systemPrompt = PromptAssembler.systemPrompt(
 					language: context.inputLanguage,
 					sourceApp: context.sourceApp,
-					customRules: context.customRules
+					customRules: context.customRules,
+					appContextOverrides: context.appContextOverrides
 				)
 				let userMessage = PromptAssembler.userMessage(text: context.text)
 

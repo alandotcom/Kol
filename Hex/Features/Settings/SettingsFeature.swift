@@ -62,6 +62,7 @@ struct SettingsFeature {
     // LLM Post-Processing
     var llmApiKey: String = ""
     var isLLMApiKeyLoaded: Bool = false
+    var showingPromptCustomization: Bool = false
   }
 
   enum Action: BindableAction {
@@ -126,6 +127,11 @@ struct SettingsFeature {
     case setLLMApiKey(String)
     case loadLLMApiKey
     case llmApiKeyLoaded(String?)
+    case setLLMPromptCode(String?)
+    case setLLMPromptMessaging(String?)
+    case setLLMPromptDocument(String?)
+    case showPromptCustomization
+    case dismissPromptCustomization
   }
 
   @Dependency(\.keyEventMonitor) var keyEventMonitor
@@ -643,6 +649,26 @@ struct SettingsFeature {
       case let .llmApiKeyLoaded(key):
         state.llmApiKey = key ?? ""
         state.isLLMApiKeyLoaded = true
+        return .none
+
+      case let .setLLMPromptCode(prompt):
+        state.$hexSettings.withLock { $0.llmPromptCode = prompt }
+        return .none
+
+      case let .setLLMPromptMessaging(prompt):
+        state.$hexSettings.withLock { $0.llmPromptMessaging = prompt }
+        return .none
+
+      case let .setLLMPromptDocument(prompt):
+        state.$hexSettings.withLock { $0.llmPromptDocument = prompt }
+        return .none
+
+      case .showPromptCustomization:
+        state.showingPromptCustomization = true
+        return .none
+
+      case .dismissPromptCustomization:
+        state.showingPromptCustomization = false
         return .none
 
       }

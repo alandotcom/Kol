@@ -52,6 +52,9 @@ public struct HexSettings: Codable, Equatable, Sendable {
 	public var llmProviderBaseURL: String
 	public var llmModelName: String
 	public var llmCustomRules: String
+	public var llmPromptCode: String?
+	public var llmPromptMessaging: String?
+	public var llmPromptDocument: String?
 
 	private mutating func normalizeDoubleTapSettings() {
 		if !doubleTapLockEnabled {
@@ -88,7 +91,10 @@ public struct HexSettings: Codable, Equatable, Sendable {
 		llmProviderPreset: String = LLMProviderPreset.groq.rawValue,
 		llmProviderBaseURL: String = LLMProviderPreset.groq.defaultConfig.baseURL,
 		llmModelName: String = LLMProviderPreset.groq.defaultConfig.modelName,
-		llmCustomRules: String = ""
+		llmCustomRules: String = "",
+		llmPromptCode: String? = nil,
+		llmPromptMessaging: String? = nil,
+		llmPromptDocument: String? = nil
 	) {
 		self.soundEffectsEnabled = soundEffectsEnabled
 		self.soundEffectsVolume = soundEffectsVolume
@@ -119,6 +125,9 @@ public struct HexSettings: Codable, Equatable, Sendable {
 		self.llmProviderBaseURL = llmProviderBaseURL
 		self.llmModelName = llmModelName
 		self.llmCustomRules = llmCustomRules
+		self.llmPromptCode = llmPromptCode
+		self.llmPromptMessaging = llmPromptMessaging
+		self.llmPromptDocument = llmPromptDocument
 		normalizeDoubleTapSettings()
 	}
 
@@ -172,6 +181,9 @@ private enum HexSettingKey: String, CodingKey, CaseIterable {
 	case llmProviderBaseURL
 	case llmModelName
 	case llmCustomRules
+	case llmPromptCode
+	case llmPromptMessaging
+	case llmPromptDocument
 }
 
 private struct SettingsField<Value: Codable & Sendable> {
@@ -310,5 +322,29 @@ private enum HexSettingsSchema {
 		SettingsField(.llmProviderBaseURL, keyPath: \.llmProviderBaseURL, default: defaults.llmProviderBaseURL).eraseToAny(),
 		SettingsField(.llmModelName, keyPath: \.llmModelName, default: defaults.llmModelName).eraseToAny(),
 		SettingsField(.llmCustomRules, keyPath: \.llmCustomRules, default: defaults.llmCustomRules).eraseToAny(),
+		SettingsField(
+			.llmPromptCode,
+			keyPath: \.llmPromptCode,
+			default: defaults.llmPromptCode,
+			encode: { container, key, value in
+				try container.encodeIfPresent(value, forKey: key)
+			}
+		).eraseToAny(),
+		SettingsField(
+			.llmPromptMessaging,
+			keyPath: \.llmPromptMessaging,
+			default: defaults.llmPromptMessaging,
+			encode: { container, key, value in
+				try container.encodeIfPresent(value, forKey: key)
+			}
+		).eraseToAny(),
+		SettingsField(
+			.llmPromptDocument,
+			keyPath: \.llmPromptDocument,
+			default: defaults.llmPromptDocument,
+			encode: { container, key, value in
+				try container.encodeIfPresent(value, forKey: key)
+			}
+		).eraseToAny(),
 	]
 }

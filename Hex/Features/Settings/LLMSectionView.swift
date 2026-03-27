@@ -121,8 +121,22 @@ struct LLMSectionView: View {
 						alignment: .topLeading
 					)
 				}
+
+				// App context prompt customization
+				Button("Customize App Context Prompts...") {
+					store.send(.showPromptCustomization)
+				}
+				.font(.caption)
 			}
 			.padding(.leading, 24)
+			.sheet(
+				isPresented: Binding(
+					get: { store.showingPromptCustomization },
+					set: { if !$0 { store.send(.dismissPromptCustomization) } }
+				)
+			) {
+				PromptCustomizationView(store: store)
+			}
 		}
 	}
 }

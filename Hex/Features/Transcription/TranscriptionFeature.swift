@@ -489,6 +489,11 @@ private extension TranscriptionFeature {
       modelName: state.hexSettings.llmModelName
     )
     let llmCustomRules = state.hexSettings.llmCustomRules
+    let llmAppContextOverrides = AppContextOverrides(
+      code: state.hexSettings.llmPromptCode,
+      messaging: state.hexSettings.llmPromptMessaging,
+      document: state.hexSettings.llmPromptDocument
+    )
     let resolvedLanguage = state.resolvedLanguage
 
     return .run { [llmPostProcessing, keychain] send in
@@ -501,7 +506,8 @@ private extension TranscriptionFeature {
               text: finalText,
               inputLanguage: resolvedLanguage,
               sourceApp: sourceAppName ?? sourceAppBundleID,
-              customRules: llmCustomRules.isEmpty ? nil : llmCustomRules
+              customRules: llmCustomRules.isEmpty ? nil : llmCustomRules,
+              appContextOverrides: llmAppContextOverrides
             )
             let startTime = Date()
             do {

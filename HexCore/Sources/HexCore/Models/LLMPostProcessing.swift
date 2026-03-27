@@ -9,17 +9,20 @@ public struct PostProcessingContext: Sendable {
 	public let inputLanguage: String?
 	public let sourceApp: String?
 	public let customRules: String?
+	public let appContextOverrides: AppContextOverrides?
 
 	public init(
 		text: String,
 		inputLanguage: String? = nil,
 		sourceApp: String? = nil,
-		customRules: String? = nil
+		customRules: String? = nil,
+		appContextOverrides: AppContextOverrides? = nil
 	) {
 		self.text = text
 		self.inputLanguage = inputLanguage
 		self.sourceApp = sourceApp
 		self.customRules = customRules
+		self.appContextOverrides = appContextOverrides
 	}
 }
 
@@ -68,6 +71,40 @@ public enum LLMProviderPreset: String, CaseIterable, Codable, Sendable {
 	}
 }
 
+// MARK: - App Context
+
+/// Category of app for prompt context selection.
+public enum AppContextCategory: String, Sendable, Equatable {
+	case code
+	case messaging
+	case document
+}
+
+/// User overrides for the built-in app context prompt layers.
+/// When a field is nil, the hardcoded default is used.
+public struct AppContextOverrides: Sendable {
+	public let code: String?
+	public let messaging: String?
+	public let document: String?
+
+	public init(code: String? = nil, messaging: String? = nil, document: String? = nil) {
+		self.code = code
+		self.messaging = messaging
+		self.document = document
+	}
+
+	/// Returns the override for a given category, or nil if unset or empty.
+	public func text(for category: AppContextCategory) -> String? {
+		let value: String? = switch category {
+		case .code: code
+		case .messaging: messaging
+		case .document: document
+		}
+		guard let v = value, !v.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+		return v
+	}
+}
+
 // MARK: - Prompt Layers
 
 /// Independent prompt fragments, each covering one concern.
@@ -113,9 +150,9 @@ public enum PromptLayers {
 	Use proper formatting. Format enumerated items as bullet points.
 	"""
 
-	/// Maps an app name or bundle ID to the appropriate context layer.
-	/// Returns nil for unknown apps (core rules only).
-	public static func appContext(for appIdentifier: String?) -> String? {
+	/// Identifies which app context category an app belongs to.
+	/// Returns nil for unknown apps.
+	public static func appContextCategory(for appIdentifier: String?) -> AppContextCategory? {
 		guard let app = appIdentifier?.lowercased() else { return nil }
 
 		let codeApps = [
@@ -138,16 +175,19 @@ public enum PromptLayers {
 			"com.microsoft.word", "com.apple.iwork.pages",
 		]
 
-		if codeApps.contains(where: { app.contains($0) }) {
-			return appContextCode
-		}
-		if messagingApps.contains(where: { app.contains($0) }) {
-			return appContextMessaging
-		}
-		if documentApps.contains(where: { app.contains($0) }) {
-			return appContextDocument
-		}
+		if codeApps.contains(where: { app.contains($0) }) { return .code }
+		if messagingApps.contains(where: { app.contains($0) }) { return .messaging }
+		if documentApps.contains(where: { app.contains($0) }) { return .document }
 		return nil
+	}
+
+	/// Returns the default prompt text for a given category.
+	public static func defaultText(for category: AppContextCategory) -> String {
+		switch category {
+		case .code: return appContextCode
+		case .messaging: return appContextMessaging
+		case .document: return appContextDocument
+		}
 	}
 }
 
@@ -157,10 +197,16 @@ public enum PromptLayers {
 /// Callers provide context; the assembler decides which layers to include.
 public enum PromptAssembler {
 	/// Build the system prompt by composing applicable layers.
+	/// - Parameters:
+	///   - language: Detected language code (e.g. "he", "en")
+	///   - sourceApp: App name or bundle ID of the frontmost app
+	///   - customRules: User-provided context/facts
+	///   - appContextOverrides: Optional per-category prompt text overrides
 	public static func systemPrompt(
 		language: String?,
 		sourceApp: String?,
-		customRules: String?
+		customRules: String?,
+		appContextOverrides: AppContextOverrides? = nil
 	) -> String {
 		var parts: [String] = [PromptLayers.core]
 
@@ -175,8 +221,9 @@ public enum PromptAssembler {
 			parts.append(PromptLayers.english)
 		}
 
-		if let appLayer = PromptLayers.appContext(for: sourceApp) {
-			parts.append(appLayer)
+		if let category = PromptLayers.appContextCategory(for: sourceApp) {
+			let text = appContextOverrides?.text(for: category) ?? PromptLayers.defaultText(for: category)
+			parts.append(text)
 		}
 
 		if let rules = customRules, !rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
