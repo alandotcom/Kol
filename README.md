@@ -1,6 +1,6 @@
 # Hex — Voice → Text (with Hebrew/Caspi support)
 
-This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added support for **Hebrew speech recognition** via [Caspi-1.7B](https://huggingface.co/OzLabs/Caspi-1.7B), a Hebrew-optimized fine-tune of Qwen3-ASR running on CoreML.
+This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added support for **Hebrew speech recognition** via [Caspi-1.7B CoreML](https://huggingface.co/alandotcom/caspi-1.7b-coreml), a Hebrew-optimized fine-tune of Qwen3-ASR running on Apple Silicon.
 
 <img width="812" alt="Hex with Caspi Hebrew model" src="https://github.com/user-attachments/assets/38f7acf0-fcb9-4bed-9a5b-1abc9beb4417" />
 
