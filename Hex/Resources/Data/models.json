@@ -16,6 +16,14 @@
     "storageSize": "650MB"
   },
   {
+    "displayName": "Caspi 1.7B (Hebrew)",
+    "internalName": "caspi-1.7b-coreml",
+    "size": "Hebrew",
+    "accuracyStars": 5,
+    "speedStars": 3,
+    "storageSize": "2.8GB"
+  },
+  {
     "displayName": "Whisper Small (Tiny)",
     "internalName": "openai_whisper-tiny",
     "size": "Multilingual",

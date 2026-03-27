@@ -24,8 +24,10 @@ struct SettingsView: View {
 			}
 
 			ModelSectionView(store: store, shouldFlash: store.shouldFlashModelSection)
-			// Only show language picker for WhisperKit models (not Parakeet)
-			if ParakeetModel(rawValue: store.hexSettings.selectedModel) == nil {
+			// Show language picker for WhisperKit and Qwen3 models (not Parakeet)
+			if ParakeetModel(rawValue: store.hexSettings.selectedModel) == nil
+				|| QwenModel(rawValue: store.hexSettings.selectedModel) != nil
+			{
 				LanguageSectionView(store: store)
 			}
 

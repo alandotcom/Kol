@@ -13,10 +13,10 @@
     {
       "identity" : "fluidaudio",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/FluidInference/FluidAudio",
+      "location" : "https://github.com/alandotcom/FluidAudio",
       "state" : {
-        "branch" : "main",
-        "revision" : "47552dde26f79b880efff2f23ad4dab55aa914ca"
+        "branch" : "caspi-1.7b",
+        "revision" : "f70b2cc5e931a15970351b5e7dcad2197741849d"
       }
     },
     {

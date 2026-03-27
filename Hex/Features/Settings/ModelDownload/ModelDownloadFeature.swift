@@ -43,16 +43,28 @@ public struct CuratedModelInfo: Equatable, Identifiable, Codable {
 		case .multilingualV3:
 			return "BEST FOR MULTILINGUAL"
 		case nil:
-			return nil
+			break
 		}
+		if qwenModel != nil {
+			return "BEST FOR HEBREW"
+		}
+		return nil
 	}
 
 	var parakeetModel: ParakeetModel? {
 		ParakeetModel(rawValue: internalName)
 	}
 
+	var qwenModel: QwenModel? {
+		QwenModel(rawValue: internalName)
+	}
+
 	var isParakeet: Bool {
 		parakeetModel != nil
+	}
+
+	var isQwen: Bool {
+		qwenModel != nil
 	}
 
 	public init(
@@ -240,7 +252,7 @@ public struct ModelDownloadFeature {
 					let recommendedSupport = try await recommendedSupportTask
 					let names = try await availableNamesTask
 					let recommended = recommendedSupport.default
-					let infos = try await withThrowingTaskGroup(of: ModelInfo.self) { group -> [ModelInfo] in
+					var infos = try await withThrowingTaskGroup(of: ModelInfo.self) { group -> [ModelInfo] in
 						for name in names {
 							group.addTask {
 								ModelInfo(
@@ -251,6 +263,11 @@ public struct ModelDownloadFeature {
 						}
 						return try await group.reduce(into: []) { $0.append($1) }
 					}
+					// Check Qwen model availability
+					for model in QwenModel.allCases {
+						let downloaded = await transcription.isModelDownloaded(model.identifier)
+						infos.append(ModelInfo(name: model.identifier, isDownloaded: downloaded))
+					}
 					await send(.modelsLoaded(recommended: recommended, available: infos))
 				} catch {
 					await send(.modelsLoaded(recommended: "", available: []))
@@ -259,9 +276,14 @@ public struct ModelDownloadFeature {
 
 		case let .modelsLoaded(recommended, available):
 			state.isLoadingModels = false
-			// Ensure our curated Parakeet options are visible even if WhisperKit doesn't list them
+			// Ensure our curated Parakeet and Qwen options are visible even if WhisperKit doesn't list them
 			var availablePlus = available
 			for model in ParakeetModel.allCases.reversed() {
+				if !availablePlus.contains(where: { $0.name == model.identifier }) {
+					availablePlus.insert(ModelInfo(name: model.identifier, isDownloaded: false), at: 0)
+				}
+			}
+			for model in QwenModel.allCases.reversed() {
 				if !availablePlus.contains(where: { $0.name == model.identifier }) {
 					availablePlus.insert(ModelInfo(name: model.identifier, isDownloaded: false), at: 0)
 				}
