@@ -609,6 +609,8 @@ struct SettingsFeature {
         return .none
 
       case let .setLLMPreset(preset):
+        let oldPreset = state.hexSettings.llmProviderPreset
+        let currentKey = state.llmApiKey
         state.$hexSettings.withLock { settings in
           settings.llmProviderPreset = preset
           if let p = LLMProviderPreset(rawValue: preset), p != .custom {
@@ -616,7 +618,14 @@ struct SettingsFeature {
             settings.llmModelName = p.defaultConfig.modelName
           }
         }
-        return .none
+        // Save current key under old provider, load key for new provider
+        return .run { [keychain] send in
+          if !currentKey.isEmpty {
+            try? await keychain.save("llmApiKey_\(oldPreset)", currentKey)
+          }
+          let newKey = await keychain.load("llmApiKey_\(preset)")
+          await send(.llmApiKeyLoaded(newKey))
+        }
 
       case let .setLLMBaseURL(url):
         state.$hexSettings.withLock { $0.llmProviderBaseURL = url }
@@ -631,18 +640,22 @@ struct SettingsFeature {
         return .none
 
       case let .setLLMApiKey(key):
+        let preset = state.hexSettings.llmProviderPreset
         state.llmApiKey = key
         return .run { [keychain] _ in
           if key.isEmpty {
-            try? await keychain.delete("llmApiKey")
+            try? await keychain.delete("llmApiKey_\(preset)")
           } else {
-            try? await keychain.save("llmApiKey", key)
+            try? await keychain.save("llmApiKey_\(preset)", key)
           }
         }
 
       case .loadLLMApiKey:
+        let preset = state.hexSettings.llmProviderPreset
         return .run { [keychain] send in
-          let key = await keychain.load("llmApiKey")
+          // Try provider-specific key first, fall back to legacy key
+          let key = await keychain.load("llmApiKey_\(preset)")
+            ?? await keychain.load("llmApiKey")
           await send(.llmApiKeyLoaded(key))
         }
 

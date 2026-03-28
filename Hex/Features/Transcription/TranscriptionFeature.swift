@@ -489,6 +489,7 @@ private extension TranscriptionFeature {
       modelName: state.hexSettings.llmModelName
     )
     let llmCustomRules = state.hexSettings.llmCustomRules
+    let llmPreset = state.hexSettings.llmProviderPreset
     let llmAppContextOverrides = AppContextOverrides(
       code: state.hexSettings.llmPromptCode,
       messaging: state.hexSettings.llmPromptMessaging,
@@ -501,7 +502,9 @@ private extension TranscriptionFeature {
         var finalText = modifiedResult
 
         if llmEnabled {
-          if let apiKey = await keychain.load("llmApiKey"), !apiKey.isEmpty {
+          let apiKey = await keychain.load("llmApiKey_\(llmPreset)")
+            ?? await keychain.load("llmApiKey")
+          if let apiKey, !apiKey.isEmpty {
             let context = PostProcessingContext(
               text: finalText,
               inputLanguage: resolvedLanguage,

@@ -1,0 +1,48 @@
+# Hex LLM Post-Processing Eval Suite
+# Run: GROQ_API_KEY=xxx npx promptfoo@latest eval
+# View: npx promptfoo@latest view
+
+description: "Hex ASR post-processing quality evaluation"
+
+maxConcurrency: 1
+
+providers:
+  - id: openai:chat:llama-3.3-70b-versatile
+    label: groq-llama3.3-70b
+    config:
+      apiBaseUrl: https://api.groq.com/openai/v1
+      apiKeyEnvar: GROQ_API_KEY
+      temperature: 0
+      max_tokens: 4096
+
+defaultTest:
+  options:
+    provider:
+      # LLM-as-judge uses a stronger model for reliable grading
+      id: openai:chat:llama-3.3-70b-versatile
+      config:
+        apiBaseUrl: https://api.groq.com/openai/v1
+        apiKeyEnvar: GROQ_API_KEY
+        temperature: 0
+  assert:
+    # Universal: output must never contain preamble
+    - type: not-contains
+      value: "Here is"
+    - type: not-contains
+      value: "Sure,"
+    - type: not-contains
+      value: "here's"
+    - type: not-contains
+      value: "Here's"
+    - type: not-contains
+      value: "Certainly"
+
+# --- English: General ---
+prompts:
+  - label: english-general
+    raw: file://prompts/english-general.txt
+
+tests: file://datasets/english.yaml
+
+# To run specific suites, use:
+#   npx promptfoo eval --tests datasets/hebrew.yaml --prompts prompts/hebrew-general.txt

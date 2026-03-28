@@ -6,7 +6,7 @@ struct PromptAssemblerTests {
 	@Test("Core rules always present")
 	func coreAlwaysPresent() {
 		let prompt = PromptAssembler.systemPrompt(language: nil, sourceApp: nil, customRules: nil)
-		#expect(prompt.contains("text post-processor"))
+		#expect(prompt.contains("dictation post-processor"))
 		#expect(prompt.contains("Fix punctuation"))
 		#expect(prompt.contains("filler words"))
 	}
@@ -113,7 +113,7 @@ struct PromptAssemblerTests {
 	@Test("User message is just the text")
 	func userMessage() {
 		let msg = PromptAssembler.userMessage(text: "hello world")
-		#expect(msg == "hello world")
+		#expect(msg == "RAW_TRANSCRIPTION: \"hello world\"")
 	}
 
 	@Test("Full composition: Hebrew + code + custom")

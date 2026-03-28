@@ -66,7 +66,14 @@ extension LLMPostProcessingClient: DependencyKey {
 					throw LLMError.invalidResponse
 				}
 
-				let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+				var trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+				// Strip outer quotes if the LLM wrapped the response
+				if trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"") && trimmed.count > 1 {
+					trimmed = String(trimmed.dropFirst().dropLast())
+						.trimmingCharacters(in: .whitespacesAndNewlines)
+				}
+				// Treat EMPTY sentinel as empty string
+				if trimmed == "EMPTY" { trimmed = "" }
 				logger.info("LLM post-processing took \(String(format: "%.0f", elapsed * 1000))ms (\(config.modelName))")
 
 				return trimmed.isEmpty ? context.text : trimmed

@@ -1,0 +1,454 @@
+# English ASR Post-Processing Test Cases
+# Run: npx promptfoo eval
+
+# =============================================================================
+# General Cleanup
+# =============================================================================
+
+- description: "Basic filler removal"
+  vars:
+    input: "um so I was thinking uh we should probably like go to the store"
+  assert:
+    - type: not-contains
+      value: " um "
+    - type: not-contains
+      value: " uh "
+    - type: contains
+      value: "store"
+    - type: javascript
+      value: "output.length > 0"
+
+- description: "Punctuation and sentence structure"
+  vars:
+    input: "hey how are you doing today I wanted to ask you something"
+  assert:
+    - type: contains
+      value: "?"
+    - type: contains
+      value: "ask"
+    - type: javascript
+      value: "output.length > 10"
+
+- description: "Run-on sentence with punctuation"
+  vars:
+    input: "so the meeting is at three and then we have lunch and then the presentation starts"
+  assert:
+    - type: contains
+      value: "meeting"
+    - type: contains
+      value: "lunch"
+    - type: contains
+      value: "presentation"
+    - type: javascript
+      value: "output.includes(',') || output.includes('.')"
+
+- description: "Numbers preserved"
+  vars:
+    input: "I need to buy like 3 or maybe 4 apples and um 2 bananas"
+  assert:
+    - type: not-contains
+      value: " like "
+    - type: not-contains
+      value: " um "
+    - type: contains-any
+      value:
+        - "3"
+        - "three"
+    - type: contains-any
+      value:
+        - "2"
+        - "two"
+    - type: contains
+      value: "apples"
+    - type: contains
+      value: "bananas"
+    - type: javascript
+      value: "output.length > 0"
+
+- description: "Question with fillers"
+  vars:
+    input: "do you think we should um go with option A or option B"
+  assert:
+    - type: not-contains
+      value: " um "
+    - type: contains
+      value: "?"
+    - type: javascript
+      value: "output.includes('option A') || output.includes('Option A')"
+    - type: javascript
+      value: "output.includes('option B') || output.includes('Option B')"
+
+- description: "Short utterance - yes"
+  vars:
+    input: "yes"
+  assert:
+    - type: javascript
+      value: "output.trim().toLowerCase() === 'yes' || output.trim().toLowerCase() === 'yes.'"
+
+- description: "Short utterance - acknowledgment"
+  vars:
+    input: "okay sounds good"
+  assert:
+    - type: javascript
+      value: "output.toLowerCase().includes('sounds good') || output.toLowerCase().includes('okay')"
+    - type: javascript
+      value: "output.split(/\\s+/).length <= 6"
+
+- description: "Filler-heavy input (has real content)"
+  vars:
+    input: "so um like uh you know I was um thinking about it"
+  assert:
+    - type: not-icontains
+      value: "EMPTY"
+    - type: not-contains
+      value: " um "
+    - type: not-contains
+      value: " uh "
+    - type: contains
+      value: "thinking"
+
+- description: "ASR stutter / repeated words"
+  vars:
+    input: "I I want to to go to the the park"
+  assert:
+    - type: not-contains
+      value: "I I"
+    - type: not-contains
+      value: "to to"
+    - type: not-contains
+      value: "the the"
+    - type: contains
+      value: "park"
+    - type: javascript
+      value: "output.length > 0"
+
+- description: "Proper noun capitalization"
+  vars:
+    input: "I talked to john and sarah about the new york trip"
+  assert:
+    - type: contains
+      value: "John"
+    - type: contains
+      value: "Sarah"
+    - type: contains
+      value: "New York"
+    - type: javascript
+      value: "output.length > 0"
+
+- description: "Dates and times"
+  vars:
+    input: "the meeting is on january 15th at 2 30 pm"
+  assert:
+    - type: contains
+      value: "January"
+    - type: contains
+      value: "15"
+    - type: javascript
+      value: "output.includes('2:30') || output.includes('2:30 PM') || output.includes('2:30 pm') || output.includes('2:30PM')"
+    - type: javascript
+      value: "output.length > 0"
+
+# =============================================================================
+# Tech / Code Context
+# =============================================================================
+
+- description: "ASR error correction - Claude Code"
+  vars:
+    input: "we should use clawed code for the refactoring"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: contains
+      value: "Claude Code"
+    - type: not-contains
+      value: "clawed"
+
+- description: "Tech term capitalization"
+  vars:
+    input: "I'm using next js with typescript and react"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: contains
+      value: "TypeScript"
+    - type: contains
+      value: "React"
+    - type: javascript
+      value: "output.includes('Next.js') || output.includes('NextJS') || output.includes('Next JS') || output.includes('Next.JS')"
+
+- description: "camelCase function name"
+  vars:
+    input: "the function name is get user profile and it returns a user object"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: javascript
+      value: "output.includes('getUserProfile') || output.includes('get user profile') || output.includes('get_user_profile')"
+    - type: contains
+      value: "user object"
+    - type: javascript
+      value: "output.length > 0"
+
+- description: "CLI commands"
+  vars:
+    input: "run npm install and then npm run dev"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: contains
+      value: "npm install"
+    - type: contains
+      value: "npm run dev"
+
+- description: "Variable names"
+  vars:
+    input: "set the value of max retries to 5"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: javascript
+      value: "output.includes('max retries') || output.includes('maxRetries') || output.includes('MAX_RETRIES') || output.includes('max_retries')"
+    - type: contains
+      value: "5"
+    - type: javascript
+      value: "output.length > 0"
+
+- description: "Code dictation"
+  vars:
+    input: "function hello world open paren close paren"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: not-contains
+      value: "open paren"
+    - type: not-contains
+      value: "close paren"
+    - type: javascript
+      value: "output.includes('helloWorld()') || output.includes('helloWorld ()') || output.includes('hello_world()') || (output.includes('function') && output.includes('()'))"
+
+- description: "File paths"
+  vars:
+    input: "look at the file at source slash components slash header dot tsx"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: not-contains
+      value: " slash "
+    - type: not-icontains
+      value: "dot tsx"
+    - type: javascript
+      value: "output.includes('/') && output.includes('.tsx')"
+
+- description: "Git commands"
+  vars:
+    input: "lets cherry pick commit a b c 1 2 3"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: javascript
+      value: "output.includes('cherry-pick') || output.includes('cherry pick')"
+    - type: javascript
+      value: "output.includes('commit')"
+
+- description: "API endpoints"
+  vars:
+    input: "the endpoint is slash api slash v2 slash users"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: contains
+      value: "/api/v2/users"
+    - type: not-contains
+      value: " slash "
+
+- description: "Error message"
+  vars:
+    input: "the error says cannot read property of undefined"
+  options:
+    prompt:
+      raw: file://prompts/english-code.txt
+  assert:
+    - type: contains
+      value: "undefined"
+    - type: icontains
+      value: "cannot read property"
+
+# =============================================================================
+# Messaging Context
+# =============================================================================
+
+- description: "Casual messaging - running late"
+  vars:
+    input: "hey yeah im gonna be like 10 minutes late sorry about that"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging.txt
+  assert:
+    - type: contains
+      value: "10"
+    - type: contains
+      value: "late"
+    - type: not-contains
+      value: "approximately"
+    - type: llm-rubric
+      value: "The output must use a casual tone — contractions, informal language. It must NOT use formal phrasing like 'I will be' or 'approximately'."
+
+- description: "Casual reaction"
+  vars:
+    input: "that's so funny haha yeah I agree"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging.txt
+  assert:
+    - type: javascript
+      value: "output.includes('haha') || output.includes('Haha') || output.includes('lol') || output.includes('Lol')"
+    - type: contains-any
+      value:
+        - "agree"
+        - "funny"
+    - type: not-contains
+      value: "I concur"
+
+- description: "Short messaging"
+  vars:
+    input: "ok cool"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging.txt
+  assert:
+    - type: javascript
+      value: "output.toLowerCase().includes('cool') || output.toLowerCase().includes('ok')"
+    - type: javascript
+      value: "output.split(/\\s+/).length <= 5"
+
+- description: "Informal question"
+  vars:
+    input: "hey did you see that thing I sent you earlier"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging.txt
+  assert:
+    - type: contains
+      value: "?"
+    - type: contains
+      value: "sent"
+    - type: contains
+      value: "earlier"
+    - type: not-contains
+      value: "Dear"
+
+- description: "Group chat"
+  vars:
+    input: "who's coming to dinner tonight is it just us or is mike coming too"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging.txt
+  assert:
+    - type: contains
+      value: "?"
+    - type: contains-any
+      value:
+        - "dinner"
+        - "eat"
+    - type: contains-any
+      value:
+        - "Mike"
+        - "mike"
+
+# =============================================================================
+# Document Context
+# =============================================================================
+
+- description: "Enumerated list"
+  vars:
+    input: "there are three things we need to do first update the docs second fix the tests and third deploy"
+  options:
+    prompt:
+      raw: file://prompts/english-document.txt
+  assert:
+    - type: contains
+      value: "docs"
+    - type: contains
+      value: "tests"
+    - type: contains
+      value: "deploy"
+    - type: llm-rubric
+      value: "The output must use some list structure — numbered list, bullet points, or line-break-separated items."
+
+- description: "Formal statement"
+  vars:
+    input: "I would like to inform you that the project is on track and we expect delivery by friday"
+  options:
+    prompt:
+      raw: file://prompts/english-document.txt
+  assert:
+    - type: contains
+      value: "Friday"
+    - type: contains-any
+      value:
+        - "on track"
+        - "progressing"
+    - type: contains
+      value: "delivery"
+    - type: javascript
+      value: "output.length > 0"
+
+- description: "Email sign-off"
+  vars:
+    input: "thanks for your help let me know if you need anything cheers"
+  options:
+    prompt:
+      raw: file://prompts/english-document.txt
+  assert:
+    - type: contains-any
+      value:
+        - "thanks"
+        - "Thanks"
+        - "Thank"
+    - type: contains-any
+      value:
+        - "cheers"
+        - "Cheers"
+    - type: javascript
+      value: "output.length > 0"
+
+- description: "Multi-topic paragraph"
+  vars:
+    input: "regarding your question about the budget we've allocated 50000 for q1 moving on to staffing we plan to hire two engineers"
+  options:
+    prompt:
+      raw: file://prompts/english-document.txt
+  assert:
+    - type: javascript
+      value: "output.includes('50,000') || output.includes('50000') || output.includes('fifty thousand')"
+    - type: javascript
+      value: "output.includes('Q1') || output.includes('q1') || output.includes('first quarter')"
+    - type: contains
+      value: "engineers"
+    - type: javascript
+      value: "output.includes('.') || output.includes(';')"
+
+- description: "Action items"
+  vars:
+    input: "action items for today one review the PR two update the roadmap three schedule the retro"
+  options:
+    prompt:
+      raw: file://prompts/english-document.txt
+  assert:
+    - type: contains
+      value: "PR"
+    - type: contains
+      value: "roadmap"
+    - type: contains
+      value: "retro"
+    - type: llm-rubric
+      value: "The output must use some list structure — numbered list, bullet points, or line-break-separated items."
