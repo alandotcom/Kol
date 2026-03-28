@@ -129,6 +129,7 @@ struct SettingsFeature {
     case setLLMApiKey(String)
     case loadLLMApiKey
     case llmApiKeyLoaded(String?)
+    case setLLMScreenContextEnabled(Bool)
     case setLLMPromptCode(String?)
     case setLLMPromptMessaging(String?)
     case setLLMPromptDocument(String?)
@@ -675,6 +676,10 @@ struct SettingsFeature {
       case let .llmApiKeyLoaded(key):
         state.llmApiKey = key ?? ""
         state.isLLMApiKeyLoaded = true
+        return .none
+
+      case let .setLLMScreenContextEnabled(enabled):
+        state.$hexSettings.withLock { $0.llmScreenContextEnabled = enabled }
         return .none
 
       case let .setLLMPromptCode(prompt):

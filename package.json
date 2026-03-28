@@ -14,6 +14,8 @@
     "changeset:version": "changeset version",
     "sync-changelog": "bun run tools/scripts/sync-changelog.ts",
     "eval": "cd evals && npx promptfoo@latest eval",
+    "eval:code": "cd evals && npx promptfoo@latest eval --prompts prompts/english-code.txt --tests datasets/code-dictation.yaml --filter-pattern 'Keyword|Operator|Full type|Variable|Interface|Switch|No capitalize|TS:|Python:|PascalCase|camelCase|Keywords stay'",
+    "eval:screen": "cd evals && npx promptfoo@latest eval --prompts prompts/english-code-screen.txt --tests datasets/code-dictation.yaml --filter-pattern 'Screen context'",
     "eval:view": "cd evals && npx promptfoo@latest view"
   },
   "devDependencies": {

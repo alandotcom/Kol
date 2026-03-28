@@ -22,9 +22,14 @@ extension LLMPostProcessingClient: DependencyKey {
 					language: context.inputLanguage,
 					sourceApp: context.sourceApp,
 					customRules: context.customRules,
-					appContextOverrides: context.appContextOverrides
+					appContextOverrides: context.appContextOverrides,
+					screenContext: context.screenContext
 				)
 				let userMessage = PromptAssembler.userMessage(text: context.text)
+
+				logger.notice("LLM sourceApp: \(context.sourceApp ?? "nil", privacy: .public)")
+				logger.notice("LLM screenContext length: \(context.screenContext?.count ?? 0)")
+				logger.notice("LLM system prompt preview: \(String(systemPrompt.suffix(200)), privacy: .public)")
 
 				let url = URL(string: "\(config.baseURL)/chat/completions")!
 				var request = URLRequest(url: url)

@@ -54,6 +54,15 @@ struct PromptAssemblerTests {
 		#expect(!prompt.contains("messaging"))
 	}
 
+	@Test("Code context includes keyword preservation and operator conversion")
+	func codeContextContent() {
+		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: "Terminal", customRules: nil)
+		#expect(prompt.contains("Programming keywords must stay as-is"))
+		#expect(prompt.contains("Convert spoken operators to symbols"))
+		#expect(prompt.contains("\"equals\" → ="))
+		#expect(prompt.contains("match spoken words to identifiers visible on screen"))
+	}
+
 	@Test("VS Code maps to code context")
 	func vscodeCodeContext() {
 		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: "com.microsoft.VSCode", customRules: nil)
@@ -194,6 +203,49 @@ struct PromptAssemblerTests {
 			appContextOverrides: overrides
 		)
 		#expect(msgPrompt.contains("messaging app"))
+	}
+
+	@Test("Screen context included when provided")
+	func screenContextIncluded() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil, customRules: nil,
+			screenContext: "func resolveModelAndLanguage() {"
+		)
+		#expect(prompt.contains("currently visible on the user's screen"))
+		#expect(prompt.contains("resolveModelAndLanguage"))
+	}
+
+	@Test("Screen context excluded when nil")
+	func screenContextExcludedNil() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil, customRules: nil,
+			screenContext: nil
+		)
+		#expect(!prompt.contains("currently visible"))
+	}
+
+	@Test("Empty/whitespace screen context excluded")
+	func screenContextExcludedEmpty() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil, customRules: nil,
+			screenContext: "  \n  "
+		)
+		#expect(!prompt.contains("currently visible"))
+	}
+
+	@Test("Screen context appears between app context and custom rules")
+	func screenContextOrdering() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en",
+			sourceApp: "Terminal",
+			customRules: "My name is Alan",
+			screenContext: "let x = 42"
+		)
+		let appContextRange = prompt.range(of: "code editor or terminal")!
+		let screenRange = prompt.range(of: "currently visible on the user's screen")!
+		let rulesRange = prompt.range(of: "Facts about the speaker")!
+		#expect(appContextRange.lowerBound < screenRange.lowerBound)
+		#expect(screenRange.lowerBound < rulesRange.lowerBound)
 	}
 
 	@Test("Override does not affect language layers or custom rules")

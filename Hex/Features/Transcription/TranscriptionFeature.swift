@@ -29,6 +29,7 @@ struct TranscriptionFeature {
     var sourceAppBundleID: String?
     var sourceAppName: String?
     var resolvedLanguage: String?
+    var capturedScreenContext: String?
     @Shared(.hexSettings) var hexSettings: HexSettings
     @Shared(.isRemappingScratchpadFocused) var isRemappingScratchpadFocused: Bool = false
     @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
@@ -75,6 +76,7 @@ struct TranscriptionFeature {
   @Dependency(\.transcriptPersistence) var transcriptPersistence
   @Dependency(\.llmPostProcessing) var llmPostProcessing
   @Dependency(\.keychain) var keychain
+  @Dependency(\.screenContext) var screenContext
 
   var body: some ReducerOf<Self> {
     Reduce { state, action in
@@ -298,6 +300,13 @@ private extension TranscriptionFeature {
       state.sourceAppBundleID = activeApp.bundleIdentifier
       state.sourceAppName = activeApp.localizedName
     }
+
+    // Capture screen context for LLM post-processing (synchronous AX call)
+    if state.hexSettings.llmPostProcessingEnabled && state.hexSettings.llmScreenContextEnabled {
+      state.capturedScreenContext = screenContext.captureVisibleText()
+    } else {
+      state.capturedScreenContext = nil
+    }
     transcriptionFeatureLogger.notice("Recording started at \(startTime.ISO8601Format())")
 
     // Prevent system sleep during recording
@@ -496,6 +505,7 @@ private extension TranscriptionFeature {
       document: state.hexSettings.llmPromptDocument
     )
     let resolvedLanguage = state.resolvedLanguage
+    let capturedScreenContext = state.capturedScreenContext
 
     return .run { [llmPostProcessing, keychain] send in
       do {
@@ -512,7 +522,8 @@ private extension TranscriptionFeature {
               inputLanguage: resolvedLanguage,
               sourceApp: sourceAppName ?? sourceAppBundleID,
               customRules: llmCustomRules.isEmpty ? nil : llmCustomRules,
-              appContextOverrides: llmAppContextOverrides
+              appContextOverrides: llmAppContextOverrides,
+              screenContext: capturedScreenContext
             )
             let startTime = Date()
             do {
@@ -606,6 +617,7 @@ private extension TranscriptionFeature {
     state.isTranscribing = false
     state.isRecording = false
     state.isPrewarming = false
+    state.capturedScreenContext = nil
 
     return .merge(
       .cancel(id: CancelID.transcription),
@@ -625,6 +637,7 @@ private extension TranscriptionFeature {
   func handleDiscard(_ state: inout State) -> Effect<Action> {
     state.isRecording = false
     state.isPrewarming = false
+    state.capturedScreenContext = nil
 
     // Silently discard - no sound effect
     return .run { [sleepManagement] _ in

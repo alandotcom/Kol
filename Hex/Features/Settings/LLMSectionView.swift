@@ -122,6 +122,18 @@ struct LLMSectionView: View {
 					)
 				}
 
+				// Screen context
+				Toggle(
+					"Include visible text as context",
+					isOn: Binding(
+						get: { store.hexSettings.llmScreenContextEnabled },
+						set: { store.send(.setLLMScreenContextEnabled($0)) }
+					)
+				)
+				Text("Captures text near the cursor to help recognize technical terms on screen.")
+					.font(.caption)
+					.foregroundColor(.secondary)
+
 				// App context prompt customization
 				Button("Customize App Context Prompts...") {
 					store.send(.showPromptCustomization)

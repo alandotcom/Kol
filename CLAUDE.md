@@ -26,26 +26,32 @@ Hex is a macOS menu bar application for on‑device voice‑to‑text. This is a
 - **Composable prompt architecture** — NOT a monolithic system prompt:
   - `PromptLayers.core` — always present (punctuation, filler removal)
   - `PromptLayers.hebrew` / `.english` — language-specific, selected based on detected language
-  - `PromptLayers.appContext(for:)` — adapts to target app (code editor, messaging, docs)
+  - `PromptLayers.appContextCode` / `.appContextMessaging` / `.appContextDocument` — adapts to target app
+  - `PromptLayers.screenContext(visibleText:)` — opt-in, captures text near cursor via Accessibility API
   - Custom rules — user-provided facts (name, company, common terms)
-  - `PromptAssembler.systemPrompt()` composes applicable layers
-- **Key files**: `LLMPostProcessing.swift` (HexCore), `LLMPostProcessingClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
+  - `PromptAssembler.systemPrompt()` composes applicable layers in order: core → language → app context → screen context → custom rules
+- **Key files**: `LLMPostProcessing.swift` (HexCore), `LLMPostProcessingClient.swift`, `ScreenContextClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
 - **Insertion point**: `TranscriptionFeature.handleTranscriptionResult()`, after word removals/remappings, before `finalizeRecordingAndStoreTranscript()`
+- **Screen context capture**: `ScreenContextClient` uses AX APIs at recording start (synchronous). State stored in `TranscriptionFeature.State.capturedScreenContext`, cleared on cancel/discard.
 - **Graceful fallback**: on any LLM error, original text is pasted
 - **API key**: stored in macOS Keychain via `KeychainClient`, NOT in settings JSON
-- **Tests**: `PromptAssemblerTests.swift` (17 tests for prompt composition)
+- **Tests**: `PromptAssemblerTests.swift` for prompt composition
+- **Evals**: promptfoo-based eval suite — see Eval Workflow section below
+
+### Prompt change workflow
+
+When modifying any prompt in `LLMPostProcessing.swift`:
+
+1. **Update the eval prompt files** — `evals/prompts/*.txt` are static copies of the assembled system prompts. They must be kept in sync manually. If you change `appContextCode`, update `evals/prompts/english-code.txt` and `evals/prompts/english-code-screen.txt`.
+2. **Run evals before building** — see Eval Workflow below.
+3. **Run unit tests** — `cd HexCore && swift test`
+4. **Then build** — `killall Hex 2>/dev/null; ./scripts/build-install.sh`
 
 ## Build & Development Commands
 
 ```bash
-# Build + sign + install (recommended for dev)
-./scripts/build-install.sh
-
-# Or manually:
-xcodebuild build -scheme Hex -configuration Release -skipMacroValidation CODE_SIGNING_ALLOWED=NO
-codesign --deep --force --sign "Apple Development: alan.mit@gmail.com (97Y8HW2AB7)" \
-  ~/Library/Developer/Xcode/DerivedData/Hex-*/Build/Products/Release/Hex.app
-rsync -a --delete ~/Library/Developer/Xcode/DerivedData/Hex-*/Build/Products/Release/Hex.app/ /Applications/Hex.app/
+# Build + sign + install (the only command you need)
+killall Hex 2>/dev/null; ./scripts/build-install.sh
 
 # Run tests (must be run from HexCore directory for unit tests)
 cd HexCore && swift test
@@ -53,6 +59,23 @@ cd HexCore && swift test
 # Open in Xcode (recommended for development)
 open Hex.xcodeproj
 ```
+
+### Build rules for agents
+
+- **Always use `./scripts/build-install.sh`** — it handles xcodebuild, codesign, and rsync. Do NOT run `xcodebuild` manually.
+- **Always `killall Hex` before installing** — the old process must be killed so the new binary is loaded. Without this, the user will test stale code.
+- **After installing, run `open /Applications/Hex.app`** to relaunch.
+- **Delete DerivedData when HexCore files change** — Xcode's incremental build does NOT reliably detect changes in the local `HexCore` Swift package. If you edited any file under `HexCore/Sources/`, you MUST delete DerivedData before building:
+  ```bash
+  killall Hex 2>/dev/null; rm -rf ~/Library/Developer/Xcode/DerivedData/Hex-* && ./scripts/build-install.sh
+  ```
+  If you only edited files under `Hex/` (the app target), a normal incremental build is fine:
+  ```bash
+  killall Hex 2>/dev/null; ./scripts/build-install.sh
+  ```
+- **Xcode uses file system synchronization** (`PBXFileSystemSynchronizedRootGroup`) — new `.swift` files added to the `Hex/` directory are automatically included in the build. No need to edit the `.xcodeproj` file.
+- **Check for build failures** — the script prints "(N failures)" if there are errors. If you see failures, grep the build output for `error:` before proceeding. Do NOT sign and install a broken build.
+- **Verify compilation actually happened** — if the build output goes straight from "Building Release..." to "Signing..." with no compilation steps, the cache was reused. This means your changes are NOT in the binary. Delete DerivedData and rebuild.
 
 **Signing note**: Use `codesign` post-build with a stable identity so macOS permissions (accessibility, input monitoring, microphone) persist between installs. Ad-hoc signing (`-`) resets permissions every build.
 
@@ -71,6 +94,7 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 - `ParakeetClient`: FluidAudio ASR for Parakeet models
 - `QwenClient`: FluidAudio Qwen3AsrManager for Caspi Hebrew model
 - `LLMPostProcessingClient`: OpenAI-compatible API for transcription cleanup
+- `ScreenContextClient`: Captures focused text field content via macOS Accessibility API for LLM context
 - `KeychainClient`: macOS Keychain for API key storage
 - `RecordingClient`: AVAudioRecorder wrapper for audio capture
 - `PasteboardClient`: Clipboard operations
@@ -161,6 +185,41 @@ FluidAudio models reside under `Application Support/FluidAudio/Models`.
 - Repeated mic prompts during debug: ensure Debug signing uses "Apple Development" so TCC sticks
 - Sandbox network errors (‑1003): add `com.apple.security.network.client = true` (already set)
 - Parakeet not detected: ensure it resides under the container path above; downloading from Hex places it correctly.
+
+## Eval Workflow
+
+The project has a promptfoo-based eval suite in `evals/` that tests LLM post-processing quality. **Run evals before building whenever you change prompts.**
+
+```bash
+# API key is in .env — always source it first
+source .env
+
+# Run the default English suite (general, messaging, document contexts)
+bun run eval
+
+# Run code dictation evals (keyword preservation, operator conversion)
+bun run eval:code
+
+# Run screen context evals (identifier resolution from visible text)
+bun run eval:screen
+
+# View results in browser
+bun run eval:view
+```
+
+### Eval structure
+- `evals/promptfooconfig.yaml` — main config, runs `english.yaml` with `english-general.txt` prompt
+- `evals/prompts/` — static copies of assembled system prompts (must be updated when `LLMPostProcessing.swift` prompts change)
+- `evals/datasets/english.yaml` — general, messaging, document test cases (~31 cases)
+- `evals/datasets/code-dictation.yaml` — code keyword, operator, and screen context test cases (~23 cases)
+- `evals/datasets/edge-cases.yaml` — adversarial and edge case inputs
+- `evals/datasets/hebrew.yaml` — Hebrew-specific test cases
+
+### Adding new eval cases
+- Code dictation tests go in `datasets/code-dictation.yaml` (NOT `english.yaml`)
+- Screen context tests use `english-code-screen.txt` prompt (has `{{screenContext}}` variable)
+- Non-screen code tests use `english-code.txt` prompt
+- General/messaging/document tests go in `english.yaml`
 
 ## Changelog Workflow Expectations
 

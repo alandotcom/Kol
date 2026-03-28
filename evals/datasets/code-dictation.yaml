@@ -1,0 +1,532 @@
+# Code Dictation Test Cases
+# Tests code-specific behavior: keyword preservation, operator conversion, screen context
+# Run: npx promptfoo eval --prompts prompts/english-code.txt --tests datasets/code-dictation.yaml
+# Screen context tests: npx promptfoo eval --prompts prompts/english-code-screen.txt --tests datasets/code-dictation.yaml
+
+# =============================================================================
+# Keywords — must stay as-is, not "corrected" to prose
+# =============================================================================
+
+- description: "Keyword: type stays as type, not TypeScript"
+  vars:
+    input: "type user equals string"
+  assert:
+    - type: contains
+      value: "type"
+    - type: not-icontains
+      value: "TypeScript"
+    - type: contains
+      value: "="
+    - type: javascript
+      value: "output.includes('type') && !output.toLowerCase().includes('typescript')"
+
+- description: "Keyword: const declaration"
+  vars:
+    input: "const max retries equals 5"
+  assert:
+    - type: javascript
+      value: "output.startsWith('const')"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "5"
+
+- description: "Keyword: let declaration"
+  vars:
+    input: "let count equals 0"
+  assert:
+    - type: javascript
+      value: "output.startsWith('let')"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "0"
+
+- description: "Keyword: func definition"
+  vars:
+    input: "func process items open paren items colon array close paren"
+  assert:
+    - type: javascript
+      value: "output.startsWith('func')"
+    - type: contains
+      value: "("
+    - type: contains
+      value: ")"
+    - type: not-contains
+      value: "open paren"
+    - type: not-contains
+      value: "close paren"
+
+- description: "Keyword: import statement"
+  vars:
+    input: "import React from react"
+  assert:
+    - type: javascript
+      value: "output.startsWith('import')"
+    - type: javascript
+      value: "output.includes('React') || output.includes('react')"
+
+- description: "Keyword: return statement"
+  vars:
+    input: "return null"
+  assert:
+    - type: javascript
+      value: "output.trim().startsWith('return')"
+    - type: contains
+      value: "null"
+
+- description: "Keyword: async await"
+  vars:
+    input: "const result equals await fetch user data open paren close paren"
+  assert:
+    - type: contains
+      value: "const"
+    - type: contains
+      value: "await"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "("
+    - type: contains
+      value: ")"
+
+# =============================================================================
+# Operator Conversion — spoken operators become symbols
+# =============================================================================
+
+- description: "Operator: equals becomes ="
+  vars:
+    input: "x equals 42"
+  assert:
+    - type: contains
+      value: "="
+    - type: contains
+      value: "42"
+    - type: not-contains
+      value: "equals"
+
+- description: "Operator: double equals"
+  vars:
+    input: "if x double equals y"
+  assert:
+    - type: javascript
+      value: "output.includes('==') || output.includes('===')"
+    - type: not-contains
+      value: "double equals"
+
+- description: "Operator: not equals"
+  vars:
+    input: "if status not equals done"
+  assert:
+    - type: contains
+      value: "!="
+    - type: not-contains
+      value: "not equals"
+
+- description: "Operator: arrow function"
+  vars:
+    input: "const handler equals open paren event close paren arrow open brace"
+  assert:
+    - type: contains
+      value: "="
+    - type: contains
+      value: "("
+    - type: contains
+      value: ")"
+    - type: contains
+      value: "=>"
+    - type: contains
+      value: "{"
+    - type: not-contains
+      value: "arrow"
+    - type: not-contains
+      value: "open brace"
+
+- description: "Operator: comparison operators"
+  vars:
+    input: "if count greater than 10"
+  assert:
+    - type: contains
+      value: ">"
+    - type: contains
+      value: "10"
+    - type: not-contains
+      value: "greater than"
+
+- description: "Operator: logical operators"
+  vars:
+    input: "if x greater than 0 double ampersand y less than 100"
+  assert:
+    - type: contains
+      value: "&&"
+    - type: contains
+      value: ">"
+    - type: contains
+      value: "<"
+
+- description: "Operator: pipe for unions"
+  vars:
+    input: "type result equals string pipe number pipe null"
+  assert:
+    - type: contains
+      value: "type"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "|"
+    - type: not-icontains
+      value: "typescript"
+
+# =============================================================================
+# Combined — keyword + operator in realistic statements
+# =============================================================================
+
+- description: "Full type declaration (user's real failure case)"
+  vars:
+    input: "type X equals wait allowed hours validation issue"
+  assert:
+    - type: contains
+      value: "type"
+    - type: not-icontains
+      value: "TypeScript"
+    - type: contains
+      value: "="
+    - type: not-contains
+      value: "equals"
+
+- description: "Variable assignment with method call"
+  vars:
+    input: "const data equals await get user profile open paren user ID close paren"
+  assert:
+    - type: javascript
+      value: "output.startsWith('const')"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "await"
+    - type: contains
+      value: "("
+    - type: contains
+      value: ")"
+    - type: not-contains
+      value: "equals"
+    - type: not-contains
+      value: "open paren"
+
+- description: "Interface definition"
+  vars:
+    input: "interface user props extends base props open brace"
+  assert:
+    - type: javascript
+      value: "output.startsWith('interface')"
+    - type: contains
+      value: "extends"
+    - type: contains
+      value: "{"
+
+- description: "Switch case"
+  vars:
+    input: "switch status open brace case active colon return true case inactive colon return false close brace"
+  assert:
+    - type: javascript
+      value: "output.startsWith('switch')"
+    - type: contains
+      value: "case"
+    - type: contains
+      value: ":"
+    - type: contains
+      value: "return"
+    - type: contains
+      value: "true"
+    - type: contains
+      value: "false"
+
+# =============================================================================
+# Capitalization — keywords must NOT be auto-capitalized
+# =============================================================================
+
+- description: "No capitalize: type at start of line"
+  vars:
+    input: "type foo equals string"
+  assert:
+    - type: javascript
+      value: "output.startsWith('type')"
+    - type: javascript
+      value: "!output.startsWith('Type')"
+    - type: contains
+      value: "="
+
+- description: "No capitalize: const at start of line"
+  vars:
+    input: "const x equals 5"
+  assert:
+    - type: javascript
+      value: "output.startsWith('const')"
+    - type: javascript
+      value: "!output.startsWith('Const')"
+
+- description: "No capitalize: def at start of line (Python)"
+  vars:
+    input: "def process items open paren self comma items close paren colon"
+  assert:
+    - type: javascript
+      value: "output.startsWith('def')"
+    - type: javascript
+      value: "!output.startsWith('Def')"
+
+- description: "No capitalize: export type (TypeScript)"
+  vars:
+    input: "export type user props equals open brace"
+  assert:
+    - type: javascript
+      value: "output.startsWith('export')"
+    - type: contains
+      value: "type"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "{"
+
+# =============================================================================
+# TypeScript / JavaScript syntax
+# =============================================================================
+
+- description: "TS: type alias with union"
+  vars:
+    input: "type status equals active pipe inactive pipe pending"
+  assert:
+    - type: javascript
+      value: "output.startsWith('type')"
+    - type: javascript
+      value: "!output.startsWith('Type')"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "|"
+
+- description: "TS: const with type annotation"
+  vars:
+    input: "const user colon partial less than user profile greater than equals open brace close brace"
+  assert:
+    - type: contains
+      value: "const"
+    - type: contains
+      value: ":"
+    - type: javascript
+      value: "output.includes('Partial') || output.includes('partial')"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "{"
+    - type: contains
+      value: "}"
+
+- description: "TS: export const"
+  vars:
+    input: "export const max retries equals 3"
+  assert:
+    - type: javascript
+      value: "output.startsWith('export')"
+    - type: contains
+      value: "const"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "3"
+
+- description: "TS: async function"
+  vars:
+    input: "async function fetch users open paren close paren colon promise less than user array greater than"
+  assert:
+    - type: javascript
+      value: "output.startsWith('async')"
+    - type: contains
+      value: "function"
+    - type: contains
+      value: "("
+    - type: contains
+      value: ")"
+    - type: contains
+      value: ":"
+    - type: javascript
+      value: "output.includes('Promise')"
+
+# =============================================================================
+# Python syntax
+# =============================================================================
+
+- description: "Python: def with type hints"
+  vars:
+    input: "def get user open paren user id colon int close paren thin arrow user colon"
+  assert:
+    - type: javascript
+      value: "output.startsWith('def')"
+    - type: contains
+      value: "("
+    - type: contains
+      value: ":"
+    - type: contains
+      value: "->"
+
+- description: "Python: from import"
+  vars:
+    input: "from typing import optional comma list comma dict"
+  assert:
+    - type: javascript
+      value: "output.startsWith('from')"
+    - type: contains
+      value: "import"
+    - type: javascript
+      value: "output.includes('Optional') || output.includes('optional')"
+
+- description: "Python: class definition"
+  vars:
+    input: "class user service open paren base service close paren colon"
+  assert:
+    - type: javascript
+      value: "output.startsWith('class')"
+    - type: contains
+      value: "("
+    - type: contains
+      value: ")"
+    - type: javascript
+      value: "output.includes(':') || output.includes(')')"
+
+# =============================================================================
+# Casing — types PascalCase, variables/functions camelCase
+# =============================================================================
+
+- description: "PascalCase: type name from spoken words"
+  vars:
+    input: "type payment method info equals open brace"
+  assert:
+    - type: javascript
+      value: "output.startsWith('type')"
+    - type: javascript
+      value: "!output.startsWith('Type')"
+    - type: contains
+      value: "PaymentMethodInfo"
+    - type: contains
+      value: "="
+
+- description: "PascalCase: interface name"
+  vars:
+    input: "interface database connection pool open brace"
+  assert:
+    - type: javascript
+      value: "output.startsWith('interface')"
+    - type: contains
+      value: "DatabaseConnectionPool"
+
+- description: "PascalCase: class name (Python)"
+  vars:
+    input: "class order processing handler colon"
+  assert:
+    - type: javascript
+      value: "output.startsWith('class')"
+    - type: contains
+      value: "OrderProcessingHandler"
+
+- description: "camelCase: function name"
+  vars:
+    input: "function validate email address open paren close paren"
+  assert:
+    - type: contains
+      value: "validateEmailAddress"
+    - type: contains
+      value: "("
+
+- description: "camelCase: const variable"
+  vars:
+    input: "const default timeout seconds equals 30"
+  assert:
+    - type: javascript
+      value: "output.includes('defaultTimeoutSeconds') || output.includes('DEFAULT_TIMEOUT_SECONDS')"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "30"
+
+- description: "Keywords stay lowercase, type names PascalCase"
+  vars:
+    input: "type wait allowed hours validation issue equals open brace"
+  assert:
+    - type: javascript
+      value: "output.startsWith('type')"
+    - type: javascript
+      value: "!output.startsWith('Type')"
+    - type: contains
+      value: "WaitAllowedHoursValidationIssue"
+    - type: contains
+      value: "="
+
+# =============================================================================
+# Screen Context — identifier resolution from visible text
+# (These tests require the english-code-screen.txt prompt)
+# =============================================================================
+
+- description: "Screen context: resolve PascalCase type from visible text"
+  vars:
+    input: "type X equals wait allowed hours validation issue"
+    screenContext: "export type WaitAllowedHoursValidationIssue = {\n  field: \"mode\" | \"start\" | \"end\" | \"window\";\n  message: string;\n};"
+  assert:
+    - type: contains
+      value: "type"
+    - type: not-icontains
+      value: "TypeScript"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "WaitAllowedHoursValidationIssue"
+    - type: not-contains
+      value: "wait allowed hours validation issue"
+
+- description: "Screen context: resolve camelCase function name"
+  vars:
+    input: "call resolve model and language"
+    screenContext: "private static func resolveModelAndLanguage(\n  selectedModel: String,\n  selectedLanguage: String?\n) -> (model: String, language: String?) {"
+  assert:
+    - type: contains
+      value: "resolveModelAndLanguage"
+    - type: not-contains
+      value: "resolve model and language"
+
+- description: "Screen context: resolve variable name"
+  vars:
+    input: "let captured screen context equals screen context dot capture visible text open paren close paren"
+    screenContext: "if state.hexSettings.llmPostProcessingEnabled && state.hexSettings.llmScreenContextEnabled {\n  state.capturedScreenContext = screenContext.captureVisibleText()\n}"
+  assert:
+    - type: contains
+      value: "capturedScreenContext"
+    - type: contains
+      value: "captureVisibleText"
+    - type: contains
+      value: "="
+    - type: contains
+      value: "("
+    - type: contains
+      value: ")"
+
+- description: "Screen context: resolve enum case name"
+  vars:
+    input: "case set LLM screen context enabled"
+    screenContext: "case setLLMEnabled(Bool)\ncase setLLMPreset(String)\ncase setLLMBaseURL(String)\ncase setLLMModelName(String)\ncase setLLMScreenContextEnabled(Bool)\ncase setLLMCustomRules(String)"
+  assert:
+    - type: javascript
+      value: "output.includes('setLLMScreenContextEnabled') || output.includes('.setLLMScreenContextEnabled')"
+
+- description: "Screen context: don't hallucinate identifiers not on screen"
+  vars:
+    input: "let foo equals bar"
+    screenContext: "func processItems(items: [Item]) {\n  for item in items {\n    validate(item)\n  }\n}"
+  assert:
+    - type: contains
+      value: "let"
+    - type: contains
+      value: "="
+    - type: javascript
+      value: "output.includes('foo') || output.includes('Foo')"
+    - type: not-contains
+      value: "processItems"
+    - type: not-contains
+      value: "validate"
