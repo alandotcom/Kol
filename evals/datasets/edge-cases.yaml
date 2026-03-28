@@ -281,6 +281,36 @@
     - type: javascript
       value: "output.includes('יא') || output.includes('יה')"
 
+- description: "Hebrew mixed slang not dropped"
+  vars:
+    input: "וואלה אחי סבבה נדבר מחר"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-messaging.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "וואלה"
+    - type: contains
+      value: "סבבה"
+
+- description: "Hebrew mami not misrecognition-corrected"
+  vars:
+    input: "תגידי מאמי את באה"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-messaging.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "מאמי"
+    - type: not-contains
+      value: "אמא"
+    - type: javascript
+      value: "!output.match(/(?<!מ)אמי/)"
+
 # =============================================================================
 # Adversarial / Security
 # =============================================================================

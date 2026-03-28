@@ -17,6 +17,8 @@ struct PromptAssemblerTests {
 		#expect(prompt.contains("maqaf"))
 		#expect(prompt.contains("על/אל"))
 		#expect(prompt.contains("code-switching"))
+		#expect(prompt.contains("מאמי"))
+		#expect(prompt.contains("NOT ASR errors"))
 	}
 
 	@Test("English layer added for English language")

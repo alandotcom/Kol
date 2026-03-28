@@ -155,6 +155,56 @@
     - type: javascript
       value: "output.includes('אחי') || output.includes('מה קורה')"
 
+- description: "Hebrew slang - mami preserved, not corrected to ima"
+  vars:
+    input: "היי מאמי מה קורה"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-messaging.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "מאמי"
+    - type: not-contains
+      value: "אמא"
+    - type: javascript
+      value: "!output.match(/(?<!מ)אמי/)"
+    - type: javascript
+      value: "output.includes('מה קורה')"
+
+- description: "Hebrew slang - Arabic loanwords preserved"
+  vars:
+    input: "יאללה חביבי אחלה שנגיע בזמן"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-messaging.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "יאללה"
+    - type: contains
+      value: "חביבי"
+    - type: contains
+      value: "אחלה"
+
+- description: "Hebrew slang - Yiddish and idioms mix"
+  vars:
+    input: "נו תכלס בלאגן פה בואי נזרום"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-messaging.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "תכלס"
+    - type: contains
+      value: "בלאגן"
+    - type: javascript
+      value: "output.includes('נזרום') || output.includes('לזרום')"
+
 # =============================================================================
 # Code-Switching (Hebrew + English)
 # =============================================================================

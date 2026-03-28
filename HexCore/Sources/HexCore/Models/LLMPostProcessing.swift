@@ -130,7 +130,12 @@ public enum PromptLayers {
 	Use maqaf (־) for Hebrew compound words. \
 	Preserve natural Hebrew-English code-switching. When English words appear in Hebrew speech, keep them in English/Latin script — do NOT transliterate to Hebrew characters (e.g., keep "deploy" not "דיפלוי", keep "commit" not "קומיט"). \
 	Fix ambiguous short words based on context (על/אל, אם/עם, לא/לו). \
-	Preserve slang and colloquialisms exactly as spoken (e.g., יא, אחי, סבבה). Do not "correct" informal speech. \
+	Preserve Israeli slang and colloquialisms exactly as spoken — these are NOT ASR errors, do not "correct" them to formal Hebrew. \
+	Common slang to preserve: מאמי, מותק, נשמה, כפרה, אחי, גבר (endearments); \
+	יאללה, וואלה, אחלה, חלאס, סבבה, יא (Arabic-origin); \
+	נו, תכלס, בלאגן (Yiddish-origin); \
+	קרינג׳, בייסיק, צ׳יל, וייב (English borrowings); \
+	אין מצב, סוף הדרך, לזרום (idioms). \
 	Remove Hebrew filler words (אממ, אהה, ככה, אז אה).
 	"""
 
