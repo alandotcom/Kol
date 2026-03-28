@@ -13,15 +13,21 @@ import Foundation
 import HexCore
 import SwiftUI
 
-// Thank you. Never mind then.What a beautiful idea.
 public enum SoundEffect: String, CaseIterable {
   case pasteTranscript
   case startRecording
   case stopRecording
   case cancel
 
-  public var fileName: String {
-    self.rawValue
+  /// Returns the audio file name for the given theme, falling back to the default name
+  /// if a themed variant doesn't exist in the bundle.
+  func fileName(for theme: SoundTheme) -> String {
+    guard theme != .standard else { return rawValue }
+    let themed = "\(rawValue)_\(theme.rawValue)"
+    if Bundle.main.url(forResource: themed, withExtension: "mp3") != nil {
+      return themed
+    }
+    return rawValue
   }
 
   var fileExtension: String {
@@ -35,6 +41,7 @@ public struct SoundEffectsClient {
   public var stop: @Sendable (SoundEffect) -> Void
   public var stopAll: @Sendable () -> Void
   public var preloadSounds: @Sendable () async -> Void
+  public var reloadSounds: @Sendable () -> Void
 }
 
 extension SoundEffectsClient: DependencyKey {
@@ -52,6 +59,9 @@ extension SoundEffectsClient: DependencyKey {
       },
       preloadSounds: {
         await live.preloadSounds()
+      },
+      reloadSounds: {
+        Task { await live.reloadSounds() }
       }
     )
   }
@@ -98,23 +108,39 @@ actor SoundEffectsClientLive {
 
   func preloadSounds() async {
     guard !isSetup else { return }
-
+    let theme = hexSettings.soundTheme
     for soundEffect in SoundEffect.allCases {
-      loadSound(soundEffect)
+      loadSound(soundEffect, theme: theme)
     }
     prepareEngineIfNeeded()
-
     isSetup = true
+  }
+
+  func reloadSounds() {
+    // Stop and detach existing players
+    for (_, player) in playerNodes {
+      player.stop()
+      engine.detach(player)
+    }
+    playerNodes.removeAll()
+    audioBuffers.removeAll()
+
+    let theme = hexSettings.soundTheme
+    for soundEffect in SoundEffect.allCases {
+      loadSound(soundEffect, theme: theme)
+    }
+    prepareEngineIfNeeded()
   }
 
   private var isSetup = false
 
-  private func loadSound(_ soundEffect: SoundEffect) {
+  private func loadSound(_ soundEffect: SoundEffect, theme: SoundTheme) {
+    let fileName = soundEffect.fileName(for: theme)
     guard let url = Bundle.main.url(
-      forResource: soundEffect.fileName,
+      forResource: fileName,
       withExtension: soundEffect.fileExtension
     ) else {
-      logger.error("Missing sound resource \(soundEffect.fileName).\(soundEffect.fileExtension)")
+      logger.error("Missing sound resource \(fileName).\(soundEffect.fileExtension)")
       return
     }
 
@@ -136,6 +162,7 @@ actor SoundEffectsClientLive {
       logger.error("Failed to load sound \(soundEffect.rawValue): \(error.localizedDescription)")
     }
   }
+
   private func prepareEngineIfNeeded() {
     if !isEngineRunning || !engine.isRunning {
       engine.prepare()

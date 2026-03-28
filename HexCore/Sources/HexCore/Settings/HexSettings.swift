@@ -6,6 +6,11 @@ public enum RecordingAudioBehavior: String, Codable, CaseIterable, Equatable, Se
 	case doNothing
 }
 
+public enum SoundTheme: String, Codable, CaseIterable, Equatable, Sendable {
+	case standard
+	case soft
+}
+
 /// User-configurable settings saved to disk.
 public struct HexSettings: Codable, Equatable, Sendable {
 	public static let defaultPasteLastTranscriptHotkey = HotKey(key: .v, modifiers: [.option, .shift])
@@ -25,6 +30,7 @@ public struct HexSettings: Codable, Equatable, Sendable {
 
 	public var soundEffectsEnabled: Bool
 	public var soundEffectsVolume: Double
+	public var soundTheme: SoundTheme
 	public var hotkey: HotKey
 	public var openOnLogin: Bool
 	public var showDockIcon: Bool
@@ -65,6 +71,7 @@ public struct HexSettings: Codable, Equatable, Sendable {
 	public init(
 		soundEffectsEnabled: Bool = true,
 		soundEffectsVolume: Double = HexSettings.baseSoundEffectsVolume,
+		soundTheme: SoundTheme = .standard,
 		hotkey: HotKey = .init(key: nil, modifiers: [.option]),
 		openOnLogin: Bool = false,
 		showDockIcon: Bool = true,
@@ -98,6 +105,7 @@ public struct HexSettings: Codable, Equatable, Sendable {
 	) {
 		self.soundEffectsEnabled = soundEffectsEnabled
 		self.soundEffectsVolume = soundEffectsVolume
+		self.soundTheme = soundTheme
 		self.hotkey = hotkey
 		self.openOnLogin = openOnLogin
 		self.showDockIcon = showDockIcon
@@ -153,6 +161,7 @@ public struct HexSettings: Codable, Equatable, Sendable {
 private enum HexSettingKey: String, CodingKey, CaseIterable {
 	case soundEffectsEnabled
 	case soundEffectsVolume
+	case soundTheme
 	case hotkey
 	case openOnLogin
 	case showDockIcon
@@ -246,6 +255,7 @@ private enum HexSettingsSchema {
 	nonisolated(unsafe) static let fields: [AnySettingsField] = [
 		SettingsField(.soundEffectsEnabled, keyPath: \.soundEffectsEnabled, default: defaults.soundEffectsEnabled).eraseToAny(),
 		SettingsField(.soundEffectsVolume, keyPath: \.soundEffectsVolume, default: defaults.soundEffectsVolume).eraseToAny(),
+		SettingsField(.soundTheme, keyPath: \.soundTheme, default: defaults.soundTheme).eraseToAny(),
 		SettingsField(.hotkey, keyPath: \.hotkey, default: defaults.hotkey).eraseToAny(),
 		SettingsField(.openOnLogin, keyPath: \.openOnLogin, default: defaults.openOnLogin).eraseToAny(),
 		SettingsField(.showDockIcon, keyPath: \.showDockIcon, default: defaults.showDockIcon).eraseToAny(),

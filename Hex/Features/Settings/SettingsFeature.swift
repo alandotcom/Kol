@@ -88,6 +88,7 @@ struct SettingsFeature {
     case setSelectedMicrophoneID(String?)
     case setSoundEffectsEnabled(Bool)
     case setSoundEffectsVolume(Double)
+    case setSoundTheme(SoundTheme)
 
     // Permission delegation (forwarded to AppFeature)
     case requestMicrophone
@@ -141,6 +142,7 @@ struct SettingsFeature {
   @Dependency(\.permissions) var permissions
   @Dependency(\.transcriptPersistence) var transcriptPersistence
   @Dependency(\.keychain) var keychain
+  @Dependency(\.soundEffects) var soundEffects
 
   private func deleteAudioEffect(for transcripts: [Transcript]) -> Effect<Action> {
     .run { [transcriptPersistence] _ in
@@ -526,6 +528,10 @@ struct SettingsFeature {
         state.$hexSettings.withLock { $0.soundEffectsVolume = volume }
         return .none
 
+      case let .setSoundTheme(theme):
+        state.$hexSettings.withLock { $0.soundTheme = theme }
+        return .run { _ in soundEffects.reloadSounds() }
+
       // Permission requests
       case .requestMicrophone:
         settingsLogger.info("User requested microphone permission from settings")
@@ -654,8 +660,10 @@ struct SettingsFeature {
         let preset = state.hexSettings.llmProviderPreset
         return .run { [keychain] send in
           // Try provider-specific key first, fall back to legacy key
-          let key = await keychain.load("llmApiKey_\(preset)")
-            ?? await keychain.load("llmApiKey")
+          var key = await keychain.load("llmApiKey_\(preset)")
+          if key == nil {
+            key = await keychain.load("llmApiKey")
+          }
           await send(.llmApiKeyLoaded(key))
         }
 

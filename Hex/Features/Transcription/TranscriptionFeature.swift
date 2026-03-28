@@ -373,7 +373,6 @@ private extension TranscriptionFeature {
       do {
         let capturedURL = await recording.stopRecording()
         guard !Task.isCancelled else { return }
-        soundEffect.play(.stopRecording)
         audioURL = capturedURL
 
         // Create transcription options with the selected language
@@ -502,8 +501,10 @@ private extension TranscriptionFeature {
         var finalText = modifiedResult
 
         if llmEnabled {
-          let apiKey = await keychain.load("llmApiKey_\(llmPreset)")
-            ?? await keychain.load("llmApiKey")
+          var apiKey = await keychain.load("llmApiKey_\(llmPreset)")
+          if apiKey == nil {
+            apiKey = await keychain.load("llmApiKey")
+          }
           if let apiKey, !apiKey.isEmpty {
             let context = PostProcessingContext(
               text: finalText,
@@ -594,7 +595,6 @@ private extension TranscriptionFeature {
     }
 
     await pasteboard.paste(result)
-    soundEffect.play(.pasteTranscript)
   }
 }
 
@@ -643,7 +643,10 @@ struct TranscriptionView: View {
   @Bindable var store: StoreOf<TranscriptionFeature>
   @ObserveInjection var inject
 
-  var status: TranscriptionIndicatorView.Status {
+  @State private var showCompleted = false
+  @State private var completedTask: Task<Void, Never>?
+
+  private var storeStatus: TranscriptionIndicatorView.Status {
     if store.isTranscribing {
       return .transcribing
     } else if store.isRecording {
@@ -655,11 +658,34 @@ struct TranscriptionView: View {
     }
   }
 
+  private var visualStatus: TranscriptionIndicatorView.Status {
+    if showCompleted { return .completed }
+    return storeStatus
+  }
+
   var body: some View {
     TranscriptionIndicatorView(
-      status: status,
+      status: visualStatus,
       meter: store.meter
     )
+    .onChange(of: storeStatus) { oldStatus, newStatus in
+      if (oldStatus == .transcribing || oldStatus == .prewarming) && newStatus == .hidden {
+        completedTask?.cancel()
+        showCompleted = true
+        completedTask = Task {
+          try? await Task.sleep(for: .milliseconds(600))
+          guard !Task.isCancelled else { return }
+          await MainActor.run {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+              showCompleted = false
+            }
+          }
+        }
+      } else if newStatus == .recording {
+        completedTask?.cancel()
+        showCompleted = false
+      }
+    }
     .task {
       await store.send(.task).finish()
     }

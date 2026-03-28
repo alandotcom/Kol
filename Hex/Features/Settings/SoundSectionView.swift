@@ -13,6 +13,11 @@ struct SoundSectionView: View {
 			set: { store.send(.setSoundEffectsVolume(actualVolume(fromPercentage: $0))) }
 		)
 
+		let themeBinding = Binding<SoundTheme>(
+			get: { store.hexSettings.soundTheme },
+			set: { store.send(.setSoundTheme($0)) }
+		)
+
 		return Section {
 			Label {
 				Toggle(
@@ -25,6 +30,23 @@ struct SoundSectionView: View {
 			} icon: {
 				Image(systemName: "speaker.wave.2.fill")
 			}
+
+			Label {
+				HStack {
+					Text("Sound Theme")
+					Spacer()
+					Picker("", selection: themeBinding) {
+						ForEach(SoundTheme.allCases, id: \.self) { theme in
+							Text(theme.rawValue.capitalized).tag(theme)
+						}
+					}
+					.pickerStyle(.menu)
+					.frame(width: 120)
+				}
+			} icon: {
+				Image(systemName: "waveform")
+			}
+			.disabled(!store.hexSettings.soundEffectsEnabled)
 
 			VStack(alignment: .leading, spacing: 8) {
 				HStack {
