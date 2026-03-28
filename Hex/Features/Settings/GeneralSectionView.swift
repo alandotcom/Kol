@@ -83,6 +83,19 @@ struct GeneralSectionView: View {
 			}
 
 			Label {
+				Toggle(
+					"Silence Detection",
+					isOn: Binding(
+						get: { store.hexSettings.vadSilenceDetectionEnabled },
+						set: { store.send(.setVADSilenceDetection($0)) }
+					)
+				)
+				Text("Use voice activity detection to skip transcription when no speech is detected. Prevents hallucinated text from background noise.")
+			} icon: {
+				Image(systemName: "waveform.badge.minus")
+			}
+
+			Label {
 				HStack(alignment: .center) {
 					Text("Audio Behavior while Recording")
 				Spacer()

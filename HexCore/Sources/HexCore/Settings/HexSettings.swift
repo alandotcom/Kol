@@ -61,6 +61,7 @@ public struct HexSettings: Codable, Equatable, Sendable {
 	public var llmPromptCode: String?
 	public var llmPromptMessaging: String?
 	public var llmPromptDocument: String?
+	public var vadSilenceDetectionEnabled: Bool
 
 	private mutating func normalizeDoubleTapSettings() {
 		if !doubleTapLockEnabled {
@@ -101,7 +102,8 @@ public struct HexSettings: Codable, Equatable, Sendable {
 		llmCustomRules: String = "",
 		llmPromptCode: String? = nil,
 		llmPromptMessaging: String? = nil,
-		llmPromptDocument: String? = nil
+		llmPromptDocument: String? = nil,
+		vadSilenceDetectionEnabled: Bool = true
 	) {
 		self.soundEffectsEnabled = soundEffectsEnabled
 		self.soundEffectsVolume = soundEffectsVolume
@@ -136,6 +138,7 @@ public struct HexSettings: Codable, Equatable, Sendable {
 		self.llmPromptCode = llmPromptCode
 		self.llmPromptMessaging = llmPromptMessaging
 		self.llmPromptDocument = llmPromptDocument
+		self.vadSilenceDetectionEnabled = vadSilenceDetectionEnabled
 		normalizeDoubleTapSettings()
 	}
 
@@ -193,6 +196,7 @@ private enum HexSettingKey: String, CodingKey, CaseIterable {
 	case llmPromptCode
 	case llmPromptMessaging
 	case llmPromptDocument
+	case vadSilenceDetectionEnabled
 }
 
 private struct SettingsField<Value: Codable & Sendable> {
@@ -356,5 +360,6 @@ private enum HexSettingsSchema {
 				try container.encodeIfPresent(value, forKey: key)
 			}
 		).eraseToAny(),
+		SettingsField(.vadSilenceDetectionEnabled, keyPath: \.vadSilenceDetectionEnabled, default: defaults.vadSilenceDetectionEnabled).eraseToAny(),
 	]
 }

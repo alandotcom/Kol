@@ -12,6 +12,10 @@ import Foundation
 import HexCore
 import WhisperKit
 
+#if canImport(FluidAudio)
+import FluidAudio
+#endif
+
 private let transcriptionLogger = HexLog.transcription
 private let modelsLogger = HexLog.models
 private let parakeetLogger = HexLog.parakeet
@@ -21,8 +25,9 @@ private let parakeetLogger = HexLog.parakeet
 @DependencyClient
 struct TranscriptionClient {
   /// Transcribes an audio file at the specified `URL` using the named `model`.
+  /// When `skipSilence` is true, runs Silero VAD first and returns empty string if no speech detected.
   /// Reports transcription progress via `progressCallback`.
-  var transcribe: @Sendable (URL, String, DecodingOptions, @escaping (Progress) -> Void) async throws -> String
+  var transcribe: @Sendable (URL, String, DecodingOptions, Bool, @escaping (Progress) -> Void) async throws -> String
 
   /// Ensures a model is downloaded (if missing) and loaded into memory, reporting progress via `progressCallback`.
   var downloadModel: @Sendable (String, @escaping (Progress) -> Void) async throws -> Void
@@ -44,7 +49,7 @@ extension TranscriptionClient: DependencyKey {
   static var liveValue: Self {
     let live = TranscriptionClientLive()
     return Self(
-      transcribe: { try await live.transcribe(url: $0, model: $1, options: $2, progressCallback: $3) },
+      transcribe: { try await live.transcribe(url: $0, model: $1, options: $2, skipSilence: $3, progressCallback: $4) },
       downloadModel: { try await live.downloadAndLoadModel(variant: $0, progressCallback: $1) },
       deleteModel: { try await live.deleteModel(variant: $0) },
       isModelDownloaded: { await live.isModelDownloaded($0) },
@@ -74,6 +79,11 @@ actor TranscriptionClientLive {
   private var currentModelName: String?
   private var parakeet: ParakeetClient = ParakeetClient()
   private var qwen: QwenClient = QwenClient()
+
+  #if canImport(FluidAudio)
+  /// Silero VAD for silence detection — lazily initialized on first use.
+  private var vad: VadManager?
+  #endif
 
   /// The base folder under which we store model data (e.g., ~/Library/Application Support/...).
   private lazy var modelsBaseFolder: URL = {
@@ -242,9 +252,17 @@ actor TranscriptionClientLive {
     url: URL,
     model: String,
     options: DecodingOptions,
+    skipSilence: Bool,
     progressCallback: @escaping (Progress) -> Void
   ) async throws -> String {
     let startAll = Date()
+
+    // VAD silence gate: check for speech before running ASR
+    if skipSilence, !(await containsSpeech(url)) {
+      transcriptionLogger.notice("VAD detected no speech in \(url.lastPathComponent, privacy: .public) — skipping transcription")
+      return ""
+    }
+
     if isParakeet(model) {
       transcriptionLogger.notice("Transcribing with Parakeet model=\(model) file=\(url.lastPathComponent)")
       let startLoad = Date()
@@ -333,6 +351,33 @@ actor TranscriptionClientLive {
 
   private func isQwen(_ name: String) -> Bool {
     QwenModel(rawValue: name) != nil
+  }
+
+  /// Runs Silero VAD on an audio file and returns true if any speech was detected.
+  /// Falls through to true (allowing transcription) if VAD fails for any reason.
+  private func containsSpeech(_ url: URL) async -> Bool {
+    #if canImport(FluidAudio)
+    do {
+      if vad == nil {
+        let t0 = Date()
+        vad = try await VadManager()
+        let elapsed = String(format: "%.2f", Date().timeIntervalSince(t0))
+        transcriptionLogger.notice("VAD initialized in \(elapsed, privacy: .public)s")
+      }
+      guard let vad else { return true }
+      let t0 = Date()
+      let results = try await vad.process(url)
+      let hasSpeech = results.contains { $0.isVoiceActive }
+      let elapsed = String(format: "%.3f", Date().timeIntervalSince(t0))
+      transcriptionLogger.notice("VAD check took \(elapsed, privacy: .public)s — speech=\(hasSpeech, privacy: .public) chunks=\(results.count, privacy: .public)")
+      return hasSpeech
+    } catch {
+      transcriptionLogger.error("VAD check failed, proceeding with transcription: \(error.localizedDescription)")
+      return true
+    }
+    #else
+    return true
+    #endif
   }
 
   /// Creates or returns the local folder (on disk) for a given `variant` model.

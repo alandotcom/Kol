@@ -89,6 +89,7 @@ struct SettingsFeature {
     case setSoundEffectsEnabled(Bool)
     case setSoundEffectsVolume(Double)
     case setSoundTheme(SoundTheme)
+    case setVADSilenceDetection(Bool)
 
     // Permission delegation (forwarded to AppFeature)
     case requestMicrophone
@@ -531,6 +532,10 @@ struct SettingsFeature {
       case let .setSoundTheme(theme):
         state.$hexSettings.withLock { $0.soundTheme = theme }
         return .run { _ in soundEffects.reloadSounds() }
+
+      case let .setVADSilenceDetection(enabled):
+        state.$hexSettings.withLock { $0.vadSilenceDetectionEnabled = enabled }
+        return .none
 
       // Permission requests
       case .requestMicrophone:

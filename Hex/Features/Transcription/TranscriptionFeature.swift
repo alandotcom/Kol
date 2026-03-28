@@ -364,6 +364,7 @@ private extension TranscriptionFeature {
     state.resolvedLanguage = language
 
     state.isPrewarming = true
+    let vadEnabled = state.hexSettings.vadSilenceDetectionEnabled
 
     return .run { [sleepManagement] send in
       // Allow system to sleep again
@@ -382,8 +383,8 @@ private extension TranscriptionFeature {
           detectLanguage: language == nil, // Only auto-detect if no language specified
           chunkingStrategy: .vad,
         )
-        
-        let result = try await transcription.transcribe(capturedURL, model, decodeOptions) { _ in }
+
+        let result = try await transcription.transcribe(capturedURL, model, decodeOptions, vadEnabled) { _ in }
         
         transcriptionFeatureLogger.notice("Transcribed audio from \(capturedURL.lastPathComponent) to text length \(result.count)")
         await send(.transcriptionResult(result, capturedURL))
