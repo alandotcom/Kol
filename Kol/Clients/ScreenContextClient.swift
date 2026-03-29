@@ -9,6 +9,8 @@ private let logger = KolLog.screenContext
 @DependencyClient
 struct ScreenContextClient: Sendable {
     var captureVisibleText: @Sendable (_ sourceAppBundleID: String?) -> String? = { _ in nil }
+    /// Returns the character immediately before the cursor in the focused text field, or nil.
+    var characterBeforeCursor: @Sendable () -> Character? = { nil }
 }
 
 extension ScreenContextClient: DependencyKey {
@@ -72,6 +74,51 @@ extension ScreenContextClient: DependencyKey {
                 }
 
                 logger.notice("No text found for \(bundleID, privacy: .public)")
+                return nil
+            },
+            characterBeforeCursor: {
+                let systemWide = AXUIElementCreateSystemWide()
+
+                var focusedRef: CFTypeRef?
+                guard AXUIElementCopyAttributeValue(
+                    systemWide,
+                    kAXFocusedUIElementAttribute as CFString,
+                    &focusedRef
+                ) == .success, let focusedRef else {
+                    return nil
+                }
+
+                let focused = focusedRef as! AXUIElement
+
+                // Strategy 1: Use parameterized attribute to read char before cursor (text editors)
+                var rangeRef: CFTypeRef?
+                if AXUIElementCopyAttributeValue(
+                    focused,
+                    kAXSelectedTextRangeAttribute as CFString,
+                    &rangeRef
+                ) == .success, let rangeRef {
+                    var cfRange = CFRange(location: 0, length: 0)
+                    if AXValueGetValue(rangeRef as! AXValue, .cfRange, &cfRange),
+                       cfRange.location > 0 {
+                        var charRange = CFRange(location: cfRange.location - 1, length: 1)
+                        if let axRange = AXValueCreate(.cfRange, &charRange) {
+                            var charRef: CFTypeRef?
+                            if AXUIElementCopyParameterizedAttributeValue(
+                                focused,
+                                kAXStringForRangeParameterizedAttribute as CFString,
+                                axRange,
+                                &charRef
+                            ) == .success, let charStr = charRef as? String, let char = charStr.first {
+                                return char
+                            }
+                        }
+                    }
+                }
+
+                // For terminals: AX parameterized attributes aren't supported,
+                // so characterBeforeCursor returns nil. This is correct — terminal
+                // buffers mix user input with command output, making reliable
+                // cursor-position detection impossible.
                 return nil
             }
         )
