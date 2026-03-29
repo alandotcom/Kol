@@ -270,7 +270,67 @@ struct TranscriptView: View {
 				.lineLimit(nil)
 				.fixedSize(horizontal: false, vertical: true)
 				.padding(.horizontal, 14)
-				.padding(.bottom, 12)
+				.padding(.bottom, transcript.llmMetadata != nil ? 4 : 12)
+
+			// LLM post-processing details (collapsible)
+			if let meta = transcript.llmMetadata {
+				Button {
+					withAnimation(.easeInOut(duration: 0.2)) {
+						showDetails.toggle()
+					}
+				} label: {
+					HStack(spacing: 4) {
+						Image(systemName: showDetails ? "chevron.down" : "chevron.right")
+							.font(.caption2)
+						Text("AI post-processing details")
+							.font(.caption)
+					}
+					.foregroundStyle(.tertiary)
+				}
+				.buttonStyle(.plain)
+				.padding(.horizontal, 14)
+				.padding(.bottom, 4)
+
+				if showDetails {
+					VStack(alignment: .leading, spacing: 6) {
+						Text("Original:")
+							.font(.caption.weight(.medium))
+							.foregroundStyle(.tertiary)
+						Text(meta.originalText)
+							.font(.callout)
+							.foregroundStyle(.secondary)
+							.lineLimit(nil)
+							.fixedSize(horizontal: false, vertical: true)
+
+						HStack(spacing: 0) {
+							if let model = meta.model {
+								Text(model)
+								Text("  ·  ").foregroundStyle(.quaternary)
+							}
+							if let ms = meta.latencyMs {
+								Text("\(ms)ms")
+								if meta.promptTokens != nil || meta.completionTokens != nil {
+									Text("  ·  ").foregroundStyle(.quaternary)
+								}
+							}
+							if let pt = meta.promptTokens, let ct = meta.completionTokens {
+								Text("\(pt) → \(ct) tokens")
+							}
+						}
+						.font(.caption)
+						.foregroundStyle(.tertiary)
+					}
+					.padding(10)
+					.frame(maxWidth: .infinity, alignment: .leading)
+					.background(GlassColors.dropdownBackground)
+					.clipShape(RoundedRectangle(cornerRadius: 8))
+					.padding(.horizontal, 14)
+					.padding(.bottom, 12)
+					.transition(.opacity.combined(with: .move(edge: .top)))
+				} else {
+					Spacer().frame(height: 8)
+				}
+			}
 
 			Divider()
 				.padding(.horizontal, 14)
@@ -325,6 +385,7 @@ struct TranscriptView: View {
 		}
 	}
 
+	@State private var showDetails = false
 	@State private var showCopied = false
 	@State private var copyTask: Task<Void, Error>?
 

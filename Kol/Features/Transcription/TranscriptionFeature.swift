@@ -510,6 +510,7 @@ private extension TranscriptionFeature {
     return .run { [llmPostProcessing, keychain] send in
       do {
         var finalText = modifiedResult
+        var llmMetadata: LLMMetadata?
 
         if llmEnabled {
           var apiKey = await keychain.load("llmApiKey_\(llmPreset)")
@@ -525,11 +526,14 @@ private extension TranscriptionFeature {
               appContextOverrides: llmAppContextOverrides,
               screenContext: capturedScreenContext
             )
-            let startTime = Date()
             do {
-              finalText = try await llmPostProcessing.process(context, llmConfig, apiKey)
-              let elapsed = Date().timeIntervalSince(startTime)
-              transcriptionFeatureLogger.info("LLM post-processing took \(String(format: "%.0f", elapsed * 1000))ms")
+              let result = try await llmPostProcessing.process(context, llmConfig, apiKey)
+              finalText = result.text
+              // Only store metadata when LLM actually changed the text
+              if result.text != modifiedResult {
+                llmMetadata = result.metadata
+              }
+              transcriptionFeatureLogger.info("LLM post-processing took \(result.metadata.latencyMs ?? 0)ms")
             } catch {
               transcriptionFeatureLogger.error("LLM post-processing failed, using original: \(error.localizedDescription)")
             }
@@ -540,6 +544,7 @@ private extension TranscriptionFeature {
 
         try await finalizeRecordingAndStoreTranscript(
           result: finalText,
+          llmMetadata: llmMetadata,
           duration: duration,
           sourceAppBundleID: sourceAppBundleID,
           sourceAppName: sourceAppName,
@@ -572,6 +577,7 @@ private extension TranscriptionFeature {
   /// Move file to permanent location, create a transcript record, paste text, and play sound.
   func finalizeRecordingAndStoreTranscript(
     result: String,
+    llmMetadata: LLMMetadata?,
     duration: TimeInterval,
     sourceAppBundleID: String?,
     sourceAppName: String?,
@@ -583,6 +589,7 @@ private extension TranscriptionFeature {
     if kolSettings.saveTranscriptionHistory {
       let transcript = try await transcriptPersistence.save(
         result,
+        llmMetadata,
         audioURL,
         duration,
         sourceAppBundleID,

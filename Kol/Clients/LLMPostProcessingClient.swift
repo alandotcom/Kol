@@ -11,7 +11,7 @@ struct LLMPostProcessingClient: Sendable {
 		_ context: PostProcessingContext,
 		_ config: LLMProviderConfig,
 		_ apiKey: String
-	) async throws -> String
+	) async throws -> LLMProcessingResult
 }
 
 extension LLMPostProcessingClient: DependencyKey {
@@ -71,6 +71,11 @@ extension LLMPostProcessingClient: DependencyKey {
 					throw LLMError.invalidResponse
 				}
 
+				// Parse token usage from response
+				let usage = json["usage"] as? [String: Any]
+				let promptTokens = usage?["prompt_tokens"] as? Int
+				let completionTokens = usage?["completion_tokens"] as? Int
+
 				var trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
 				// Strip outer quotes if the LLM wrapped the response
 				if trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"") && trimmed.count > 1 {
@@ -79,9 +84,18 @@ extension LLMPostProcessingClient: DependencyKey {
 				}
 				// Treat EMPTY sentinel as empty string
 				if trimmed == "EMPTY" { trimmed = "" }
-				logger.info("LLM post-processing took \(String(format: "%.0f", elapsed * 1000))ms (\(config.modelName))")
+				let latencyMs = Int(elapsed * 1000)
+				logger.info("LLM post-processing took \(latencyMs)ms (\(config.modelName))")
 
-				return trimmed.isEmpty ? context.text : trimmed
+				let finalText = trimmed.isEmpty ? context.text : trimmed
+				let metadata = LLMMetadata(
+					originalText: context.text,
+					model: config.modelName,
+					latencyMs: latencyMs,
+					promptTokens: promptTokens,
+					completionTokens: completionTokens
+				)
+				return LLMProcessingResult(text: finalText, metadata: metadata)
 			}
 		)
 	}

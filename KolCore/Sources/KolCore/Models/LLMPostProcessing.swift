@@ -1,5 +1,18 @@
 import Foundation
 
+// MARK: - Processing Result
+
+/// Result of LLM post-processing, including the cleaned text and metadata for history.
+public struct LLMProcessingResult: Sendable {
+	public let text: String
+	public let metadata: LLMMetadata
+
+	public init(text: String, metadata: LLMMetadata) {
+		self.text = text
+		self.metadata = metadata
+	}
+}
+
 // MARK: - Post-Processing Context
 
 /// Everything the LLM needs to clean up a transcription.

@@ -33,7 +33,7 @@ if [ -z "$APP_PATH" ]; then
 fi
 
 echo "Signing..."
-codesign --deep --force --sign "Apple Development: alan.mit@gmail.com (97Y8HW2AB7)" "$APP_PATH"
+codesign --deep --force --sign "Developer ID Application: Alan Cohen (G365XP38PA)" "$APP_PATH"
 
 echo "Installing to /Applications/Kol.app..."
 rsync -a --delete "$APP_PATH/" /Applications/Kol.app/
