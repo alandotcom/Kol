@@ -50,6 +50,15 @@ extension TranscriptPersistenceClient: DependencyKey {
     )
 }
 
+public extension TranscriptPersistenceClient {
+    /// Convenience: delete audio files for multiple transcripts, ignoring individual errors.
+    func deleteAudioFiles(for transcripts: [Transcript]) async {
+        for transcript in transcripts {
+            try? await deleteAudio(transcript)
+        }
+    }
+}
+
 public extension DependencyValues {
     var transcriptPersistence: TranscriptPersistenceClient {
         get { self[TranscriptPersistenceClient.self] }

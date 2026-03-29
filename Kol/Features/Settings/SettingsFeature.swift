@@ -147,9 +147,7 @@ struct SettingsFeature {
 
   private func deleteAudioEffect(for transcripts: [Transcript]) -> Effect<Action> {
     .run { [transcriptPersistence] _ in
-      for transcript in transcripts {
-        try? await transcriptPersistence.deleteAudio(transcript)
-      }
+      await transcriptPersistence.deleteAudioFiles(for: transcripts)
     }
   }
 
@@ -266,18 +264,6 @@ struct SettingsFeature {
 
         // Listen for key events and load microphones (existing + new)
         return .run { send in
-          func audioPropertyAddress(
-            _ selector: AudioObjectPropertySelector,
-            scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal,
-            element: AudioObjectPropertyElement = kAudioObjectPropertyElementMain
-          ) -> AudioObjectPropertyAddress {
-            AudioObjectPropertyAddress(
-              mSelector: selector,
-              mScope: scope,
-              mElement: element
-            )
-          }
-
           await send(.modelDownload(.fetchModels))
           await send(.loadAvailableInputDevices)
           await send(.loadLLMApiKey)

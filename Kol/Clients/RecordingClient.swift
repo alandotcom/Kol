@@ -5,7 +5,7 @@
 //  Created by Kit Langton on 1/24/25.
 //
 
-import AppKit // For NSEvent media key simulation
+import AppKit
 import AVFoundation
 import ComposableArchitecture
 import CoreAudio
@@ -14,7 +14,6 @@ import DependenciesMacros
 import Foundation
 
 private let recordingLogger = KolLog.recording
-private let mediaLogger = KolLog.media
 private typealias CoreAudioPropertyListenerBlock = @convention(block) (UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void
 
 /// Represents an audio input device
@@ -58,252 +57,6 @@ extension RecordingClient: DependencyKey {
 struct Meter: Equatable {
   let averagePower: Double
   let peakPower: Double
-}
-
-// Define function pointer types for the MediaRemote functions.
-typealias MRNowPlayingIsPlayingFunc = @convention(c) (DispatchQueue, @escaping (Bool) -> Void) -> Void
-typealias MRMediaRemoteSendCommandFunc = @convention(c) (Int32, CFDictionary?) -> Void
-
-enum MediaRemoteCommand: Int32 {
-  case play = 0
-  case pause = 1
-  case togglePlayPause = 2
-}
-
-/// Wraps a few MediaRemote functions.
-@Observable
-class MediaRemoteController {
-  private var mediaRemoteHandle: UnsafeMutableRawPointer?
-  private var mrNowPlayingIsPlaying: MRNowPlayingIsPlayingFunc?
-  private var mrSendCommand: MRMediaRemoteSendCommandFunc?
-
-  init?() {
-    // Open the private framework.
-    guard let handle = dlopen("/System/Library/PrivateFrameworks/MediaRemote.framework/MediaRemote", RTLD_NOW) as UnsafeMutableRawPointer? else {
-      mediaLogger.error("Unable to open MediaRemote framework")
-      return nil
-    }
-    mediaRemoteHandle = handle
-
-    // Get pointer for the "is playing" function.
-    guard let playingPtr = dlsym(handle, "MRMediaRemoteGetNowPlayingApplicationIsPlaying") else {
-      mediaLogger.error("Unable to find MRMediaRemoteGetNowPlayingApplicationIsPlaying symbol")
-      return nil
-    }
-    mrNowPlayingIsPlaying = unsafeBitCast(playingPtr, to: MRNowPlayingIsPlayingFunc.self)
-
-    if let commandPtr = dlsym(handle, "MRMediaRemoteSendCommand") {
-      mrSendCommand = unsafeBitCast(commandPtr, to: MRMediaRemoteSendCommandFunc.self)
-    } else {
-      mediaLogger.error("Unable to find MRMediaRemoteSendCommand symbol")
-    }
-  }
-
-  deinit {
-    if let handle = mediaRemoteHandle {
-      dlclose(handle)
-    }
-  }
-
-  /// Asynchronously refreshes the "is playing" status.
-  func isMediaPlaying() async -> Bool {
-    guard let isPlayingFunc = mrNowPlayingIsPlaying else { return false }
-    return await withCheckedContinuation { continuation in
-      isPlayingFunc(DispatchQueue.main) { isPlaying in
-        continuation.resume(returning: isPlaying)
-      }
-    }
-  }
-
-  func send(_ command: MediaRemoteCommand) -> Bool {
-    guard let sendCommand = mrSendCommand else {
-      return false
-    }
-    sendCommand(command.rawValue, nil)
-    return true
-  }
-}
-
-// Global instance of MediaRemoteController
-private let mediaRemoteController = MediaRemoteController()
-
-func isAudioPlayingOnDefaultOutput() async -> Bool {
-  // Refresh the state before checking
-  return await mediaRemoteController?.isMediaPlaying() ?? false
-}
-
-/// Check if an application is installed by looking for its bundle
-private func isAppInstalled(bundleID: String) -> Bool {
-  let workspace = NSWorkspace.shared
-  return workspace.urlForApplication(withBundleIdentifier: bundleID) != nil
-}
-
-/// Cached list of installed media players (computed once at first access)
-private let installedMediaPlayers: [String: String] = {
-  var result: [String: String] = [:]
-
-  if isAppInstalled(bundleID: "com.apple.Music") {
-    result["Music"] = "com.apple.Music"
-  }
-
-  if isAppInstalled(bundleID: "com.apple.iTunes") {
-    result["iTunes"] = "com.apple.iTunes"
-  }
-
-  if isAppInstalled(bundleID: "com.spotify.client") {
-    result["Spotify"] = "com.spotify.client"
-  }
-
-  if isAppInstalled(bundleID: "org.videolan.vlc") {
-    result["VLC"] = "org.videolan.vlc"
-  }
-
-  return result
-}()
-
-// Backoff to avoid spamming AppleScript errors on systems without controllable players
-private var mediaControlErrorCount = 0
-private var mediaControlDisabled = false
-
-func pauseAllMediaApplications() async -> [String] {
-  if mediaControlDisabled { return [] }
-  // Use cached list of installed media players
-  if installedMediaPlayers.isEmpty {
-    return []
-  }
-
-  mediaLogger.debug("Installed media players: \(installedMediaPlayers.keys.joined(separator: ", "))")
-  
-  // Create AppleScript that only targets installed players
-  var scriptParts: [String] = ["set pausedPlayers to {}"]
-
-  for (appName, _) in installedMediaPlayers {
-    if appName == "VLC" {
-      // VLC: check running, then pause if currently playing
-      scriptParts.append("""
-      try
-        if application \"VLC\" is running then
-          tell application \"VLC\"
-            if playing then
-              pause
-              set end of pausedPlayers to \"VLC\"
-            end if
-          end tell
-        end if
-      end try
-      """)
-    } else {
-      // Music / iTunes / Spotify: check running outside of tell, then query player state
-      scriptParts.append("""
-      try
-        if application \"\(appName)\" is running then
-          tell application \"\(appName)\"
-            if player state is playing then
-              pause
-              set end of pausedPlayers to \"\(appName)\"
-            end if
-          end tell
-        end if
-      end try
-      """)
-    }
-  }
-  
-  scriptParts.append("return pausedPlayers")
-  let script = scriptParts.joined(separator: "\n\n")
-  
-  let appleScript = NSAppleScript(source: script)
-  var error: NSDictionary?
-  guard let resultDescriptor = appleScript?.executeAndReturnError(&error) else {
-    if let error = error {
-      mediaLogger.error("Failed to pause media apps: \(error)")
-      mediaControlErrorCount += 1
-      if mediaControlErrorCount >= 3 { mediaControlDisabled = true }
-    }
-    return []
-  }
-  
-  // Convert AppleScript list to Swift array
-  var pausedPlayers: [String] = []
-  let count = resultDescriptor.numberOfItems
-  
-  if count > 0 {
-    for i in 1...count {
-      if let item = resultDescriptor.atIndex(i)?.stringValue {
-        pausedPlayers.append(item)
-      }
-    }
-  }
-    
-  mediaLogger.notice("Paused media players: \(pausedPlayers.joined(separator: ", "))")
-  
-  return pausedPlayers
-}
-
-func resumeMediaApplications(_ players: [String]) async {
-  guard !players.isEmpty else { return }
-
-  // Only attempt to resume players that are installed
-  let validPlayers = players.filter { installedMediaPlayers.keys.contains($0) }
-  if validPlayers.isEmpty {
-    return
-  }
-  
-  // Create specific resume script for each player
-  var scriptParts: [String] = []
-  
-  for player in validPlayers {
-    if player == "VLC" {
-      scriptParts.append("""
-      try
-        if application id \"org.videolan.vlc\" is running then
-          tell application id \"org.videolan.vlc\" to play
-        end if
-      end try
-      """)
-    } else {
-      scriptParts.append("""
-      try
-        if application \"\(player)\" is running then
-          tell application \"\(player)\" to play
-        end if
-      end try
-      """)
-    }
-  }
-  
-  let script = scriptParts.joined(separator: "\n\n")
-  
-  let appleScript = NSAppleScript(source: script)
-  var error: NSDictionary?
-  appleScript?.executeAndReturnError(&error)
-  if let error = error {
-    mediaLogger.error("Failed to resume media apps: \(error)")
-  }
-}
-
-/// Simulates a media key press (the Play/Pause key) by posting a system-defined NSEvent.
-/// This toggles the state of the active media app.
-private func sendMediaKey() {
-  let NX_KEYTYPE_PLAY: UInt32 = 16
-  func postKeyEvent(down: Bool) {
-    let flags: NSEvent.ModifierFlags = down ? .init(rawValue: 0xA00) : .init(rawValue: 0xB00)
-    let data1 = Int((NX_KEYTYPE_PLAY << 16) | (down ? 0xA << 8 : 0xB << 8))
-    if let event = NSEvent.otherEvent(with: .systemDefined,
-                                      location: .zero,
-                                      modifierFlags: flags,
-                                      timestamp: 0,
-                                      windowNumber: 0,
-                                      context: nil,
-                                      subtype: 8,
-                                      data1: data1,
-                                      data2: -1)
-    {
-      event.cgEvent?.post(tap: .cghidEventTap)
-    }
-  }
-  postKeyEvent(down: true)
-  postKeyEvent(down: false)
 }
 
 // MARK: - RecordingClientLive Implementation
@@ -355,17 +108,7 @@ actor RecordingClientLive {
 
   @Shared(.kolSettings) var kolSettings: KolSettings
 
-  /// Tracks whether media was paused using the media key when recording started.
-  private var didPauseMedia: Bool = false
-
-  /// Tracks whether media was toggled via MediaRemote
-  private var didPauseViaMediaRemote: Bool = false
-
-  /// Tracks which specific media players were paused
-  private var pausedPlayers: [String] = []
-
-  /// Tracks previous system volume when muted for recording
-  private var previousVolume: Float?
+  @Dependency(\.mediaControl) var mediaControl
 
   // Cache to store already-processed device information
   private var deviceCache: [AudioDeviceID: (hasInput: Bool, name: String?)] = [:]
@@ -420,21 +163,6 @@ actor RecordingClientLive {
     return name
   }
   
-  // MARK: - Core Audio Helpers
-
-  /// Creates an AudioObjectPropertyAddress with common defaults.
-  private func audioPropertyAddress(
-    _ selector: AudioObjectPropertySelector,
-    scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal,
-    element: AudioObjectPropertyElement = kAudioObjectPropertyElementMain
-  ) -> AudioObjectPropertyAddress {
-    AudioObjectPropertyAddress(
-      mSelector: selector,
-      mScope: scope,
-      mElement: element
-    )
-  }
-
   func startObservingSystemChanges() {
     guard !isObservingSystemChanges else { return }
     isObservingSystemChanges = true
@@ -752,7 +480,19 @@ actor RecordingClientLive {
     await AVCaptureDevice.requestAccess(for: .audio)
   }
 
-  // MARK: - Input Device Query
+  // MARK: - Device Query
+
+  /// Gets the current default output device ID (used for logging only)
+  private func getDefaultOutputDevice() -> AudioDeviceID? {
+    var deviceID = AudioDeviceID(0)
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    var address = audioPropertyAddress(kAudioHardwarePropertyDefaultOutputDevice)
+
+    let status = AudioObjectGetPropertyData(
+      AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID
+    )
+    return status == 0 ? deviceID : nil
+  }
 
   /// Gets the current default input device ID
   private func getDefaultInputDevice() -> AudioDeviceID? {
@@ -843,11 +583,11 @@ actor RecordingClientLive {
   }
 
   private func makeCaptureRecordingURL() -> URL {
-    FileManager.default.temporaryDirectory.appendingPathComponent("hex-capture-\(UUID().uuidString).wav")
+    FileManager.default.temporaryDirectory.appendingPathComponent("kol-capture-\(UUID().uuidString).wav")
   }
 
   private func makeIgnoredStopURL() -> URL {
-    FileManager.default.temporaryDirectory.appendingPathComponent("hex-ignored-stop-\(UUID().uuidString).wav")
+    FileManager.default.temporaryDirectory.appendingPathComponent("kol-ignored-stop-\(UUID().uuidString).wav")
   }
 
   nonisolated static func shouldIgnoreStopRequest(
@@ -950,95 +690,7 @@ actor RecordingClientLive {
     }
   }
 
-  // MARK: - Volume Control
-
-  /// Mutes system volume and returns the previous volume level
-  private func muteSystemVolume() async -> Float {
-    let currentVolume = getSystemVolume()
-    setSystemVolume(0)
-    recordingLogger.notice("Muted system volume (was \(String(format: "%.2f", currentVolume)))")
-    return currentVolume
-  }
-
-  /// Restores system volume to the specified level
-  private func restoreSystemVolume(_ volume: Float) async {
-    setSystemVolume(volume)
-    recordingLogger.notice("Restored system volume to \(String(format: "%.2f", volume))")
-  }
-
-  /// Gets the default output device ID
-  private func getDefaultOutputDevice() -> AudioDeviceID? {
-    var deviceID = AudioDeviceID(0)
-    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-    var address = audioPropertyAddress(kAudioHardwarePropertyDefaultOutputDevice)
-
-    let status = AudioObjectGetPropertyData(
-      AudioObjectID(kAudioObjectSystemObject),
-      &address,
-      0,
-      nil,
-      &size,
-      &deviceID
-    )
-
-    if status != 0 {
-      recordingLogger.error("Failed to get default output device: \(status)")
-      return nil
-    }
-
-    return deviceID
-  }
-
-  /// Gets the current system output volume (0.0 to 1.0)
-  private func getSystemVolume() -> Float {
-    guard let deviceID = getDefaultOutputDevice() else {
-      return 0.0
-    }
-
-    var volume: Float32 = 0.0
-    var size = UInt32(MemoryLayout<Float32>.size)
-    var address = audioPropertyAddress(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: kAudioDevicePropertyScopeOutput)
-
-    let status = AudioObjectGetPropertyData(
-      deviceID,
-      &address,
-      0,
-      nil,
-      &size,
-      &volume
-    )
-
-    if status != 0 {
-      recordingLogger.error("Failed to get system volume: \(status)")
-      return 0.0
-    }
-
-    return volume
-  }
-
-  /// Sets the system output volume (0.0 to 1.0)
-  private func setSystemVolume(_ volume: Float) {
-    guard let deviceID = getDefaultOutputDevice() else {
-      return
-    }
-
-    var newVolume = volume
-    let size = UInt32(MemoryLayout<Float32>.size)
-    var address = audioPropertyAddress(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: kAudioDevicePropertyScopeOutput)
-
-    let status = AudioObjectSetPropertyData(
-      deviceID,
-      &address,
-      0,
-      nil,
-      size,
-      &newVolume
-    )
-
-    if status != 0 {
-      recordingLogger.error("Failed to set system volume: \(status)")
-    }
-  }
+  // MARK: - Recording
 
   func startRecording() async {
     // Check and fix device-level mute before recording
@@ -1049,47 +701,12 @@ actor RecordingClientLive {
     mediaControlTask?.cancel()
     mediaControlTask = nil
 
-    // Handle audio behavior based on user preference
-    switch kolSettings.recordingAudioBehavior {
-    case .pauseMedia:
-      // Pause media in background - don't block recording from starting
-      mediaControlTask = Task { [sessionID] in
-        guard await self.isCurrentSession(sessionID) else { return }
-        if await self.pauseUsingMediaRemoteIfPossible(sessionID: sessionID) {
-          return
-        }
-
-        // First, pause all media applications using their AppleScript interface.
-        let paused = await pauseAllMediaApplications()
-        await self.updatePausedPlayers(paused, sessionID: sessionID)
-
-        // If no specific players were paused, pause generic media using the media key.
-        guard await self.isCurrentSession(sessionID) else { return }
-        if paused.isEmpty {
-          if await isAudioPlayingOnDefaultOutput() {
-            mediaLogger.notice("Detected active audio on default output; sending media pause")
-            await MainActor.run {
-              sendMediaKey()
-            }
-            await self.setDidPauseMedia(true, sessionID: sessionID)
-            mediaLogger.notice("Paused media via media key fallback")
-          }
-        } else {
-          mediaLogger.notice("Paused media players: \(paused.joined(separator: ", "))")
-        }
+    // Pause/mute media in background — MediaControlClient manages its own state
+    let behavior = kolSettings.recordingAudioBehavior
+    if behavior != .doNothing {
+      mediaControlTask = Task {
+        await mediaControl.pauseForRecording(behavior)
       }
-
-    case .mute:
-      // Mute system volume in background
-      mediaControlTask = Task { [sessionID] in
-        guard await self.isCurrentSession(sessionID) else { return }
-        let volume = await self.muteSystemVolume()
-        await self.setPreviousVolume(volume, sessionID: sessionID)
-      }
-
-    case .doNothing:
-      // No audio handling
-      break
     }
 
     let activeInputDevice = applyPreferredInputDevice()
@@ -1183,7 +800,7 @@ actor RecordingClientLive {
       }
 
       await flushDeferredCaptureRestartIfNeeded()
-      await resumeMediaIfNeeded()
+      await mediaControl.resumeAfterRecording()
       return captureURL
     }
 
@@ -1232,51 +849,9 @@ actor RecordingClientLive {
     }
 
     await flushDeferredCaptureRestartIfNeeded()
-    await resumeMediaIfNeeded()
+    await mediaControl.resumeAfterRecording()
 
     return exportedURL
-  }
-
-  private func resumeMediaIfNeeded() async {
-    // Resume audio in background - don't block stop from completing
-    let playersToResume = pausedPlayers
-    let shouldResumeMedia = didPauseMedia
-    let shouldResumeViaMediaRemote = didPauseViaMediaRemote
-    let volumeToRestore = previousVolume
-
-    if !playersToResume.isEmpty || shouldResumeMedia || shouldResumeViaMediaRemote || volumeToRestore != nil {
-      Task {
-        // Restore volume if it was muted
-        if let volume = volumeToRestore {
-          await self.restoreSystemVolume(volume)
-        }
-        // Resume media if we previously paused specific players
-        else if !playersToResume.isEmpty {
-          mediaLogger.notice("Resuming players: \(playersToResume.joined(separator: ", "))")
-          await resumeMediaApplications(playersToResume)
-        }
-        else if shouldResumeViaMediaRemote {
-          if mediaRemoteController?.send(.play) == true {
-            mediaLogger.notice("Resuming media via MediaRemote")
-          } else {
-            mediaLogger.error("Failed to resume via MediaRemote; falling back to media key")
-            await MainActor.run {
-              sendMediaKey()
-            }
-          }
-        }
-        // Resume generic media if we paused it with the media key
-        else if shouldResumeMedia {
-          await MainActor.run {
-            sendMediaKey()
-          }
-          mediaLogger.notice("Resuming media via media key")
-        }
-
-        // Clear the flags
-        self.clearMediaState()
-      }
-    }
   }
 
   // Actor state update helpers
@@ -1297,54 +872,6 @@ actor RecordingClientLive {
   private func invalidatePrimedState() {
     isRecorderPrimedForNextSession = false
     lastPrimedDeviceID = nil
-  }
-
-  private func updatePausedPlayers(_ players: [String], sessionID: UUID) {
-    guard recordingSessionID == sessionID else { return }
-    pausedPlayers = players
-  }
-
-  private func setDidPauseMedia(_ value: Bool, sessionID: UUID) {
-    guard recordingSessionID == sessionID else { return }
-    didPauseMedia = value
-  }
-
-  private func setDidPauseViaMediaRemote(_ value: Bool, sessionID: UUID) {
-    guard recordingSessionID == sessionID else { return }
-    didPauseViaMediaRemote = value
-  }
-
-  private func setPreviousVolume(_ volume: Float, sessionID: UUID) {
-    guard recordingSessionID == sessionID else { return }
-    previousVolume = volume
-  }
-
-  private func clearMediaState() {
-    pausedPlayers = []
-    didPauseMedia = false
-    didPauseViaMediaRemote = false
-    previousVolume = nil
-  }
-
-  @discardableResult
-  private func pauseUsingMediaRemoteIfPossible(sessionID: UUID) async -> Bool {
-    guard let controller = mediaRemoteController else {
-      return false
-    }
-
-    let isPlaying = await controller.isMediaPlaying()
-    guard isPlaying else {
-      return false
-    }
-
-    guard controller.send(.pause) else {
-      mediaLogger.error("Failed to send MediaRemote pause command")
-      return false
-    }
-
-    setDidPauseViaMediaRemote(true, sessionID: sessionID)
-    mediaLogger.notice("Paused media via MediaRemote")
-    return true
   }
 
   private enum RecorderPreparationError: Error {
@@ -1388,7 +915,7 @@ actor RecordingClientLive {
 
     let exportURL = recordingURL
       .deletingLastPathComponent()
-      .appendingPathComponent("hex-recording-\(UUID().uuidString).wav")
+      .appendingPathComponent("kol-recording-\(UUID().uuidString).wav")
 
     if fm.fileExists(atPath: exportURL.path) {
       try fm.removeItem(at: exportURL)

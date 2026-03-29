@@ -302,7 +302,7 @@ struct PasteboardClientLive {
         // Optional tiny wait before keystrokes
         try? await wait(milliseconds: delayMs)
         let source = CGEventSource(stateID: .combinedSessionState)
-        let vKey = vKeyCode()
+        let vKey = Sauce.shared.keyCode(for: .v)
         let cmdKey: CGKeyCode = 55
         let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: cmdKey, keyDown: true)
         let vDown = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: true)
@@ -310,17 +310,15 @@ struct PasteboardClientLive {
         let vUp = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: false)
         vUp?.flags = .maskCommand
         let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: cmdKey, keyDown: false)
+        guard cmdDown != nil, vDown != nil, vUp != nil, cmdUp != nil else {
+            pasteboardLogger.error("Failed to create CGEvent for Cmd+V paste")
+            return false
+        }
         cmdDown?.post(tap: .cghidEventTap)
         vDown?.post(tap: .cghidEventTap)
         vUp?.post(tap: .cghidEventTap)
         cmdUp?.post(tap: .cghidEventTap)
         return true
-    }
-
-    @MainActor
-    private func vKeyCode() -> CGKeyCode {
-        if Thread.isMainThread { return Sauce.shared.keyCode(for: .v) }
-        return DispatchQueue.main.sync { Sauce.shared.keyCode(for: .v) }
     }
 
     @MainActor
