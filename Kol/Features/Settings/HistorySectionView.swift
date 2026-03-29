@@ -1,7 +1,6 @@
 import ComposableArchitecture
 import Inject
 import SwiftUI
-import KolCore
 
 struct HistorySectionContent: View {
 	@ObserveInjection var inject

@@ -1,5 +1,4 @@
 import ComposableArchitecture
-import KolCore
 import SwiftUI
 
 private let appLogger = KolLog.app

@@ -1,4 +1,3 @@
-import KolCore
 import SwiftUI
 
 struct SidebarView: View {

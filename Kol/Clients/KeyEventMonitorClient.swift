@@ -6,7 +6,6 @@ import CoreGraphics
 import Dependencies
 import DependenciesMacros
 import Foundation
-import KolCore
 import IOKit
 import IOKit.hidsystem
 import Sauce

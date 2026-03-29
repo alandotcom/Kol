@@ -3,7 +3,6 @@ import AppKit
 import ComposableArchitecture
 import CoreAudio
 import Dependencies
-import KolCore
 import IdentifiedCollections
 import Sauce
 import ServiceManagement

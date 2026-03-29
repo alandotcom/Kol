@@ -7,7 +7,6 @@ import AppKit
 import ComposableArchitecture
 import Darwin
 import Dependencies
-import KolCore
 import IdentifiedCollections
 
 // ──────────────────────────────────────────────────────────────────────────

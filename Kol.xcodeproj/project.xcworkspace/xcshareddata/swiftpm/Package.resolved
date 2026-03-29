@@ -1,5 +1,5 @@
 {
-  "originHash" : "8a7ea49952cd693ef306e8ac1fb694e07d7259bed61037458abdc86902f1bbaa",
+  "originHash" : "ac47bb02d1401ab51ca183586944d4af15d2bc11e11fda9ba706821fd019bb08",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -150,15 +150,6 @@
       "state" : {
         "revision" : "ba2364165002abe8f4f3992d74a7b547c635638e",
         "version" : "2.2.1"
-      }
-    },
-    {
-      "identity" : "swift-log",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-log.git",
-      "state" : {
-        "revision" : "2778fd4e5a12a8aaa30a3ee8285f4ce54c5f3181",
-        "version" : "1.9.1"
       }
     },
     {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import KolCore
+@testable import Kol
 
 final class KolSettingsMigrationTests: XCTestCase {
 	func testV1FixtureMigratesToCurrentDefaults() throws {

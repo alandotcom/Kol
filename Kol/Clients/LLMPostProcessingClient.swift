@@ -1,7 +1,6 @@
 import Dependencies
 import DependenciesMacros
 import Foundation
-import KolCore
 
 private let logger = KolLog.llm
 

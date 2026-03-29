@@ -1,5 +1,5 @@
 import Testing
-@testable import KolCore
+@testable import Kol
 
 @Suite("PromptAssembler")
 struct PromptAssemblerTests {

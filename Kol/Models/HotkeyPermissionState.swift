@@ -1,6 +1,5 @@
 import ComposableArchitecture
 import Foundation
-import KolCore
 
 struct HotkeyPermissionState: Codable, Equatable {
   var accessibility: PermissionStatus = .notDetermined

@@ -1,4 +1,3 @@
-import KolCore
 import OSLog
 
 enum DiagnosticsLogging {

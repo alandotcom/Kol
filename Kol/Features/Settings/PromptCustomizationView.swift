@@ -1,5 +1,4 @@
 import ComposableArchitecture
-import KolCore
 import SwiftUI
 
 struct PromptCustomizationView: View {

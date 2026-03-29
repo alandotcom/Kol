@@ -1,5 +1,4 @@
 import Foundation
-import KolCore
 
 #if canImport(FluidAudio)
 import FluidAudio

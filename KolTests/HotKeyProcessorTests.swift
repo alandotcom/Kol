@@ -7,7 +7,7 @@
 
 import Dependencies
 import Foundation
-@testable import KolCore
+@testable import Kol
 import Sauce
 import Testing
 

@@ -8,7 +8,6 @@
 import AppKit
 import ComposableArchitecture
 import Dependencies
-import KolCore
 import SwiftUI
 
 @Reducer

@@ -9,7 +9,6 @@ import Carbon
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
-import KolCore
 import Inject
 import SwiftUI
 import WhisperKit

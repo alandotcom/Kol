@@ -10,7 +10,6 @@ import ComposableArchitecture
 import Dependencies
 import DependenciesMacros
 import Foundation
-import KolCore
 import SwiftUI
 
 public enum SoundEffect: String, CaseIterable {

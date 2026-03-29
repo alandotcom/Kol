@@ -1,6 +1,5 @@
 import AVFoundation
 import Foundation
-import KolCore
 import os.log
 
 struct ParakeetClipPreparationResult {

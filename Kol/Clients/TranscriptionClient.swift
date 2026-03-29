@@ -9,7 +9,6 @@ import AVFoundation
 import Dependencies
 import DependenciesMacros
 import Foundation
-import KolCore
 import WhisperKit
 
 #if canImport(FluidAudio)

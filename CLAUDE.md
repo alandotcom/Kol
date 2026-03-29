@@ -30,7 +30,7 @@ Kol (קול, Hebrew for "voice") is a macOS menu bar application for on‑device
   - `PromptLayers.screenContext(visibleText:)` — opt-in, captures text near cursor via Accessibility API
   - Custom rules — user-provided facts (name, company, common terms)
   - `PromptAssembler.systemPrompt()` composes applicable layers in order: core → language → app context → screen context → custom rules
-- **Key files**: `LLMPostProcessing.swift` (KolCore), `LLMPostProcessingClient.swift`, `ScreenContextClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
+- **Key files**: `Kol/Core/Models/LLMPostProcessing.swift`, `LLMPostProcessingClient.swift`, `ScreenContextClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
 - **Insertion point**: `TranscriptionFeature.handleTranscriptionResult()`, after word removals/remappings, before `finalizeRecordingAndStoreTranscript()`
 - **Screen context capture**: `ScreenContextClient` uses AX APIs at recording start (synchronous). State stored in `TranscriptionFeature.State.capturedScreenContext`, cleared on cancel/discard.
 - **Graceful fallback**: on any LLM error, original text is pasted
@@ -44,17 +44,20 @@ When modifying any prompt in `LLMPostProcessing.swift`:
 
 1. **Update the eval prompt files** — `evals/prompts/*.txt` are static copies of the assembled system prompts. They must be kept in sync manually. If you change `appContextCode`, update `evals/prompts/english-code.txt` and `evals/prompts/english-code-screen.txt`.
 2. **Run evals before building** — see Eval Workflow below.
-3. **Run unit tests** — `cd KolCore && swift test`
+3. **Run unit tests** — `xcodebuild test -scheme Kol -destination 'platform=macOS'`
 4. **Then build** — `killall Kol 2>/dev/null; ./scripts/build-install.sh`
 
 ## Build & Development Commands
 
 ```bash
-# Build + sign + install (the only command you need)
+# Debug build for local testing (default workflow)
+killall "Kol Debug" 2>/dev/null; ./scripts/build-install.sh --debug && open ~/Library/Developer/Xcode/DerivedData/Kol-*/Build/Products/Debug/Kol\ Debug.app
+
+# Release build + install to /Applications (only for final verification before release)
 killall Kol 2>/dev/null; ./scripts/build-install.sh
 
-# Run tests (must be run from KolCore directory for unit tests)
-cd KolCore && swift test
+# Run tests
+xcodebuild test -scheme Kol -destination 'platform=macOS' 2>&1 | tail -5
 
 # Open in Xcode (recommended for development)
 open Kol.xcodeproj
@@ -62,13 +65,8 @@ open Kol.xcodeproj
 
 ### Build rules for agents
 
+- **Use debug builds for local testing** — run `./scripts/build-install.sh --debug` and launch from DerivedData. Do NOT replace `/Applications/Kol.app` with every iteration. The release install (`./scripts/build-install.sh` without `--debug`) is only for final verification before a release.
 - **Always use `./scripts/build-install.sh`** — it handles xcodebuild, codesign, and rsync. Do NOT run `xcodebuild` manually.
-- **Always `killall Kol` before installing** — the old process must be killed so the new binary is loaded. Without this, the user will test stale code.
-- **After installing, run `open /Applications/Kol.app`** to relaunch.
-- **KolCore cache auto-invalidation** — `build-install.sh` automatically detects when KolCore sources have changed and selectively cleans only KolCore build artifacts (~21MB) instead of all DerivedData (~330MB). You no longer need to manually delete DerivedData. Just run:
-  ```bash
-  killall Kol 2>/dev/null; ./scripts/build-install.sh
-  ```
 - **Xcode uses file system synchronization** (`PBXFileSystemSynchronizedRootGroup`) — new `.swift` files added to the `Kol/` directory are automatically included in the build. No need to edit the `.xcodeproj` file.
 - **Check for build failures** — the script prints "(N failures)" if there are errors. If you see failures, grep the build output for `error:` before proceeding. Do NOT sign and install a broken build.
 
@@ -119,7 +117,7 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 
 5. **Permissions**: Requires audio input and automation entitlements (see `Kol.entitlements`)
 
-6. **Logging**: All diagnostics should use the unified logging helper `KolLog` (`KolCore/Sources/KolCore/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
+6. **Logging**: All diagnostics should use the unified logging helper `KolLog` (`Kol/Core/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
 
 ## Models
 

@@ -2,7 +2,6 @@ import SwiftUI
 import ComposableArchitecture
 import Dependencies
 import AppKit
-import KolCore
 import Sauce
 
 struct MenuBarCopyLastTranscriptButton: View {

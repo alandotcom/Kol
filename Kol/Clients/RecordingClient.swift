@@ -12,7 +12,6 @@ import CoreAudio
 import Dependencies
 import DependenciesMacros
 import Foundation
-import KolCore
 
 private let recordingLogger = KolLog.recording
 private let mediaLogger = KolLog.media

@@ -2,7 +2,6 @@ import AVFoundation
 import AppKit
 import ComposableArchitecture
 import Dependencies
-import KolCore
 import Inject
 import SwiftUI
 
