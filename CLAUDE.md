@@ -65,17 +65,12 @@ open Kol.xcodeproj
 - **Always use `./scripts/build-install.sh`** — it handles xcodebuild, codesign, and rsync. Do NOT run `xcodebuild` manually.
 - **Always `killall Kol` before installing** — the old process must be killed so the new binary is loaded. Without this, the user will test stale code.
 - **After installing, run `open /Applications/Kol.app`** to relaunch.
-- **Delete DerivedData when KolCore files change** — Xcode's incremental build does NOT reliably detect changes in the local `KolCore` Swift package. If you edited any file under `KolCore/Sources/`, you MUST delete DerivedData before building:
-  ```bash
-  killall Kol 2>/dev/null; rm -rf ~/Library/Developer/Xcode/DerivedData/Kol-* && ./scripts/build-install.sh
-  ```
-  If you only edited files under `Kol/` (the app target), a normal incremental build is fine:
+- **KolCore cache auto-invalidation** — `build-install.sh` automatically detects when KolCore sources have changed and selectively cleans only KolCore build artifacts (~21MB) instead of all DerivedData (~330MB). You no longer need to manually delete DerivedData. Just run:
   ```bash
   killall Kol 2>/dev/null; ./scripts/build-install.sh
   ```
 - **Xcode uses file system synchronization** (`PBXFileSystemSynchronizedRootGroup`) — new `.swift` files added to the `Kol/` directory are automatically included in the build. No need to edit the `.xcodeproj` file.
 - **Check for build failures** — the script prints "(N failures)" if there are errors. If you see failures, grep the build output for `error:` before proceeding. Do NOT sign and install a broken build.
-- **Verify compilation actually happened** — if the build output goes straight from "Building Release..." to "Signing..." with no compilation steps, the cache was reused. This means your changes are NOT in the binary. Delete DerivedData and rebuild.
 
 **Signing note**: Use `codesign` post-build with a stable identity so macOS permissions (accessibility, input monitoring, microphone) persist between installs. Ad-hoc signing (`-`) resets permissions every build.
 

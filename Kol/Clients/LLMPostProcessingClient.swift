@@ -18,17 +18,20 @@ extension LLMPostProcessingClient: DependencyKey {
 	static var liveValue: Self {
 		Self(
 			process: { context, config, apiKey in
+				let precedingText = context.precedingText
 				let systemPrompt = PromptAssembler.systemPrompt(
 					language: context.inputLanguage,
 					sourceApp: context.sourceApp,
 					customRules: context.customRules,
 					appContextOverrides: context.appContextOverrides,
-					screenContext: context.screenContext
+					screenContext: context.screenContext,
+					hasPrecedingText: precedingText != nil
 				)
-				let userMessage = PromptAssembler.userMessage(text: context.text)
+				let userMessage = PromptAssembler.userMessage(text: context.text, precedingText: precedingText)
 
 				logger.notice("LLM sourceApp: \(context.sourceApp ?? "nil", privacy: .public)")
 				logger.notice("LLM screenContext length: \(context.screenContext?.count ?? 0)")
+				logger.notice("LLM precedingText: \(precedingText ?? "nil", privacy: .public)")
 				logger.notice("LLM system prompt preview: \(String(systemPrompt.suffix(200)), privacy: .public)")
 
 				let url = URL(string: "\(config.baseURL)/chat/completions")!
@@ -84,7 +87,16 @@ extension LLMPostProcessingClient: DependencyKey {
 				}
 				// Treat EMPTY sentinel as empty string
 				if trimmed == "EMPTY" { trimmed = "" }
+
+				// Strip preceding text prefix — the LLM outputs full combined text,
+				// we only want the new portion to paste.
+				if let prec = precedingText, !prec.isEmpty {
+					trimmed = PromptAssembler.stripPrecedingPrefix(trimmed, precedingText: prec)
+				}
+
 				let latencyMs = Int(elapsed * 1000)
+				logger.notice("LLM raw response: [\(content, privacy: .public)]")
+				logger.notice("LLM after strip: [\(trimmed, privacy: .public)]")
 				logger.info("LLM post-processing took \(latencyMs)ms (\(config.modelName))")
 
 				let finalText = trimmed.isEmpty ? context.text : trimmed

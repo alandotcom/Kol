@@ -24,6 +24,7 @@ public struct PostProcessingContext: Sendable {
 	public let customRules: String?
 	public let appContextOverrides: AppContextOverrides?
 	public let screenContext: String?
+	public let precedingText: String?
 
 	public init(
 		text: String,
@@ -31,7 +32,8 @@ public struct PostProcessingContext: Sendable {
 		sourceApp: String? = nil,
 		customRules: String? = nil,
 		appContextOverrides: AppContextOverrides? = nil,
-		screenContext: String? = nil
+		screenContext: String? = nil,
+		precedingText: String? = nil
 	) {
 		self.text = text
 		self.inputLanguage = inputLanguage
@@ -39,6 +41,7 @@ public struct PostProcessingContext: Sendable {
 		self.customRules = customRules
 		self.appContextOverrides = appContextOverrides
 		self.screenContext = screenContext
+		self.precedingText = precedingText
 	}
 }
 
@@ -200,9 +203,12 @@ public enum PromptLayers {
 	"""
 
 	/// Screen context layer: visible text near the cursor to help resolve ambiguous terms.
-	public static func screenContext(visibleText: String) -> String {
-		"""
-		The following text is currently visible on the user's screen near the cursor. \
+	public static func screenContext(visibleText: String, isTerminal: Bool = false) -> String {
+		let preamble = isTerminal
+			? "The following is recent terminal output visible on the user's screen."
+			: "The following text is currently visible on the user's screen near the cursor."
+		return """
+		\(preamble) \
 		Use it ONLY to resolve ambiguous words, technical terms, function names, or variable names \
 		that appear in the transcription. Do NOT add, summarize, or reference this text in your output.
 		---
@@ -210,6 +216,16 @@ public enum PromptLayers {
 		---
 		"""
 	}
+
+	/// Continuation rules layer: added when PRECEDING_TEXT will be in the user message.
+	public static let continuation = """
+	Continuation rules — when PRECEDING_TEXT is provided in the user message:
+	The transcription continues from where PRECEDING_TEXT left off. Output the FULL combined text: \
+	repeat the PRECEDING_TEXT character-for-character without any changes, then append the cleaned \
+	transcription with correct punctuation and spacing between them. Do NOT modify, correct, or add \
+	punctuation to the PRECEDING_TEXT itself — only add joining punctuation/spacing AFTER it. \
+	The caller will strip the PRECEDING_TEXT prefix from your output.
+	"""
 
 	/// Identifies which app context category an app belongs to.
 	/// Returns nil for unknown apps.
@@ -221,6 +237,7 @@ public enum PromptLayers {
 			"vscode", "visual studio code", "code", "xcode", "neovim", "vim",
 			"intellij", "webstorm", "pycharm", "cursor", "zed", "sublime",
 			"com.apple.terminal", "com.googlecode.iterm2", "dev.warp.warp-stable",
+			"com.mitchellh.ghostty", "net.kovidgoyal.kitty", "org.alacritty",
 			"com.microsoft.vscode", "com.apple.dt.xcode", "com.todesktop.230313mzl4w4u92",
 			"dev.zed.zed",
 		]
@@ -240,6 +257,17 @@ public enum PromptLayers {
 		if messagingApps.contains(where: { app.contains($0) }) { return .messaging }
 		if documentApps.contains(where: { app.contains($0) }) { return .document }
 		return nil
+	}
+
+	/// Whether the source app is a terminal emulator (as opposed to a code editor).
+	public static func isTerminal(_ appIdentifier: String?) -> Bool {
+		guard let app = appIdentifier?.lowercased() else { return false }
+		let terminals = [
+			"terminal", "iterm", "warp", "alacritty", "kitty", "ghostty",
+			"com.apple.terminal", "com.googlecode.iterm2", "dev.warp.warp-stable",
+			"com.mitchellh.ghostty", "net.kovidgoyal.kitty", "org.alacritty",
+		]
+		return terminals.contains(where: { app.contains($0) })
 	}
 
 	/// Returns the default prompt text for a given category.
@@ -268,7 +296,8 @@ public enum PromptAssembler {
 		sourceApp: String?,
 		customRules: String?,
 		appContextOverrides: AppContextOverrides? = nil,
-		screenContext: String? = nil
+		screenContext: String? = nil,
+		hasPrecedingText: Bool = false
 	) -> String {
 		var parts: [String] = [PromptLayers.core]
 
@@ -289,7 +318,14 @@ public enum PromptAssembler {
 		}
 
 		if let ctx = screenContext, !ctx.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-			parts.append(PromptLayers.screenContext(visibleText: ctx))
+			parts.append(PromptLayers.screenContext(
+				visibleText: ctx,
+				isTerminal: PromptLayers.isTerminal(sourceApp)
+			))
+		}
+
+		if hasPrecedingText {
+			parts.append(PromptLayers.continuation)
 		}
 
 		if let rules = customRules, !rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -301,7 +337,45 @@ public enum PromptAssembler {
 
 	/// Build the user message. Wraps the transcription in a delimiter so the model
 	/// treats it as text to clean, not as instructions to follow.
-	public static func userMessage(text: String) -> String {
-		"RAW_TRANSCRIPTION: \"\(text)\""
+	/// When `precedingText` is provided, the LLM outputs full combined text for proper joining.
+	public static func userMessage(text: String, precedingText: String? = nil) -> String {
+		if let prec = precedingText, !prec.isEmpty {
+			return "PRECEDING_TEXT: \"\(prec)\"\nRAW_TRANSCRIPTION: \"\(text)\""
+		}
+		return "RAW_TRANSCRIPTION: \"\(text)\""
+	}
+
+	/// Extracts the last non-empty line from screen context as the text immediately before the cursor.
+	public static func extractPrecedingText(from screenContext: String?) -> String? {
+		guard let ctx = screenContext else { return nil }
+		return ctx
+			.split(separator: "\n", omittingEmptySubsequences: true)
+			.last
+			.map(String.init)?
+			.trimmingCharacters(in: .whitespaces)
+	}
+
+	/// Strips the preceding text prefix from LLM output, returning just the new text to paste.
+	/// Also fixes capitalization after comma/semicolon joins (mid-sentence should be lowercase).
+	public static func stripPrecedingPrefix(_ output: String, precedingText: String) -> String {
+		guard output.hasPrefix(precedingText) else {
+			// If LLM didn't preserve the prefix exactly, return original output
+			return output
+		}
+		var remainder = String(output.dropFirst(precedingText.count))
+
+		// Fix capitalization: after comma/semicolon + space, lowercase the next character
+		// e.g. ", Let's" → ", let's" (mid-sentence shouldn't be capitalized)
+		for prefix in [", ", "; "] {
+			if remainder.hasPrefix(prefix) && remainder.count > prefix.count {
+				let idx = remainder.index(remainder.startIndex, offsetBy: prefix.count)
+				let char = remainder[idx]
+				if char.isUppercase {
+					remainder = prefix + char.lowercased() + String(remainder[remainder.index(after: idx)...])
+				}
+			}
+		}
+
+		return remainder
 	}
 }

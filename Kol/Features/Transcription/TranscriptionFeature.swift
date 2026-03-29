@@ -30,6 +30,9 @@ struct TranscriptionFeature {
     var sourceAppName: String?
     var resolvedLanguage: String?
     var capturedScreenContext: String?
+    /// Tracks the last text pasted, so the next dictation can use it as preceding context.
+    var lastPastedText: String?
+    var lastPastedAppBundleID: String?
     @Shared(.kolSettings) var kolSettings: KolSettings
     @Shared(.isRemappingScratchpadFocused) var isRemappingScratchpadFocused: Bool = false
     @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
@@ -55,6 +58,9 @@ struct TranscriptionFeature {
     // Transcription result flow
     case transcriptionResult(String, URL)
     case transcriptionError(Error, URL?)
+
+    // Continuation tracking
+    case didPasteText(String, appBundleID: String?)
 
     // Model availability
     case modelMissing
@@ -129,6 +135,11 @@ struct TranscriptionFeature {
         return handleTranscriptionError(&state, error: error, audioURL: audioURL)
 
       case .modelMissing:
+        return .none
+
+      case let .didPasteText(text, appBundleID):
+        state.lastPastedText = text
+        state.lastPastedAppBundleID = appBundleID
         return .none
 
       // MARK: - Cancel/Discard Flow
@@ -303,7 +314,7 @@ private extension TranscriptionFeature {
 
     // Capture screen context for LLM post-processing (synchronous AX call)
     if state.kolSettings.llmPostProcessingEnabled && state.kolSettings.llmScreenContextEnabled {
-      state.capturedScreenContext = screenContext.captureVisibleText()
+      state.capturedScreenContext = screenContext.captureVisibleText(state.sourceAppBundleID)
     } else {
       state.capturedScreenContext = nil
     }
@@ -464,8 +475,9 @@ private extension TranscriptionFeature {
     let remappings = state.kolSettings.wordRemappings
     let removalsEnabled = state.kolSettings.wordRemovalsEnabled
     let removals = state.kolSettings.wordRemovals
+    let isRemappingScratchpadFocused = state.isRemappingScratchpadFocused
     let modifiedResult: String
-    if state.isRemappingScratchpadFocused {
+    if isRemappingScratchpadFocused {
       modifiedResult = result
       transcriptionFeatureLogger.info("Scratchpad focused; skipping word modifications")
     } else {
@@ -478,11 +490,9 @@ private extension TranscriptionFeature {
         }
         output = removedResult
       }
-      let remappedResult = WordRemappingApplier.apply(output, remappings: remappings)
-      if remappedResult != output {
-        transcriptionFeatureLogger.info("Applied \(remappings.count) word remapping(s)")
-      }
-      modifiedResult = remappedResult
+      // Word remappings are applied AFTER LLM post-processing (below)
+      // so the LLM can't undo them.
+      modifiedResult = output
     }
 
     guard !modifiedResult.isEmpty else {
@@ -506,6 +516,9 @@ private extension TranscriptionFeature {
     )
     let resolvedLanguage = state.resolvedLanguage
     let capturedScreenContext = state.capturedScreenContext
+    // Use last pasted text as preceding context if same app
+    let precedingText = (sourceAppBundleID != nil && sourceAppBundleID == state.lastPastedAppBundleID)
+      ? state.lastPastedText : nil
 
     return .run { [llmPostProcessing, keychain] send in
       do {
@@ -524,7 +537,8 @@ private extension TranscriptionFeature {
               sourceApp: sourceAppName ?? sourceAppBundleID,
               customRules: llmCustomRules.isEmpty ? nil : llmCustomRules,
               appContextOverrides: llmAppContextOverrides,
-              screenContext: capturedScreenContext
+              screenContext: capturedScreenContext,
+              precedingText: precedingText
             )
             do {
               let result = try await llmPostProcessing.process(context, llmConfig, apiKey)
@@ -542,6 +556,15 @@ private extension TranscriptionFeature {
           }
         }
 
+        // Apply word remappings after LLM so the LLM can't undo them
+        if !isRemappingScratchpadFocused {
+          let remappedText = WordRemappingApplier.apply(finalText, remappings: remappings)
+          if remappedText != finalText {
+            transcriptionFeatureLogger.info("Applied \(remappings.count) word remapping(s)")
+            finalText = remappedText
+          }
+        }
+
         try await finalizeRecordingAndStoreTranscript(
           result: finalText,
           llmMetadata: llmMetadata,
@@ -551,6 +574,7 @@ private extension TranscriptionFeature {
           audioURL: audioURL,
           transcriptionHistory: transcriptionHistory
         )
+        await send(.didPasteText(finalText, appBundleID: sourceAppBundleID))
       } catch {
         await send(.transcriptionError(error, audioURL))
       }

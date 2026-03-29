@@ -1,0 +1,230 @@
+# Text Continuation Test Cases
+# Tests that the LLM properly handles joining consecutive dictations.
+# The LLM is asked to output FULL combined text (preceding + new).
+# The caller strips the PRECEDING_TEXT prefix to get the insert text.
+#
+# Run: source .env && npx promptfoo eval --config promptfooconfig.yaml --prompts prompts/english-general-continuation.txt --tests datasets/continuation.yaml
+
+# Helper: all assertions use `context.vars.precedingText` to strip prefix and test the remainder.
+# The "remainder" is what gets pasted after the preceding text.
+
+# =============================================================================
+# Leading space — previous text ends without space
+# =============================================================================
+
+- description: "Continuation: space after complete sentence with period"
+  vars:
+    precedingText: "I went to the store."
+    input: "then I came home"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith(' ');
+      metric: leading-space
+    - type: icontains
+      value: "came home"
+
+- description: "Continuation: join after word without punctuation"
+  vars:
+    precedingText: "hello world"
+    input: "how are you"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith('. ') || remainder.startsWith(', ') || remainder.startsWith(' ');
+      metric: leading-join
+    - type: icontains
+      value: "how are you"
+
+- description: "Continuation: space after comma"
+  vars:
+    precedingText: "first we do this,"
+    input: "then we do that"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith(' ');
+      metric: leading-space
+    - type: icontains
+      value: "then"
+
+# =============================================================================
+# Punctuation repair — previous text missing end punctuation
+# =============================================================================
+
+- description: "Continuation: add punctuation between two separate sentences"
+  vars:
+    precedingText: "I went to the store"
+    input: "then I came back home"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith('. ') || remainder.startsWith(', ');
+      metric: punctuation-repair
+    - type: icontains
+      value: "came back home"
+
+- description: "Continuation: period between statement and new sentence"
+  vars:
+    precedingText: "The meeting went well"
+    input: "we decided to move forward with the project"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith('. ');
+      metric: punctuation-repair
+    - type: icontains
+      value: "decided"
+
+- description: "Continuation: punctuation when previous was a question"
+  vars:
+    precedingText: "Do you want to go to the store"
+    input: "I think we should"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith('? ') || remainder.startsWith('. ');
+      metric: punctuation-repair
+    - type: icontains
+      value: "should"
+
+# =============================================================================
+# No leading space needed — previous text already ends with space/newline
+# =============================================================================
+
+- description: "Continuation: no double space when preceding ends with space"
+  vars:
+    precedingText: "Hello "
+    input: "how are you doing today"
+  assert:
+    - type: javascript
+      value: |
+        // LLM may modify "Hello " to "Hello, " which is acceptable
+        const prec = context.vars.precedingText;
+        const idx = output.toLowerCase().indexOf('how are you');
+        return idx > 0 && output[idx-1] === ' ' && (idx < 2 || output[idx-2] !== ' ');
+      metric: no-extra-space
+    - type: icontains
+      value: "how are you"
+
+# =============================================================================
+# Punctuation already present — don't double up
+# =============================================================================
+
+- description: "Continuation: don't double period"
+  vars:
+    precedingText: "I went to the store."
+    input: "then I came home"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return !remainder.startsWith('.');
+      metric: no-double-punct
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith(' ');
+      metric: leading-space
+
+- description: "Continuation: don't double question mark"
+  vars:
+    precedingText: "Are you coming?"
+    input: "yes I am"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return !remainder.startsWith('?');
+      metric: no-double-punct
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith(' ');
+      metric: leading-space
+
+# =============================================================================
+# Real-world terminal/Claude Code scenarios
+# =============================================================================
+
+- description: "Continuation: dictating into Claude Code after previous dictation"
+  vars:
+    precedingText: "please fix the bug in the login page"
+    input: "and also update the tests"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith(' ') || remainder.startsWith('. ') || remainder.startsWith(', ');
+      metric: leading-join
+    - type: icontains
+      value: "update the tests"
+
+- description: "Continuation: second instruction to Claude Code"
+  vars:
+    precedingText: "Add a new function called processItems that takes an array of items"
+    input: "it should return the filtered results"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith('. ');
+      metric: punctuation-repair
+    - type: icontains
+      value: "filtered results"
+
+- description: "Continuation: continuing mid-sentence naturally"
+  vars:
+    precedingText: "I want you to"
+    input: "fix the bug and deploy it"
+  assert:
+    - type: javascript
+      value: |
+        const prec = context.vars.precedingText;
+        if (!output.startsWith(prec)) return false;
+        const remainder = output.slice(prec.length);
+        return remainder.startsWith(' ') && !remainder.startsWith('. ') && !remainder.startsWith('? ');
+      metric: mid-sentence-join
+    - type: icontains
+      value: "fix the bug"
+
+- description: "Continuation: output includes preceding text exactly"
+  vars:
+    precedingText: "The API is broken"
+    input: "we need to fix it before the release"
+  assert:
+    - type: javascript
+      value: "output.startsWith(context.vars.precedingText)"
+      metric: prefix-preserved
+    - type: icontains
+      value: "fix it"

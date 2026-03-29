@@ -215,6 +215,27 @@ struct PromptAssemblerTests {
 		#expect(prompt.contains("resolveModelAndLanguage"))
 	}
 
+	@Test("Screen context uses terminal preamble for terminal apps")
+	func screenContextTerminalPreamble() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "com.mitchellh.ghostty", customRules: nil,
+			screenContext: "$ git status"
+		)
+		#expect(prompt.contains("recent terminal output"))
+		#expect(!prompt.contains("currently visible on the user's screen near the cursor"))
+		#expect(prompt.contains("git status"))
+	}
+
+	@Test("Screen context uses standard preamble for non-terminal apps")
+	func screenContextEditorPreamble() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "com.microsoft.VSCode", customRules: nil,
+			screenContext: "func foo() {"
+		)
+		#expect(prompt.contains("currently visible on the user's screen"))
+		#expect(!prompt.contains("recent terminal output"))
+	}
+
 	@Test("Screen context excluded when nil")
 	func screenContextExcludedNil() {
 		let prompt = PromptAssembler.systemPrompt(
@@ -242,7 +263,7 @@ struct PromptAssemblerTests {
 			screenContext: "let x = 42"
 		)
 		let appContextRange = prompt.range(of: "code editor or terminal")!
-		let screenRange = prompt.range(of: "currently visible on the user's screen")!
+		let screenRange = prompt.range(of: "recent terminal output")!
 		let rulesRange = prompt.range(of: "Facts about the speaker")!
 		#expect(appContextRange.lowerBound < screenRange.lowerBound)
 		#expect(screenRange.lowerBound < rulesRange.lowerBound)
@@ -262,15 +283,76 @@ struct PromptAssemblerTests {
 	}
 }
 
+@Suite("PromptAssembler helpers")
+struct PromptAssemblerHelperTests {
+	@Test("extractPrecedingText gets last non-empty line")
+	func extractPrecedingText() {
+		#expect(PromptAssembler.extractPrecedingText(from: "line1\nline2\nline3") == "line3")
+		#expect(PromptAssembler.extractPrecedingText(from: "line1\nline2\n\n") == "line2")
+		#expect(PromptAssembler.extractPrecedingText(from: "single line") == "single line")
+		#expect(PromptAssembler.extractPrecedingText(from: nil) == nil)
+		#expect(PromptAssembler.extractPrecedingText(from: "") == nil)
+	}
+
+	@Test("stripPrecedingPrefix removes exact prefix")
+	func stripPrecedingPrefix() {
+		#expect(PromptAssembler.stripPrecedingPrefix("hello world. How are you?", precedingText: "hello world") == ". How are you?")
+		#expect(PromptAssembler.stripPrecedingPrefix("hello world how are you", precedingText: "hello world") == " how are you")
+	}
+
+	@Test("stripPrecedingPrefix lowercases after comma join")
+	func stripPrecedingPrefixCommaCase() {
+		#expect(PromptAssembler.stripPrecedingPrefix("okay, Let's see", precedingText: "okay") == ", let's see")
+		#expect(PromptAssembler.stripPrecedingPrefix("okay, let's see", precedingText: "okay") == ", let's see")
+	}
+
+	@Test("stripPrecedingPrefix returns original when prefix doesn't match")
+	func stripPrecedingPrefixNoMatch() {
+		#expect(PromptAssembler.stripPrecedingPrefix("different text", precedingText: "hello world") == "different text")
+	}
+
+	@Test("userMessage includes preceding text when provided")
+	func userMessageWithPrecedingText() {
+		let msg = PromptAssembler.userMessage(text: "how are you", precedingText: "hello")
+		#expect(msg.contains("PRECEDING_TEXT: \"hello\""))
+		#expect(msg.contains("RAW_TRANSCRIPTION: \"how are you\""))
+	}
+
+	@Test("userMessage excludes preceding text when nil")
+	func userMessageWithoutPrecedingText() {
+		let msg = PromptAssembler.userMessage(text: "hello world", precedingText: nil)
+		#expect(!msg.contains("PRECEDING_TEXT"))
+		#expect(msg.contains("RAW_TRANSCRIPTION: \"hello world\""))
+	}
+}
+
 @Suite("PromptLayers.appContextCategory")
 struct PromptLayersAppContextTests {
 	@Test("Bundle IDs map to correct categories")
 	func bundleIDs() {
 		#expect(PromptLayers.appContextCategory(for: "com.apple.Terminal") == .code)
 		#expect(PromptLayers.appContextCategory(for: "com.microsoft.VSCode") == .code)
+		#expect(PromptLayers.appContextCategory(for: "com.mitchellh.ghostty") == .code)
 		#expect(PromptLayers.appContextCategory(for: "com.apple.MobileSMS") == .messaging)
 		#expect(PromptLayers.appContextCategory(for: "com.apple.notes") == .document)
 		#expect(PromptLayers.appContextCategory(for: "com.unknown.app") == nil)
 		#expect(PromptLayers.appContextCategory(for: nil) == nil)
+	}
+
+	@Test("isTerminal detects terminal emulators")
+	func isTerminal() {
+		#expect(PromptLayers.isTerminal("com.mitchellh.ghostty"))
+		#expect(PromptLayers.isTerminal("com.apple.Terminal"))
+		#expect(PromptLayers.isTerminal("com.googlecode.iterm2"))
+		#expect(PromptLayers.isTerminal("Ghostty"))
+		#expect(PromptLayers.isTerminal("Terminal"))
+	}
+
+	@Test("isTerminal rejects non-terminal apps")
+	func isNotTerminal() {
+		#expect(!PromptLayers.isTerminal("com.microsoft.VSCode"))
+		#expect(!PromptLayers.isTerminal("com.apple.dt.xcode"))
+		#expect(!PromptLayers.isTerminal("com.apple.notes"))
+		#expect(!PromptLayers.isTerminal(nil))
 	}
 }
