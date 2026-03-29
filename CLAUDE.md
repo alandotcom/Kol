@@ -236,75 +236,22 @@ bun run eval:view
 
 ## Releasing a New Version
 
-Releases are automated via a local CLI tool that handles building, signing, notarizing, and uploading.
+Releases use `scripts/release.sh`, which bumps versions, builds, signs, creates a ZIP, pushes to GitHub, and creates a GitHub release.
 
-### Prerequisites
+```bash
+# Ensure all changes are committed (clean working tree required)
+./scripts/release.sh <version>
+# Example: ./scripts/release.sh 1.1.0
+```
 
-1. **AWS credentials** must be set (for S3 uploads):
-   ```bash
-   export AWS_ACCESS_KEY_ID=...
-   export AWS_SECRET_ACCESS_KEY=...
-   ```
+### What the Release Script Does
 
-2. **Notarization credentials** stored in keychain (one-time setup):
-   ```bash
-   xcrun notarytool store-credentials "AC_PASSWORD"
-   ```
-
-3. **Dependencies installed** at project root and in tools:
-   ```bash
-   bun install                # project root (for changesets)
-   cd tools && bun install    # tools dependencies
-   ```
-
-### Release Steps
-
-1. **Ensure all changes are committed** - the release tool requires a clean working tree
-
-2. **Ensure changesets exist** - any user-facing change should have a `.changeset/*.md` file:
-   ```bash
-   bun run changeset:add-ai patch "Fix microphone selection"
-   ```
-
-3. **Run the release command** from project root:
-   ```bash
-   bun run tools/src/cli.ts release
-   ```
-
-### What the Release Tool Does
-
-1. Checks for clean working tree
-2. Finds pending changesets and applies them (bumps version in `package.json`)
-3. Syncs changelog to `Kol/Resources/changelog.md`
-4. Updates `Info.plist` and `project.pbxproj` with new version
-5. Increments build number
-6. Cleans DerivedData and archives with xcodebuild
-7. Exports and signs with Developer ID
-8. Notarizes app with Apple
-9. Creates and signs DMG
-10. Notarizes DMG
-11. Generates Sparkle appcast
-12. Uploads to S3 (versioned DMG + `kol-latest.dmg` + appcast.xml)
-13. Commits version changes, creates git tag, pushes
-14. Creates GitHub release with DMG and ZIP attachments
-
-### If No Changesets Exist
-
-The tool will prompt you to either:
-- Stop and create a changeset (recommended)
-- Continue with manual version bump (useful for re-running failed releases)
-
-### Artifacts
-
-Each release produces:
-- `Kol-{version}.dmg` - Signed, notarized DMG
-- `Kol-{version}.zip` - For Homebrew cask
-- `kol-latest.dmg` - Always points to latest
-- `appcast.xml` - Sparkle update feed
-
-### Troubleshooting
-
-- **"Working tree is not clean"**: Commit or stash all changes before releasing
-- **Notarization fails**: Check Apple ID credentials and app-specific password
-- **S3 upload fails**: Verify AWS credentials and bucket permissions
-- **Build fails**: Ensure Xcode 16+ and valid code signing certificates
+1. Validates semver and checks for clean working tree
+2. Bumps version in `Info.plist`, `project.pbxproj`, and `package.json`
+3. Increments build number
+4. Commits version bump + creates git tag `v<version>`
+5. Builds with xcodebuild (Release configuration)
+6. Signs with Apple Development identity
+7. Creates ZIP artifact in `build/`
+8. Pushes commit + tag to `fork` remote
+9. Creates GitHub release via `gh release create` with ZIP attached
