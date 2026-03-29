@@ -1,6 +1,6 @@
 {
   "name": "kol-app",
-  "version": "0.7.3",
+  "version": "1.0.0",
   "description": "Release metadata + changelog automation for the Kol macOS app.",
   "private": true,
   "license": "MIT",

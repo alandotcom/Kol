@@ -2,7 +2,15 @@
 
 Kol (קול, Hebrew for "voice") is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added support for **Hebrew speech recognition** via [Caspi-1.7B CoreML](https://huggingface.co/alandotcom/caspi-1.7b-coreml), a Hebrew-optimized fine-tune of Qwen3-ASR running on Apple Silicon.
 
-<img width="812" alt="Kol with Caspi Hebrew model" src="https://github.com/user-attachments/assets/38f7acf0-fcb9-4bed-9a5b-1abc9beb4417" />
+<img width="812" alt="Kol Settings" src="docs/screenshots/settings.png" />
+
+<details>
+<summary>More screenshots</summary>
+
+<img width="812" alt="Kol Transforms" src="docs/screenshots/transforms.png" />
+<img width="812" alt="Kol Advanced" src="docs/screenshots/advanced.png" />
+
+</details>
 
 ## What's added
 
@@ -64,21 +72,6 @@ Once you've configured a global hotkey, there are **two recording modes**:
 
 1. **Press-and-hold** the hotkey to begin recording, say whatever you want, and then release the hotkey to start the transcription process.
 2. **Double-tap** the hotkey to *lock recording*, say whatever you want, and then **tap** the hotkey once more to start the transcription process.
-
-## Contributing
-
-**Issue reports are welcome!** If you encounter bugs or have feature requests, please [open an issue](https://github.com/alandotcom/Kol/issues).
-
-**Note on Pull Requests:** At this stage, I'm not actively reviewing code contributions for significant features or core logic changes. The project is evolving rapidly and it's easier for me to work directly from issue reports. Bug fixes and documentation improvements are still appreciated, but please open an issue first to discuss before investing time in a large PR. Thanks for understanding!
-
-### Changelog workflow
-
-- **For AI agents:** Run `bun run changeset:add-ai <type> "summary"` (e.g., `bun run changeset:add-ai patch "Fix clipboard timing"`) to create a changeset non-interactively.
-- **For humans:** Run `bunx changeset` when your PR needs release notes. Pick `patch`, `minor`, or `major` and write a short summary—this creates a `.changeset/*.md` fragment.
-- Check what will ship with `bunx changeset status --verbose`.
-- `npm run sync-changelog` (or `bun run tools/scripts/sync-changelog.ts`) mirrors the root `CHANGELOG.md` into `Kol/Resources/changelog.md` so the in-app sheet always matches GitHub releases.
-- The release tool consumes the pending fragments, bumps `package.json` + `Info.plist`, regenerates `CHANGELOG.md`, and feeds the resulting section to GitHub + Sparkle automatically. Releases fail fast if no changesets are queued, so you can't forget.
-- If you truly need to ship without pending Changesets (for example, re-running a failed publish), the release script will now prompt you to confirm and choose a `patch`/`minor`/`major` bump interactively before continuing.
 
 ## License
 
