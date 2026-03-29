@@ -1,10 +1,10 @@
-# Hex – Dev Notes for Agents
+# Kol – Dev Notes for Agents
 
 This file provides guidance for coding agents working in this repo.
 
 ## Project Overview
 
-Hex is a macOS menu bar application for on‑device voice‑to‑text. This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added Hebrew ASR and LLM post-processing. It supports Whisper (Core ML via WhisperKit), Parakeet TDT v3 (Core ML via FluidAudio), and Caspi 1.7B (Hebrew, Core ML via Qwen3-ASR). Users activate transcription with hotkeys; text can be auto‑pasted into the active app.
+Kol (קול, Hebrew for "voice") is a macOS menu bar application for on‑device voice‑to‑text. This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added Hebrew ASR and LLM post-processing. It supports Whisper (Core ML via WhisperKit), Parakeet TDT v3 (Core ML via FluidAudio), and Caspi 1.7B (Hebrew, Core ML via Qwen3-ASR). Users activate transcription with hotkeys; text can be auto‑pasted into the active app.
 
 ## Fork-Specific Features
 
@@ -30,7 +30,7 @@ Hex is a macOS menu bar application for on‑device voice‑to‑text. This is a
   - `PromptLayers.screenContext(visibleText:)` — opt-in, captures text near cursor via Accessibility API
   - Custom rules — user-provided facts (name, company, common terms)
   - `PromptAssembler.systemPrompt()` composes applicable layers in order: core → language → app context → screen context → custom rules
-- **Key files**: `LLMPostProcessing.swift` (HexCore), `LLMPostProcessingClient.swift`, `ScreenContextClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
+- **Key files**: `LLMPostProcessing.swift` (KolCore), `LLMPostProcessingClient.swift`, `ScreenContextClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
 - **Insertion point**: `TranscriptionFeature.handleTranscriptionResult()`, after word removals/remappings, before `finalizeRecordingAndStoreTranscript()`
 - **Screen context capture**: `ScreenContextClient` uses AX APIs at recording start (synchronous). State stored in `TranscriptionFeature.State.capturedScreenContext`, cleared on cancel/discard.
 - **Graceful fallback**: on any LLM error, original text is pasted
@@ -44,36 +44,36 @@ When modifying any prompt in `LLMPostProcessing.swift`:
 
 1. **Update the eval prompt files** — `evals/prompts/*.txt` are static copies of the assembled system prompts. They must be kept in sync manually. If you change `appContextCode`, update `evals/prompts/english-code.txt` and `evals/prompts/english-code-screen.txt`.
 2. **Run evals before building** — see Eval Workflow below.
-3. **Run unit tests** — `cd HexCore && swift test`
-4. **Then build** — `killall Hex 2>/dev/null; ./scripts/build-install.sh`
+3. **Run unit tests** — `cd KolCore && swift test`
+4. **Then build** — `killall Kol 2>/dev/null; ./scripts/build-install.sh`
 
 ## Build & Development Commands
 
 ```bash
 # Build + sign + install (the only command you need)
-killall Hex 2>/dev/null; ./scripts/build-install.sh
+killall Kol 2>/dev/null; ./scripts/build-install.sh
 
-# Run tests (must be run from HexCore directory for unit tests)
-cd HexCore && swift test
+# Run tests (must be run from KolCore directory for unit tests)
+cd KolCore && swift test
 
 # Open in Xcode (recommended for development)
-open Hex.xcodeproj
+open Kol.xcodeproj
 ```
 
 ### Build rules for agents
 
 - **Always use `./scripts/build-install.sh`** — it handles xcodebuild, codesign, and rsync. Do NOT run `xcodebuild` manually.
-- **Always `killall Hex` before installing** — the old process must be killed so the new binary is loaded. Without this, the user will test stale code.
-- **After installing, run `open /Applications/Hex.app`** to relaunch.
-- **Delete DerivedData when HexCore files change** — Xcode's incremental build does NOT reliably detect changes in the local `HexCore` Swift package. If you edited any file under `HexCore/Sources/`, you MUST delete DerivedData before building:
+- **Always `killall Kol` before installing** — the old process must be killed so the new binary is loaded. Without this, the user will test stale code.
+- **After installing, run `open /Applications/Kol.app`** to relaunch.
+- **Delete DerivedData when KolCore files change** — Xcode's incremental build does NOT reliably detect changes in the local `KolCore` Swift package. If you edited any file under `KolCore/Sources/`, you MUST delete DerivedData before building:
   ```bash
-  killall Hex 2>/dev/null; rm -rf ~/Library/Developer/Xcode/DerivedData/Hex-* && ./scripts/build-install.sh
+  killall Kol 2>/dev/null; rm -rf ~/Library/Developer/Xcode/DerivedData/Kol-* && ./scripts/build-install.sh
   ```
-  If you only edited files under `Hex/` (the app target), a normal incremental build is fine:
+  If you only edited files under `Kol/` (the app target), a normal incremental build is fine:
   ```bash
-  killall Hex 2>/dev/null; ./scripts/build-install.sh
+  killall Kol 2>/dev/null; ./scripts/build-install.sh
   ```
-- **Xcode uses file system synchronization** (`PBXFileSystemSynchronizedRootGroup`) — new `.swift` files added to the `Hex/` directory are automatically included in the build. No need to edit the `.xcodeproj` file.
+- **Xcode uses file system synchronization** (`PBXFileSystemSynchronizedRootGroup`) — new `.swift` files added to the `Kol/` directory are automatically included in the build. No need to edit the `.xcodeproj` file.
 - **Check for build failures** — the script prints "(N failures)" if there are errors. If you see failures, grep the build output for `error:` before proceeding. Do NOT sign and install a broken build.
 - **Verify compilation actually happened** — if the build output goes straight from "Building Release..." to "Signing..." with no compilation steps, the cache was reused. This means your changes are NOT in the binary. Delete DerivedData and rebuild.
 
@@ -116,15 +116,15 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
    - Mouse clicks and extra modifiers are discarded within threshold, ignored after
    - Only ESC cancels recordings after the threshold
 
-2. **Model Management**: Models are managed by `ModelDownloadFeature`. Curated defaults live in `Hex/Resources/Data/models.json`. The Settings UI shows Parakeet, Caspi, and Whisper models. Caspi auto-downloads from HuggingFace on first use.
+2. **Model Management**: Models are managed by `ModelDownloadFeature`. Curated defaults live in `Kol/Resources/Data/models.json`. The Settings UI shows Parakeet, Caspi, and Whisper models. Caspi auto-downloads from HuggingFace on first use.
 
 3. **Sound Effects**: Audio feedback is provided via `SoundEffect.swift` using files in `Resources/Audio/`
 
 4. **Window Management**: Uses an `InvisibleWindow` for the transcription indicator overlay
 
-5. **Permissions**: Requires audio input and automation entitlements (see `Hex.entitlements`)
+5. **Permissions**: Requires audio input and automation entitlements (see `Kol.entitlements`)
 
-6. **Logging**: All diagnostics should use the unified logging helper `HexLog` (`HexCore/Sources/HexCore/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
+6. **Logging**: All diagnostics should use the unified logging helper `KolLog` (`KolCore/Sources/KolCore/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
 
 ## Models
 
@@ -137,10 +137,10 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 ### Storage Locations
 
 - WhisperKit models
-  - `~/Library/Application Support/com.kitlangton.Hex/models/argmaxinc/whisperkit-coreml/<model>`
+  - `~/Library/Application Support/com.alandotcom.Kol/models/argmaxinc/whisperkit-coreml/<model>`
 - Parakeet (FluidAudio)
   - We set `XDG_CACHE_HOME` on launch so Parakeet caches under the app container:
-  - `~/Library/Containers/com.kitlangton.Hex/Data/Library/Application Support/FluidAudio/Models/parakeet-tdt-0.6b-v3-coreml`
+  - `~/Library/Containers/com.alandotcom.Kol/Data/Library/Application Support/FluidAudio/Models/parakeet-tdt-0.6b-v3-coreml`
   - Legacy `~/.cache/fluidaudio/Models/…` is not visible to the sandbox; re‑download or import.
 
 ### Progress + Availability
@@ -170,7 +170,7 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 Set at app launch and logged:
 
 ```
-XDG_CACHE_HOME = ~/Library/Containers/com.kitlangton.Hex/Data/Library/Application Support/com.kitlangton.Hex/cache
+XDG_CACHE_HOME = ~/Library/Containers/com.alandotcom.Kol/Data/Library/Application Support/com.alandotcom.Kol/cache
 ```
 
 FluidAudio models reside under `Application Support/FluidAudio/Models`.
@@ -184,7 +184,7 @@ FluidAudio models reside under `Application Support/FluidAudio/Models`.
 
 - Repeated mic prompts during debug: ensure Debug signing uses "Apple Development" so TCC sticks
 - Sandbox network errors (‑1003): add `com.apple.security.network.client = true` (already set)
-- Parakeet not detected: ensure it resides under the container path above; downloading from Hex places it correctly.
+- Parakeet not detected: ensure it resides under the container path above; downloading from Kol places it correctly.
 
 ## Eval Workflow
 
@@ -230,7 +230,7 @@ bun run eval:view
    bun run changeset:add-ai minor "Add new feature"
    bun run changeset:add-ai major "Breaking change"
    ```
-3. **Only create changesets, don't process them:** Agents should only create changeset fragments. The release tool is responsible for running `changeset version` to collect changesets into `CHANGELOG.md` and syncing to `Hex/Resources/changelog.md`.
+3. **Only create changesets, don't process them:** Agents should only create changeset fragments. The release tool is responsible for running `changeset version` to collect changesets into `CHANGELOG.md` and syncing to `Kol/Resources/changelog.md`.
 4. **Reference GitHub issues:** When a change addresses a filed issue, link it in code comments and the changeset entry (`(#123)`) so release notes and Sparkle updates point users back to the discussion. If the work should close an issue, include "Fixes #123" (or "Closes #123") in the commit or PR description so GitHub auto-closes it once merged.
 
 ## Git Commit Messages
@@ -280,7 +280,7 @@ Releases are automated via a local CLI tool that handles building, signing, nota
 
 1. Checks for clean working tree
 2. Finds pending changesets and applies them (bumps version in `package.json`)
-3. Syncs changelog to `Hex/Resources/changelog.md`
+3. Syncs changelog to `Kol/Resources/changelog.md`
 4. Updates `Info.plist` and `project.pbxproj` with new version
 5. Increments build number
 6. Cleans DerivedData and archives with xcodebuild
@@ -289,7 +289,7 @@ Releases are automated via a local CLI tool that handles building, signing, nota
 9. Creates and signs DMG
 10. Notarizes DMG
 11. Generates Sparkle appcast
-12. Uploads to S3 (versioned DMG + `hex-latest.dmg` + appcast.xml)
+12. Uploads to S3 (versioned DMG + `kol-latest.dmg` + appcast.xml)
 13. Commits version changes, creates git tag, pushes
 14. Creates GitHub release with DMG and ZIP attachments
 
@@ -302,9 +302,9 @@ The tool will prompt you to either:
 ### Artifacts
 
 Each release produces:
-- `Hex-{version}.dmg` - Signed, notarized DMG
-- `Hex-{version}.zip` - For Homebrew cask
-- `hex-latest.dmg` - Always points to latest
+- `Kol-{version}.dmg` - Signed, notarized DMG
+- `Kol-{version}.zip` - For Homebrew cask
+- `kol-latest.dmg` - Always points to latest
 - `appcast.xml` - Sparkle update feed
 
 ### Troubleshooting

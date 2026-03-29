@@ -1,0 +1,146 @@
+import ComposableArchitecture
+import KolCore
+import Inject
+import SwiftUI
+
+struct LLMSectionContent: View {
+	@ObserveInjection var inject
+	@Bindable var store: StoreOf<SettingsFeature>
+
+	var body: some View {
+		Toggle(
+			"Enable AI Post-Processing",
+			isOn: Binding(
+				get: { store.kolSettings.llmPostProcessingEnabled },
+				set: { store.send(.setLLMEnabled($0)) }
+			)
+		)
+
+		if store.kolSettings.llmPostProcessingEnabled {
+			VStack(alignment: .leading, spacing: 8) {
+				Picker(
+					"Provider",
+					selection: Binding(
+						get: { store.kolSettings.llmProviderPreset },
+						set: { store.send(.setLLMPreset($0)) }
+					)
+				) {
+					ForEach(LLMProviderPreset.allCases, id: \.rawValue) { preset in
+						Text(preset.displayName).tag(preset.rawValue)
+					}
+				}
+				.pickerStyle(.segmented)
+
+				HStack {
+					SecureField(
+						"API Key",
+						text: Binding(
+							get: { store.llmApiKey },
+							set: { store.send(.setLLMApiKey($0)) }
+						)
+					)
+					.textFieldStyle(.roundedBorder)
+
+					if !store.llmApiKey.isEmpty {
+						Image(systemName: "checkmark.circle.fill")
+							.foregroundColor(.green)
+							.font(.caption)
+					}
+				}
+
+				let isCustom = store.kolSettings.llmProviderPreset == LLMProviderPreset.custom.rawValue
+
+				TextField(
+					"Base URL",
+					text: Binding(
+						get: { store.kolSettings.llmProviderBaseURL },
+						set: { store.send(.setLLMBaseURL($0)) }
+					)
+				)
+				.textFieldStyle(.roundedBorder)
+				.disabled(!isCustom)
+				.opacity(isCustom ? 1 : 0.5)
+
+				TextField(
+					"Model",
+					text: Binding(
+						get: { store.kolSettings.llmModelName },
+						set: { store.send(.setLLMModelName($0)) }
+					)
+				)
+				.textFieldStyle(.roundedBorder)
+				.disabled(!isCustom)
+				.opacity(isCustom ? 1 : 0.5)
+
+				VStack(alignment: .leading, spacing: 4) {
+					HStack {
+						Text("Custom Context")
+							.font(.caption)
+							.foregroundColor(.secondary)
+						Spacer()
+						if !store.kolSettings.llmCustomRules.isEmpty {
+							Button("Clear") {
+								store.send(.setLLMCustomRules(""))
+							}
+							.font(.caption)
+							.buttonStyle(.plain)
+							.foregroundColor(.secondary)
+						}
+					}
+
+					TextEditor(
+						text: Binding(
+							get: { store.kolSettings.llmCustomRules },
+							set: { store.send(.setLLMCustomRules($0)) }
+						)
+					)
+					.frame(height: 60)
+					.font(.caption)
+					.scrollContentBackground(.hidden)
+					.background(Color(.textBackgroundColor).opacity(0.5))
+					.cornerRadius(6)
+					.overlay(
+						Group {
+							if store.kolSettings.llmCustomRules.isEmpty {
+								Text("e.g. My name is Alan. Common terms: Claude Code, Railway, CoreML")
+									.font(.caption)
+									.foregroundColor(.secondary.opacity(0.5))
+									.padding(.horizontal, 4)
+									.padding(.top, 8)
+									.allowsHitTesting(false)
+							}
+						},
+						alignment: .topLeading
+					)
+				}
+
+				Toggle(
+					"Include visible text as context",
+					isOn: Binding(
+						get: { store.kolSettings.llmScreenContextEnabled },
+						set: { store.send(.setLLMScreenContextEnabled($0)) }
+					)
+				)
+				Text("Captures text near the cursor to help recognize technical terms on screen.")
+					.font(.caption)
+					.foregroundColor(.secondary)
+
+				Button("Customize App Context Prompts...") {
+					store.send(.showPromptCustomization)
+				}
+				.font(.caption)
+			}
+			.sheet(
+				isPresented: Binding(
+					get: { store.showingPromptCustomization },
+					set: { if !$0 { store.send(.dismissPromptCustomization) } }
+				)
+			) {
+				PromptCustomizationView(store: store)
+			}
+		}
+
+		EmptyView()
+			.enableInjection()
+	}
+}

@@ -12,8 +12,8 @@ bin
 scripts
 tools
 ExportOptions.plist
-HexCore/.build
-HexCore/.swiftpm/xcode/xcuserdata/kit.xcuserdatad/xcschemes
+KolCore/.build
+KolCore/.swiftpm/xcode/xcuserdata/kit.xcuserdatad/xcschemes
 FluidAudio/
 node_modules/
 .npm-cache/

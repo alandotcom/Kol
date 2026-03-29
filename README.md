@@ -1,8 +1,8 @@
-# Hex — Voice → Text (with Hebrew/Caspi support)
+# Kol — Voice → Text (with Hebrew/Caspi support)
 
-This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added support for **Hebrew speech recognition** via [Caspi-1.7B CoreML](https://huggingface.co/alandotcom/caspi-1.7b-coreml), a Hebrew-optimized fine-tune of Qwen3-ASR running on Apple Silicon.
+Kol (קול, Hebrew for "voice") is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added support for **Hebrew speech recognition** via [Caspi-1.7B CoreML](https://huggingface.co/alandotcom/caspi-1.7b-coreml), a Hebrew-optimized fine-tune of Qwen3-ASR running on Apple Silicon.
 
-<img width="812" alt="Hex with Caspi Hebrew model" src="https://github.com/user-attachments/assets/38f7acf0-fcb9-4bed-9a5b-1abc9beb4417" />
+<img width="812" alt="Kol with Caspi Hebrew model" src="https://github.com/user-attachments/assets/38f7acf0-fcb9-4bed-9a5b-1abc9beb4417" />
 
 ## What's added
 
@@ -28,48 +28,46 @@ This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added
 Requires macOS 15+, Xcode 16+, Apple Silicon.
 
 ```bash
-git clone https://github.com/alandotcom/Hex.git
-cd Hex
+git clone https://github.com/alandotcom/Kol.git
+cd Kol
 xcodebuild build \
-  -scheme Hex \
+  -scheme Kol \
   -configuration Release \
   -skipMacroValidation \
   CODE_SIGN_IDENTITY=- \
   CODE_SIGN_STYLE=Manual
 
 # Find and install the built app
-cp -R ~/Library/Developer/Xcode/DerivedData/Hex-*/Build/Products/Release/Hex.app /Applications/
-open /Applications/Hex.app
+cp -R ~/Library/Developer/Xcode/DerivedData/Kol-*/Build/Products/Release/Kol.app /Applications/
+open /Applications/Kol.app
 ```
 
-Or open `Hex.xcodeproj` in Xcode, set your signing team under Signing & Capabilities, and hit Cmd+R.
+Or open `Kol.xcodeproj` in Xcode, set your signing team under Signing & Capabilities, and hit Cmd+R.
 
 On first launch, grant microphone and accessibility permissions. Select **Caspi 1.7B (Hebrew)** in Settings — the model downloads automatically (~2.8 GB).
 
 ---
 
-*Original README below:*
+*Originally forked from [kitlangton/Hex](https://github.com/kitlangton/Hex):*
 
 Press-and-hold a hotkey to transcribe your voice and paste the result wherever you're typing.
 
-**[Download Hex for macOS](https://hex-updates.s3.us-east-1.amazonaws.com/hex-latest.dmg)** (original, without Caspi)
+> **Note:** Kol is currently only available for **Apple Silicon** Macs.
 
-> **Note:** Hex is currently only available for **Apple Silicon** Macs.
-
-Hex supports [Parakeet TDT v3](https://github.com/FluidInference/FluidAudio) via the awesome [FluidAudio](https://github.com/FluidInference/FluidAudio) (the default—it's frickin' unbelievable: fast, multilingual, and cloud-optimized), [WhisperKit](https://github.com/argmaxinc/WhisperKit) for on-device transcription, and now **Caspi-1.7B** for Hebrew. We use the incredible [Swift Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture) for structuring the app.
+Kol supports [Parakeet TDT v3](https://github.com/FluidInference/FluidAudio) via the awesome [FluidAudio](https://github.com/FluidInference/FluidAudio) (the default—it's frickin' unbelievable: fast, multilingual, and cloud-optimized), [WhisperKit](https://github.com/argmaxinc/WhisperKit) for on-device transcription, and now **Caspi-1.7B** for Hebrew. We use the incredible [Swift Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture) for structuring the app.
 
 ## Instructions
 
-Once you open Hex, you'll need to grant it microphone and accessibility permissions—so it can record your voice and paste the transcribed text into any application, respectively.
+Once you open Kol, you'll need to grant it microphone and accessibility permissions—so it can record your voice and paste the transcribed text into any application, respectively.
 
 Once you've configured a global hotkey, there are **two recording modes**:
 
-1. **Press-and-hold** the hotkey to begin recording, say whatever you want, and then release the hotkey to start the transcription process. 
+1. **Press-and-hold** the hotkey to begin recording, say whatever you want, and then release the hotkey to start the transcription process.
 2. **Double-tap** the hotkey to *lock recording*, say whatever you want, and then **tap** the hotkey once more to start the transcription process.
 
 ## Contributing
 
-**Issue reports are welcome!** If you encounter bugs or have feature requests, please [open an issue](https://github.com/kitlangton/Hex/issues).
+**Issue reports are welcome!** If you encounter bugs or have feature requests, please [open an issue](https://github.com/alandotcom/Kol/issues).
 
 **Note on Pull Requests:** At this stage, I'm not actively reviewing code contributions for significant features or core logic changes. The project is evolving rapidly and it's easier for me to work directly from issue reports. Bug fixes and documentation improvements are still appreciated, but please open an issue first to discuss before investing time in a large PR. Thanks for understanding!
 
@@ -78,10 +76,10 @@ Once you've configured a global hotkey, there are **two recording modes**:
 - **For AI agents:** Run `bun run changeset:add-ai <type> "summary"` (e.g., `bun run changeset:add-ai patch "Fix clipboard timing"`) to create a changeset non-interactively.
 - **For humans:** Run `bunx changeset` when your PR needs release notes. Pick `patch`, `minor`, or `major` and write a short summary—this creates a `.changeset/*.md` fragment.
 - Check what will ship with `bunx changeset status --verbose`.
-- `npm run sync-changelog` (or `bun run tools/scripts/sync-changelog.ts`) mirrors the root `CHANGELOG.md` into `Hex/Resources/changelog.md` so the in-app sheet always matches GitHub releases.
+- `npm run sync-changelog` (or `bun run tools/scripts/sync-changelog.ts`) mirrors the root `CHANGELOG.md` into `Kol/Resources/changelog.md` so the in-app sheet always matches GitHub releases.
 - The release tool consumes the pending fragments, bumps `package.json` + `Info.plist`, regenerates `CHANGELOG.md`, and feeds the resulting section to GitHub + Sparkle automatically. Releases fail fast if no changesets are queued, so you can't forget.
 - If you truly need to ship without pending Changesets (for example, re-running a failed publish), the release script will now prompt you to confirm and choose a `patch`/`minor`/`major` bump interactively before continuing.
 
 ## License
 
-This project is licensed under the MIT License. See `LICENSE` for details.
+This project is licensed under the MIT License — originally created by [Kit Langton](https://github.com/kitlangton). See `LICENSE` for details.

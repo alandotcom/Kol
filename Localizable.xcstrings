@@ -4,7 +4,13 @@
     "" : {
       "shouldTranslate" : false
     },
+    "·" : {
+
+    },
     "(%@)" : {
+
+    },
+    "(customized)" : {
 
     },
     "%@ %@" : {
@@ -17,8 +23,18 @@
         }
       }
     },
-    "•" : {
-      "shouldTranslate" : false
+    "%lld active of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld active of %2$lld"
+          }
+        }
+      }
+    },
+    "%lld words" : {
+
     },
     "50" : {
 
@@ -37,6 +53,7 @@
     },
     "About" : {
       "comment" : "Settings -> About Section headline",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -61,10 +78,13 @@
     "Accuracy" : {
 
     },
-    "Add Remapping" : {
+    "Add" : {
 
     },
-    "Add Removal" : {
+    "API Key" : {
+
+    },
+    "App Context Prompts" : {
 
     },
     "Are you sure you want to delete all transcripts? This action cannot be undone." : {
@@ -84,7 +104,7 @@
     "Audio Behavior while Recording" : {
 
     },
-    "Become a Sponsor" : {
+    "Base URL" : {
 
     },
     "Cancel" : {
@@ -99,6 +119,9 @@
       }
     },
     "Cancel Download" : {
+
+    },
+    "Captures text near the cursor to help recognize technical terms on screen." : {
 
     },
     "Changelog" : {
@@ -123,6 +146,7 @@
     },
     "Check for Updates" : {
       "comment" : "Check for updates button in About section of Settings",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -134,6 +158,7 @@
     },
     "Check for Updates…" : {
       "comment" : "Check for updates button in top menu",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -142,6 +167,9 @@
           }
         }
       }
+    },
+    "Clear" : {
+
     },
     "Clear shortcut" : {
 
@@ -179,6 +207,15 @@
       }
     },
     "Copy transcription text to clipboard in addition to pasting it" : {
+
+    },
+    "Custom Context" : {
+
+    },
+    "Customize App Context Prompts..." : {
+
+    },
+    "Customize the instructions sent to the LLM for each type of app. These tell the AI how to format and clean up your transcription." : {
 
     },
     "Delete" : {
@@ -232,6 +269,9 @@
     "Do Nothing" : {
 
     },
+    "Done" : {
+
+    },
     "Download" : {
 
     },
@@ -276,6 +316,12 @@
     "Downloading… %lld%%" : {
 
     },
+    "e.g. My name is Alan. Common terms: Claude Code, Railway, CoreML" : {
+
+    },
+    "Enable AI Post-Processing" : {
+
+    },
     "Enable double-tap lock" : {
 
     },
@@ -285,14 +331,17 @@
     "Enable Word Removals" : {
 
     },
-    "Ensure Hex can access your microphone and system accessibility features." : {
+    "English Model" : {
+
+    },
+    "Ensure Kol can access your microphone and system accessibility features." : {
       "comment" : "Footer for permissions section in settings",
       "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sicherstellen, dass Hex dein Mikrofon und Systemweite Bedienungshilfen benutzen kann."
+            "value" : "Sicherstellen, dass Kol dein Mikrofon und Systemweite Bedienungshilfen benutzen kann."
           }
         }
       }
@@ -308,8 +357,12 @@
         }
       }
     },
+    "Fast but may not restore all clipboard content. Turn off to use simulated keypresses." : {
+
+    },
     "General" : {
       "comment" : "General section in Settings Header.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -334,19 +387,12 @@
         }
       }
     },
-    "Hex is open source" : {
-      "comment" : "In about section in settings.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hex ist Open Source"
-          }
-        }
-      }
+    "Hebrew Model" : {
+
     },
     "History" : {
       "comment" : "History View Title",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -361,6 +407,7 @@
     },
     "Hot Key" : {
       "comment" : "hotkey section in settings.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -380,13 +427,40 @@
         }
       }
     },
+    "Include visible text as context" : {
+
+    },
+    "Input" : {
+
+    },
     "Input Device" : {
 
     },
-    "Input Monitoring is required so Hex can listen for your hotkey." : {
+    "Input Monitoring is required so Kol can listen for your hotkey." : {
 
     },
-    "Keep the microphone warm and prepend a short in-memory buffer for near-instant capture. macOS will keep showing the microphone indicator while this mode is armed." : {
+    "Keep the microphone warm for near-instant capture. macOS will keep showing the microphone indicator." : {
+
+    },
+    "Kol" : {
+
+    },
+    "Kol is open source" : {
+      "comment" : "In about section in settings.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kol ist Open Source"
+          }
+        }
+      }
+    },
+    "Kol switches automatically based on your keyboard layout" : {
+
+    },
+    "Kol switches automatically based on your keyboard layout." : {
 
     },
     "Match" : {
@@ -407,10 +481,7 @@
         }
       }
     },
-    "Microphone Selection" : {
-
-    },
-    "Model prewarming..." : {
+    "Model" : {
 
     },
     "Modification Type" : {
@@ -451,9 +522,6 @@
     "Oldest entries will be automatically deleted when limit is reached" : {
 
     },
-    "On" : {
-
-    },
     "Open Input Monitoring Settings" : {
 
     },
@@ -468,6 +536,9 @@
         }
       }
     },
+    "Original Project" : {
+
+    },
     "Output Language" : {
       "comment" : "transcription model setting for which language to use for text output.",
       "localizations" : {
@@ -479,13 +550,10 @@
         }
       }
     },
-    "Override the system default microphone with a specific input device. This setting will persist across sessions." : {
+    "Override the system default microphone with a specific input device." : {
 
     },
     "Paste Last Transcript" : {
-
-    },
-    "Pattern" : {
 
     },
     "Pause Media" : {
@@ -505,6 +573,7 @@
     },
     "Permissions" : {
       "comment" : "Header for permission section in settings.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -539,6 +608,9 @@
     "Preview" : {
 
     },
+    "Provider" : {
+
+    },
     "Quit" : {
 
     },
@@ -548,16 +620,7 @@
     "Regex Pattern" : {
 
     },
-    "Remove filler words using case-insensitive regex patterns." : {
-
-    },
-    "Remove or replace words in every transcript. Removals use regex patterns and match whole words." : {
-
-    },
     "Replace" : {
-
-    },
-    "Replace specific words in every transcript. Matches whole words, case-insensitive, in order." : {
 
     },
     "Request Permission" : {
@@ -572,6 +635,9 @@
         }
       }
     },
+    "Reset to Default" : {
+
+    },
     "Save Transcription History" : {
 
     },
@@ -579,9 +645,6 @@
 
     },
     "Say something…" : {
-
-    },
-    "Scratchpad" : {
 
     },
     "Selected device not connected. System default will be used." : {
@@ -601,6 +664,7 @@
     },
     "Settings" : {
       "comment" : "title for settings view.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -622,6 +686,7 @@
       }
     },
     "Show Changelog" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -651,8 +716,15 @@
     "Show more" : {
 
     },
+    "Silence Detection" : {
+
+    },
+    "Skip transcription when no speech is detected. Prevents hallucinated text from background noise." : {
+
+    },
     "Sound" : {
       "comment" : "sound section in general settings.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -673,6 +745,9 @@
         }
       }
     },
+    "Sound Theme" : {
+
+    },
     "Speed" : {
 
     },
@@ -690,17 +765,12 @@
     "Super Fast Mode" : {
 
     },
-    "Support the developer" : {
-
-    },
-    "Transcript Modifications" : {
-
-    },
     "Transcription history is currently disabled." : {
 
     },
     "Transcription Model" : {
       "comment" : "Label for Transcription Model Section",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -710,16 +780,13 @@
         }
       }
     },
-    "Transforms" : {
-
-    },
     "Unavailable Device" : {
 
     },
     "Unlimited" : {
 
     },
-    "Use at least one modifier (⌘, ⌥, ⇧, ⌃) plus a key." : {
+    "Use at least one modifier plus a key." : {
 
     },
     "Use clipboard to insert" : {
@@ -735,6 +802,7 @@
     },
     "Use clipboard to insert text. Fast but may not restore all clipboard content.\nTurn off to use simulated keypresses. Slower, but doesn't need to restore clipboard" : {
       "comment" : "More info on \"use clipboard to insert\" toggle in general section.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -749,6 +817,7 @@
     },
     "Version" : {
       "comment" : "Label for version in About section.",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -758,8 +827,12 @@
         }
       }
     },
+    "Version %@" : {
+
+    },
     "Visit our GitHub" : {
       "comment" : "button text to link to github",
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -773,12 +846,6 @@
 
     },
     "When disabled, transcriptions will not be saved and audio files will be deleted immediately after transcription." : {
-
-    },
-    "Word Remappings" : {
-
-    },
-    "Word Removals" : {
 
     },
     "Your transcription history will appear here." : {
