@@ -354,22 +354,28 @@ actor TranscriptionClientLive {
   }
 
   /// Runs Silero VAD on an audio file and returns true if any speech was detected.
+  /// Uses segmentSpeech (hysteresis state machine) instead of raw per-chunk checking
+  /// to filter out isolated noise spikes from fans/AC.
   /// Falls through to true (allowing transcription) if VAD fails for any reason.
   private func containsSpeech(_ url: URL) async -> Bool {
     #if canImport(FluidAudio)
     do {
       if vad == nil {
         let t0 = Date()
-        vad = try await VadManager()
+        vad = try await VadManager(config: VadConfig(defaultThreshold: 0.90))
         let elapsed = String(format: "%.2f", Date().timeIntervalSince(t0))
         transcriptionLogger.notice("VAD initialized in \(elapsed, privacy: .public)s")
       }
       guard let vad else { return true }
       let t0 = Date()
       let results = try await vad.process(url)
-      let hasSpeech = results.contains { $0.isVoiceActive }
+      let totalSamples = results.count * VadManager.chunkSize
+      let segConfig = VadSegmentationConfig(minSpeechDuration: 0.30)
+      let segments = await vad.segmentSpeech(from: results, totalSamples: totalSamples, config: segConfig)
+      let hasSpeech = !segments.isEmpty
+      let totalDuration = segments.reduce(0.0) { $0 + $1.duration }
       let elapsed = String(format: "%.3f", Date().timeIntervalSince(t0))
-      transcriptionLogger.notice("VAD check took \(elapsed, privacy: .public)s — speech=\(hasSpeech, privacy: .public) chunks=\(results.count, privacy: .public)")
+      transcriptionLogger.notice("VAD check took \(elapsed, privacy: .public)s — segments=\(segments.count, privacy: .public) totalSpeech=\(String(format: "%.2f", totalDuration), privacy: .public)s chunks=\(results.count, privacy: .public) speech=\(hasSpeech, privacy: .public)")
       return hasSpeech
     } catch {
       transcriptionLogger.error("VAD check failed, proceeding with transcription: \(error.localizedDescription)")
