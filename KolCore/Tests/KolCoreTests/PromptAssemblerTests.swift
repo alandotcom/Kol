@@ -283,49 +283,6 @@ struct PromptAssemblerTests {
 	}
 }
 
-@Suite("PromptAssembler helpers")
-struct PromptAssemblerHelperTests {
-	@Test("extractPrecedingText gets last non-empty line")
-	func extractPrecedingText() {
-		#expect(PromptAssembler.extractPrecedingText(from: "line1\nline2\nline3") == "line3")
-		#expect(PromptAssembler.extractPrecedingText(from: "line1\nline2\n\n") == "line2")
-		#expect(PromptAssembler.extractPrecedingText(from: "single line") == "single line")
-		#expect(PromptAssembler.extractPrecedingText(from: nil) == nil)
-		#expect(PromptAssembler.extractPrecedingText(from: "") == nil)
-	}
-
-	@Test("stripPrecedingPrefix removes exact prefix")
-	func stripPrecedingPrefix() {
-		#expect(PromptAssembler.stripPrecedingPrefix("hello world. How are you?", precedingText: "hello world") == ". How are you?")
-		#expect(PromptAssembler.stripPrecedingPrefix("hello world how are you", precedingText: "hello world") == " how are you")
-	}
-
-	@Test("stripPrecedingPrefix lowercases after comma join")
-	func stripPrecedingPrefixCommaCase() {
-		#expect(PromptAssembler.stripPrecedingPrefix("okay, Let's see", precedingText: "okay") == ", let's see")
-		#expect(PromptAssembler.stripPrecedingPrefix("okay, let's see", precedingText: "okay") == ", let's see")
-	}
-
-	@Test("stripPrecedingPrefix returns original when prefix doesn't match")
-	func stripPrecedingPrefixNoMatch() {
-		#expect(PromptAssembler.stripPrecedingPrefix("different text", precedingText: "hello world") == "different text")
-	}
-
-	@Test("userMessage includes preceding text when provided")
-	func userMessageWithPrecedingText() {
-		let msg = PromptAssembler.userMessage(text: "how are you", precedingText: "hello")
-		#expect(msg.contains("PRECEDING_TEXT: \"hello\""))
-		#expect(msg.contains("RAW_TRANSCRIPTION: \"how are you\""))
-	}
-
-	@Test("userMessage excludes preceding text when nil")
-	func userMessageWithoutPrecedingText() {
-		let msg = PromptAssembler.userMessage(text: "hello world", precedingText: nil)
-		#expect(!msg.contains("PRECEDING_TEXT"))
-		#expect(msg.contains("RAW_TRANSCRIPTION: \"hello world\""))
-	}
-}
-
 @Suite("PromptLayers.appContextCategory")
 struct PromptLayersAppContextTests {
 	@Test("Bundle IDs map to correct categories")

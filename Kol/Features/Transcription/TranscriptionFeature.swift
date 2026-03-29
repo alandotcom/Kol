@@ -30,9 +30,6 @@ struct TranscriptionFeature {
     var sourceAppName: String?
     var resolvedLanguage: String?
     var capturedScreenContext: String?
-    /// Tracks the last text pasted, so the next dictation can use it as preceding context.
-    var lastPastedText: String?
-    var lastPastedAppBundleID: String?
     @Shared(.kolSettings) var kolSettings: KolSettings
     @Shared(.isRemappingScratchpadFocused) var isRemappingScratchpadFocused: Bool = false
     @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
@@ -58,9 +55,6 @@ struct TranscriptionFeature {
     // Transcription result flow
     case transcriptionResult(String, URL)
     case transcriptionError(Error, URL?)
-
-    // Continuation tracking
-    case didPasteText(String, appBundleID: String?)
 
     // Model availability
     case modelMissing
@@ -137,10 +131,6 @@ struct TranscriptionFeature {
       case .modelMissing:
         return .none
 
-      case let .didPasteText(text, appBundleID):
-        state.lastPastedText = text
-        state.lastPastedAppBundleID = appBundleID
-        return .none
 
       // MARK: - Cancel/Discard Flow
 
@@ -516,9 +506,6 @@ private extension TranscriptionFeature {
     )
     let resolvedLanguage = state.resolvedLanguage
     let capturedScreenContext = state.capturedScreenContext
-    // Use last pasted text as preceding context if same app
-    let precedingText = (sourceAppBundleID != nil && sourceAppBundleID == state.lastPastedAppBundleID)
-      ? state.lastPastedText : nil
 
     return .run { [llmPostProcessing, keychain] send in
       do {
@@ -537,8 +524,7 @@ private extension TranscriptionFeature {
               sourceApp: sourceAppName ?? sourceAppBundleID,
               customRules: llmCustomRules.isEmpty ? nil : llmCustomRules,
               appContextOverrides: llmAppContextOverrides,
-              screenContext: capturedScreenContext,
-              precedingText: precedingText
+              screenContext: capturedScreenContext
             )
             do {
               let result = try await llmPostProcessing.process(context, llmConfig, apiKey)
@@ -574,7 +560,6 @@ private extension TranscriptionFeature {
           audioURL: audioURL,
           transcriptionHistory: transcriptionHistory
         )
-        await send(.didPasteText(finalText, appBundleID: sourceAppBundleID))
       } catch {
         await send(.transcriptionError(error, audioURL))
       }
