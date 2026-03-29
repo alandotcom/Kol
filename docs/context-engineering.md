@@ -28,6 +28,71 @@ Kol's transcription quality is fundamentally limited by how much it knows about 
 
 ---
 
+## 0. Foundation: AX Framework Selection
+
+### Problem
+Kol's `ScreenContextClient` (~260 lines) uses raw `AXUIElement` C API calls for text extraction near the cursor. This works for the current single-grab-at-recording-start approach, but the features planned in this document — tree walking, element querying, real-time observation, app-specific adapters — would require hundreds of lines of custom traversal, querying, and observation code on top of the raw C API.
+
+### Decision: AXorcist
+
+**[steipete/AXorcist](https://github.com/steipete/AXorcist)** — MIT, Swift 6.2, SPM library, single dependency (`swift-log`). It is the accessibility engine behind both Peekaboo (3K stars) and Ghost OS (1.2K stars).
+
+**What it provides over raw `AXUIElement` calls:**
+
+| Capability | Raw C API | AXorcist |
+|------------|-----------|----------|
+| Find element by role/title/value | Manual tree walk | `QueryCommand` with 6 match modes (exact, contains, regex, prefix, suffix, containsAny) |
+| Hierarchical navigation | Manual parent/child iteration | `PathNavigator` with locator chains |
+| Recursive tree dump | Custom BFS/DFS code | `collectAll` with depth limits and filter criteria |
+| Focused element + attributes | `AXUIElementCopyAttributeValue` | `getFocusedElement` with attribute selection |
+| Real-time observation | `AXObserverAddNotification` + CFRunLoop | `observe` command with async notifications (`AXFocusedUIElementChanged`, `AXValueChanged`, `AXSelectedTextChanged`) |
+| Structured output | Manual dictionary building | `AXElementData` — Codable struct with role, attributes, textual content, children, path |
+| Permissions | Manual `AXIsProcessTrusted` | Async/await + `AsyncStream<Bool>` for monitoring |
+| Text extraction | Manual parameterized attribute queries | `insertionPointLineNumber()`, `selectedTextRange`, `isEditable()`, `stringValue()` |
+
+**Which planned features benefit:**
+
+| Feature | Without AXorcist | With AXorcist |
+|---------|-----------------|---------------|
+| Structured cursor context (§1) | Extend existing raw API code | `getFocusedElement` with attribute queries |
+| IDE-specific context (§4) | Custom AX tree walk per editor | `collectAll` with role filter for tab bar elements |
+| Conversation awareness (§5) | Custom walk of chat UI per app | `collectAll` with role/subrole filters for message elements |
+| Continuous context updates (§8) | Polling timer + manual AX calls | `observe` for `AXValueChanged` / `AXFocusedUIElementChanged` |
+| App-specific adapters (§10) | Imperative per-app traversal code | Declarative queries and path locators |
+
+**Requirements:**
+- Swift 6.2 (`swift-tools-version: 6.2`) — verify Xcode compatibility before adopting
+- macOS 14+
+- Add as SPM dependency: `.package(url: "https://github.com/steipete/AXorcist.git", from: "0.1.0")`
+
+**Migration path:**
+1. Add AXorcist as a dependency
+2. Rewrite `ScreenContextClient` internals to use AXorcist queries (keep the public API unchanged)
+3. New features (§4, §5, §8, §10) build directly on AXorcist from the start
+4. Remove raw `AXUIElement` C API calls as features migrate
+
+### Complementary: CursorBounds
+
+**[Aeastr/CursorBounds](https://github.com/Aeastr/CursorBounds)** — 111 stars, SPM, macOS, last push Jan 2026. Provides:
+- Cursor screen position (caret rect, text field bounds, mouse position)
+- Browser context extraction for 18+ browsers (current URL, domain, page title)
+- App context (focused app name, bundle ID, window title)
+
+**Use case:** The browser URL context is uniquely useful — it tells us "user is writing in Gmail" vs "user is writing in Google Docs" without parsing window titles. This enriches app category detection (§10 BrowserAdapter) and could distinguish `mail.google.com` (email mode) from `docs.google.com` (document mode) directly.
+
+**Not a replacement for AXorcist** — CursorBounds gives cursor *position* and app metadata, not text content or tree structure.
+
+### Alternatives Considered
+
+| Library | Stars | Status | Why not |
+|---------|-------|--------|---------|
+| AXSwift (tmandry) | 404 | Unmaintained since 2023 | No tree walking, no structured output, no observation helpers |
+| AXUI/AXON (1amageek) | 5 | New, tiny community | No license, no text extraction, flat dump only |
+| MacosUseSDK (mediar-ai) | 195 | Active | Backup if Swift 6.2 is a blocker — macOS 12+, zero deps |
+| Raw C API (current) | — | — | Works for current scope, doesn't scale to §4-§10 |
+
+---
+
 ## 1. Structured Cursor Context
 
 ### Problem
