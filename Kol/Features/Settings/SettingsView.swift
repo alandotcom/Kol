@@ -60,6 +60,6 @@ struct SettingsView: View {
 
 extension Text {
 	func settingsCaption() -> some View {
-		self.font(.caption).foregroundStyle(.secondary)
+		self.font(.system(size: 13)).foregroundStyle(.secondary)
 	}
 }

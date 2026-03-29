@@ -25,7 +25,7 @@ struct CuratedRow: View {
 							.font(.headline)
 						if let badge = model.badge {
 							Text(badge)
-								.font(.caption2)
+								.font(.system(size: 12))
 								.fontWeight(.semibold)
 								.foregroundStyle(.white)
 								.padding(.horizontal, 6)
@@ -37,11 +37,11 @@ struct CuratedRow: View {
 					HStack(spacing: 16) {
 						HStack(spacing: 6) {
 							StarRatingView(model.accuracyStars)
-							Text("Accuracy").font(.caption2).foregroundStyle(.secondary)
+							Text("Accuracy").font(.system(size: 12)).foregroundStyle(.secondary)
 						}
 						HStack(spacing: 6) {
 							StarRatingView(model.speedStars)
-							Text("Speed").font(.caption2).foregroundStyle(.secondary)
+							Text("Speed").font(.system(size: 12)).foregroundStyle(.secondary)
 						}
 					}
 				}

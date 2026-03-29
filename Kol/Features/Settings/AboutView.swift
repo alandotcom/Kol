@@ -29,7 +29,7 @@ struct AboutView: View {
                     .foregroundStyle(.secondary)
 
                 Text("Up to date")
-                    .font(.caption.weight(.medium))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.green)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 4)
@@ -94,7 +94,7 @@ struct AboutView: View {
             // Footer
             VStack(spacing: 4) {
                 Text("Based on Hex by Kit Langton")
-                    .font(.caption)
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
@@ -123,7 +123,7 @@ private struct FeatureCard: View {
                 Text(title)
                     .font(.subheadline.weight(.medium))
                 Text(description)
-                    .font(.caption)
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
 
@@ -153,7 +153,7 @@ private struct ShortcutRow: View {
             HStack(spacing: 4) {
                 ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
                     Text(key)
-                        .font(.caption.monospaced())
+                        .font(.system(size: 13, design: .monospaced))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Color.gray.opacity(0.1))
@@ -185,7 +185,7 @@ private struct ResourceLink: View {
                     .font(.subheadline)
                 Spacer()
                 Image(systemName: "arrow.up.right")
-                    .font(.caption)
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .opacity(isHovered ? 1 : 0)
             }

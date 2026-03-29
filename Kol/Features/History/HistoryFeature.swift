@@ -232,7 +232,7 @@ struct TranscriptView: View {
 						.frame(width: 14, height: 14)
 					if let appName = transcript.sourceAppName {
 						Text(appName)
-							.font(.caption.weight(.medium))
+							.font(.system(size: 13, weight: .medium))
 					}
 					Text("·")
 						.foregroundStyle(.tertiary)
@@ -251,13 +251,13 @@ struct TranscriptView: View {
 				// Word count badge
 				let wordCount = transcript.text.split(separator: " ").count
 				Text("\(wordCount) words")
-					.font(.caption2)
+					.font(.system(size: 12))
 					.padding(.horizontal, 8)
 					.padding(.vertical, 3)
 					.background(GlassColors.dropdownBackground)
 					.clipShape(RoundedRectangle(cornerRadius: 6))
 			}
-			.font(.caption)
+			.font(.system(size: 13))
 			.foregroundStyle(.secondary)
 			.padding(.horizontal, 14)
 			.padding(.top, 12)
@@ -280,9 +280,9 @@ struct TranscriptView: View {
 				} label: {
 					HStack(spacing: 4) {
 						Image(systemName: showDetails ? "chevron.down" : "chevron.right")
-							.font(.caption2)
+							.font(.system(size: 12))
 						Text("AI post-processing details")
-							.font(.caption)
+							.font(.system(size: 13))
 					}
 					.foregroundStyle(.tertiary)
 				}
@@ -293,7 +293,7 @@ struct TranscriptView: View {
 				if showDetails {
 					VStack(alignment: .leading, spacing: 6) {
 						Text("Original:")
-							.font(.caption.weight(.medium))
+							.font(.system(size: 13, weight: .medium))
 							.foregroundStyle(.tertiary)
 						Text(meta.originalText)
 							.font(.callout)
@@ -316,7 +316,7 @@ struct TranscriptView: View {
 								Text("\(pt) → \(ct) tokens")
 							}
 						}
-						.font(.caption)
+						.font(.system(size: 13))
 						.foregroundStyle(.tertiary)
 					}
 					.padding(10)
@@ -345,7 +345,7 @@ struct TranscriptView: View {
 					HStack(spacing: 4) {
 						Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
 						if showCopied {
-							Text("Copied").font(.caption)
+							Text("Copied").font(.system(size: 13))
 						}
 					}
 				}
@@ -443,7 +443,7 @@ private struct StatCard: View {
 			Text(value)
 				.font(.title2.bold())
 			Text(label)
-				.font(.caption)
+				.font(.system(size: 13))
 				.foregroundStyle(.secondary)
 		}
 		.frame(maxWidth: .infinity)

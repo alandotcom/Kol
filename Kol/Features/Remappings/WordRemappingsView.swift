@@ -58,7 +58,7 @@ struct WordRemappingsView: View {
 						.fill(Color.green)
 						.frame(width: 6, height: 6)
 					Text("\(activeCount) active")
-						.font(.caption.weight(.medium))
+						.font(.system(size: 13, weight: .medium))
 						.foregroundStyle(.green)
 				}
 				.padding(.horizontal, 12)
@@ -67,7 +67,7 @@ struct WordRemappingsView: View {
 				.clipShape(RoundedRectangle(cornerRadius: 8))
 
 				Text("of \(totalCount) transforms")
-					.font(.caption)
+					.font(.system(size: 13))
 					.foregroundStyle(.secondary)
 			}
 
@@ -91,7 +91,7 @@ struct WordRemappingsView: View {
 				HStack(spacing: 16) {
 					VStack(alignment: .leading, spacing: 4) {
 						Text("Test Input")
-							.font(.caption.weight(.semibold))
+							.font(.system(size: 13, weight: .semibold))
 							.foregroundStyle(.secondary)
 						TextField("Say something…", text: $store.remappingScratchpadText)
 							.textFieldStyle(.roundedBorder)
@@ -102,7 +102,7 @@ struct WordRemappingsView: View {
 					}
 					VStack(alignment: .leading, spacing: 4) {
 						Text("Preview")
-							.font(.caption.weight(.semibold))
+							.font(.system(size: 13, weight: .semibold))
 							.foregroundStyle(.secondary)
 						Text(previewText.isEmpty ? "—" : previewText)
 							.font(.body)
@@ -128,7 +128,7 @@ struct WordRemappingsView: View {
 					Text("Pro Tip")
 						.font(.subheadline.weight(.medium))
 					Text("Transforms are applied in sequence. Word removals run first, then remappings.")
-						.font(.caption)
+						.font(.system(size: 13))
 						.foregroundStyle(.secondary)
 				}
 			}
@@ -193,7 +193,7 @@ struct WordRemappingsView: View {
 								.font(.subheadline)
 							Image(systemName: "arrow.right")
 								.foregroundStyle(.secondary)
-								.font(.caption)
+								.font(.system(size: 13))
 							TextField("Replace", text: binding.replacement)
 								.textFieldStyle(.roundedBorder)
 								.font(.subheadline)

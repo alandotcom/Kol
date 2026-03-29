@@ -70,7 +70,7 @@ struct MicrophoneSectionContent: View {
 		}
 
 		Text("Override the system default microphone with a specific input device.")
-			.font(.caption)
+			.font(.system(size: 13))
 			.foregroundColor(.secondary)
 
 		EmptyView()

@@ -308,6 +308,7 @@ struct AppView: View {
             .padding(.vertical, 28)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .font(.system(size: 14))
         .scrollContentBackground(.hidden)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       }

@@ -6,9 +6,9 @@ struct SectionHeader: View {
     var style: Style = .page
 
     enum Style {
-        case page      // text-2xl font-bold (Transforms, History, About)
-        case settings  // text-xl font-semibold (Settings)
-        case section   // text-sm font-semibold (subsection headings)
+        case page      // Large page titles (Transforms, History, About)
+        case settings  // Settings page title
+        case section   // Subsection headings
     }
 
     var body: some View {
@@ -17,7 +17,7 @@ struct SectionHeader: View {
                 .font(titleFont)
             if let subtitle {
                 Text(subtitle)
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
             }
         }
@@ -25,9 +25,9 @@ struct SectionHeader: View {
 
     private var titleFont: Font {
         switch style {
-        case .page: .title2.bold()
-        case .settings: .title3.weight(.semibold)
-        case .section: .subheadline.weight(.semibold)
+        case .page: .system(size: 20, weight: .bold)
+        case .settings: .system(size: 20, weight: .semibold)
+        case .section: .system(size: 16, weight: .semibold)
         }
     }
 }

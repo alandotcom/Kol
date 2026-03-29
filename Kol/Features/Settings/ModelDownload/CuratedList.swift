@@ -65,7 +65,7 @@ struct CuratedList: View {
 			)
 
 			Text("Kol switches automatically based on your keyboard layout.")
-				.font(.caption)
+				.font(.system(size: 13))
 				.foregroundStyle(.secondary)
 
 			if !hiddenModels.isEmpty {
@@ -110,7 +110,7 @@ private struct ModelDropdown: View {
 		VStack(alignment: .leading, spacing: 8) {
 			// Label
 			Text(label)
-				.font(.caption.weight(.medium))
+				.font(.system(size: 12, weight: .medium))
 				.foregroundStyle(.secondary)
 				.tracking(0.5)
 
@@ -125,7 +125,7 @@ private struct ModelDropdown: View {
 						Text(model.displayName)
 							.font(.body.weight(.medium))
 						Text(model.storageSize)
-							.font(.caption)
+							.font(.system(size: 13))
 							.foregroundStyle(.secondary)
 					} else {
 						Text("Select a model")
@@ -133,7 +133,7 @@ private struct ModelDropdown: View {
 					}
 					Spacer()
 					Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-						.font(.caption)
+						.font(.system(size: 13))
 						.foregroundStyle(.secondary)
 				}
 				.padding(.horizontal, 16)
@@ -210,13 +210,13 @@ private struct ModelRow: View {
 
 				// Model name
 				Text(model.displayName)
-					.font(.subheadline.weight(.medium))
+					.font(.body.weight(.medium))
 
 				Spacer()
 
 				// Size
 				Text(model.storageSize)
-					.font(.caption)
+					.font(.system(size: 13))
 					.foregroundStyle(.secondary)
 
 				// Status icon
@@ -227,7 +227,7 @@ private struct ModelRow: View {
 						.frame(width: 18, height: 18)
 				} else if model.isDownloaded {
 					Image(systemName: "checkmark")
-						.font(.caption.weight(.semibold))
+						.font(.system(size: 13, weight: .semibold))
 						.foregroundStyle(.green)
 				} else {
 					Image(systemName: "arrow.down.circle")

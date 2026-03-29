@@ -43,7 +43,7 @@ struct HistorySectionContent: View {
 			PasteLastTranscriptHotkeyRow(store: store)
 		} else {
 			Text("When disabled, transcriptions will not be saved and audio files will be deleted immediately after transcription.")
-				.font(.caption)
+				.font(.system(size: 13))
 				.foregroundColor(.secondary)
 		}
 
@@ -62,7 +62,7 @@ private struct PasteLastTranscriptHotkeyRow: View {
 		VStack(alignment: .leading, spacing: 12) {
 			VStack(alignment: .leading, spacing: 2) {
 				Text("Paste Last Transcript")
-					.font(.subheadline.weight(.semibold))
+					.font(.body.weight(.semibold))
 				Text("Assign a shortcut (modifier + key) to instantly paste your last transcription.")
 					.settingsCaption()
 			}
@@ -97,7 +97,7 @@ private struct PasteLastTranscriptHotkeyRow: View {
 					Label("Clear shortcut", systemImage: "xmark.circle")
 				}
 				.buttonStyle(.borderless)
-				.font(.caption)
+				.font(.system(size: 13))
 				.foregroundStyle(.secondary)
 			}
 		}

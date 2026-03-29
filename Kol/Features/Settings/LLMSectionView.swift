@@ -43,7 +43,7 @@ struct LLMSectionContent: View {
 					if !store.llmApiKey.isEmpty {
 						Image(systemName: "checkmark.circle.fill")
 							.foregroundColor(.green)
-							.font(.caption)
+							.font(.system(size: 13))
 					}
 				}
 
@@ -74,14 +74,14 @@ struct LLMSectionContent: View {
 				VStack(alignment: .leading, spacing: 4) {
 					HStack {
 						Text("Custom Context")
-							.font(.caption)
+							.font(.system(size: 13))
 							.foregroundColor(.secondary)
 						Spacer()
 						if !store.kolSettings.llmCustomRules.isEmpty {
 							Button("Clear") {
 								store.send(.setLLMCustomRules(""))
 							}
-							.font(.caption)
+							.font(.system(size: 13))
 							.buttonStyle(.plain)
 							.foregroundColor(.secondary)
 						}
@@ -94,7 +94,7 @@ struct LLMSectionContent: View {
 						)
 					)
 					.frame(height: 60)
-					.font(.caption)
+					.font(.system(size: 13))
 					.scrollContentBackground(.hidden)
 					.background(Color(.textBackgroundColor).opacity(0.5))
 					.cornerRadius(6)
@@ -102,7 +102,7 @@ struct LLMSectionContent: View {
 						Group {
 							if store.kolSettings.llmCustomRules.isEmpty {
 								Text("e.g. My name is Alan. Common terms: Claude Code, Railway, CoreML")
-									.font(.caption)
+									.font(.system(size: 13))
 									.foregroundColor(.secondary.opacity(0.5))
 									.padding(.horizontal, 4)
 									.padding(.top, 8)
@@ -121,13 +121,13 @@ struct LLMSectionContent: View {
 					)
 				)
 				Text("Captures text near the cursor to help recognize technical terms on screen.")
-					.font(.caption)
+					.font(.system(size: 13))
 					.foregroundColor(.secondary)
 
 				Button("Customize App Context Prompts...") {
 					store.send(.showPromptCustomization)
 				}
-				.font(.caption)
+				.font(.system(size: 13))
 			}
 			.sheet(
 				isPresented: Binding(

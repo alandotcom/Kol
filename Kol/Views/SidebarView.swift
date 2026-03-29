@@ -30,11 +30,11 @@ struct SidebarView: View {
                         .fill(statusColor)
                         .frame(width: 8, height: 8)
                     Text(statusTitle)
-                        .font(.caption.weight(.medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
                 Text(statusSubtitle)
-                    .font(.caption2)
+                    .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
             }
             .padding(12)

@@ -41,7 +41,7 @@ struct HotKeySectionContent: View {
 
             SettingsRow {
                 Text("Enable double-tap lock")
-                    .font(.subheadline)
+                    .font(.body)
             } trailing: {
                 Toggle("", isOn: Binding(
                     get: { store.kolSettings.doubleTapLockEnabled },
@@ -56,7 +56,7 @@ struct HotKeySectionContent: View {
 
                 SettingsRow {
                     Text("Use double-tap only")
-                        .font(.subheadline)
+                        .font(.body)
                 } trailing: {
                     Toggle("", isOn: Binding(
                         get: { store.kolSettings.useDoubleTapOnly },
@@ -74,7 +74,7 @@ struct HotKeySectionContent: View {
                 VStack(spacing: 12) {
                     HStack {
                         Text("Ignore below \(store.kolSettings.minimumKeyTime, specifier: "%.1f")s")
-                            .font(.subheadline)
+                            .font(.body)
                         Spacer()
                     }
                     Slider(
@@ -132,7 +132,7 @@ private struct ModifierSideControls: View {
 
                     HStack {
                         Text("Modifier side")
-                            .font(.subheadline)
+                            .font(.body)
                         Spacer()
                         Picker("", selection: binding) {
                             ForEach(Modifier.Side.allCases, id: \.self) { side in

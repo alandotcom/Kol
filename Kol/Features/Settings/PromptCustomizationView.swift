@@ -75,7 +75,7 @@ struct PromptCustomizationView: View {
 					.font(.subheadline.weight(.semibold))
 				if value != nil {
 					Text("customized")
-						.font(.caption)
+						.font(.system(size: 13))
 						.foregroundStyle(.blue)
 						.padding(.horizontal, 8)
 						.padding(.vertical, 2)
@@ -85,7 +85,7 @@ struct PromptCustomizationView: View {
 				Spacer()
 				if value != nil {
 					Button("Reset") { onReset() }
-						.font(.caption)
+						.font(.system(size: 13))
 						.buttonStyle(.plain)
 						.foregroundStyle(.secondary)
 				}
@@ -98,7 +98,7 @@ struct PromptCustomizationView: View {
 				)
 			)
 			.frame(height: 80)
-			.font(.system(.caption, design: .monospaced))
+			.font(.system(size: 13, design: .monospaced))
 			.scrollContentBackground(.hidden)
 			.padding(10)
 			.background(GlassColors.dropdownBackground)
@@ -109,7 +109,7 @@ struct PromptCustomizationView: View {
 			)
 
 			Text(caption)
-				.font(.caption)
+				.font(.system(size: 13))
 				.foregroundStyle(.tertiary)
 		}
 	}

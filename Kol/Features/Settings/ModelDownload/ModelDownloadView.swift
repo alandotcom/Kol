@@ -44,7 +44,7 @@ public struct ModelDownloadView: View {
 			if let err = store.downloadError {
 				Text("Download Error: \(err)")
 					.foregroundColor(.red)
-					.font(.caption)
+					.font(.system(size: 13))
 			}
 		}
 		.frame(maxWidth: 500)
