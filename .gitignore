@@ -20,5 +20,5 @@ node_modules/
 .tmp/
 
 # Claude
-.claude/
 .env
+.claude/settings.local.json
