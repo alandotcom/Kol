@@ -9,7 +9,6 @@ updates/
 *.xcuserstate
 buildServer.json
 bin
-scripts
 tools
 ExportOptions.plist
 KolCore/.build
