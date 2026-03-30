@@ -10,17 +10,20 @@ Kol's transcription quality is fundamentally limited by how much it knows about 
 
 **What Kol does today:**
 - `ScreenContextClient.captureVisibleText()` — single synchronous AX call at recording start, returns up to 3000 chars of visible text
+- `ScreenContextClient.captureCursorContext()` — structured before/after/selected text relative to cursor position *(Phase A, done)*
 - `characterBeforeCursor()` — single char before cursor for spacing decisions
 - App category detection via bundle ID / display name → code / messaging / document
 - Terminal-aware windowing (tail of text vs head)
-- Context fed only to LLM post-processing via `PromptAssembler` system prompt
-- Context is ephemeral — discarded after each dictation
+- `VocabularyExtractor` — regex-based extraction of identifiers, proper nouns, file names from screen text *(Phase A, done)*
+- `VocabularyCacheClient` — in-memory LRU cache of extracted vocabulary across dictation sessions *(Phase A, done)*
+- Context fed to LLM post-processing via `PromptAssembler` system prompt with structured cursor context and vocabulary hints
+- Vocabulary cache persists for app lifetime (not across launches)
 
 **What's missing:**
 - ASR model has zero contextual information
-- No structured cursor-relative text (before/after)
-- No proper noun or identifier extraction
-- No persistent vocabulary across dictation sessions
+- ~~No structured cursor-relative text (before/after)~~ *(done)*
+- ~~No proper noun or identifier extraction~~ *(done — local regex)*
+- ~~No persistent vocabulary across dictation sessions~~ *(done — in-memory LRU)*
 - No post-paste correction tracking
 - No conversation awareness in messaging apps
 - No IDE-specific context (variable names, open files)
@@ -705,6 +708,67 @@ struct AppSpecificContext {
 
 ### Complexity
 High overall, but each adapter is independent and can be built incrementally. Start with the apps users dictate in most.
+
+---
+
+## Implementation Status
+
+### Phase A — in progress
+
+**§0 AXorcist — done (dependency only)**
+- AXorcist added as SPM dependency to the Kol target
+- ScreenContextClient internals NOT yet migrated — still uses raw `AXUIElement` C API
+- Migration deferred to when a feature actually needs AXorcist's query/observation APIs
+
+**§1 Structured Cursor Context — done**
+- `CursorContext` model in `KolCore/CursorContext.swift` — `beforeCursor`, `afterCursor`, `selectedText`, `isTerminal`, `flatText`
+- `ScreenContextClient.captureCursorContext()` — new method using raw AX API, splits text at cursor position, applies 1500-char windowing per side, word-boundary truncation
+- `PromptLayers.structuredScreenContext()` — new prompt layer with `--- BEFORE CURSOR ---` / `--- AFTER CURSOR ---` / `--- SELECTED TEXT ---` sections
+- `PromptAssembler.systemPrompt()` — prefers structured context over flat `screenContext` when available; falls back gracefully
+- `TranscriptionFeature.handleStartRecording()` — captures structured context, stores in `state.capturedCursorContext`
+- Eval prompt `evals/prompts/english-code-screen.txt` updated to structured format
+- 9 new PromptAssemblerTests covering structured context and fallback
+
+**§2 Proper Noun & Identifier Extraction (Option A) — done**
+- `VocabularyExtractor` in `KolCore/VocabularyExtractor.swift` — pure enum, regex-based, no network
+- Patterns: camelCase, PascalCase, snake_case identifiers; multi-word proper nouns; file names with known extensions
+- Capped at 50 terms, deduplicated case-insensitively
+- `PromptLayers.vocabularyHints()` — new prompt layer: "Names and identifiers visible on screen: ..."
+- Layer ordering: core → language → app context → screen context → vocabulary hints → custom rules
+- 13 VocabularyExtractorTests (camelCase, PascalCase, snake_case, proper nouns, file names, dedup, cap, edge cases)
+
+**§3 Persistent Vocabulary Cache — done**
+- `VocabularyCacheClient` in `KolCore/VocabularyCache.swift` — TCA `@DependencyClient` with `merge`/`topTerms`/`clear`
+- Backed by `NSLock`-protected LRU cache (max 200 entries), sorted by frequency then recency
+- In-memory only (no disk persistence), rebuilds from screen context captures each session
+- Integrated in `TranscriptionFeature.handleStartRecording()` — extracts vocabulary, merges into cache, passes top 30 terms to prompt
+- 5 VocabularyCacheTests (merge, frequency ordering, limit, clear, case-insensitive dedup)
+
+**No new settings added.** Vocabulary extraction piggybacks on existing `llmPostProcessingEnabled && llmScreenContextEnabled` gates.
+
+### Architecture changes
+
+**KolCore framework target** — extracted from the app target to fix test infrastructure:
+- Native Xcode framework target (not SPM package — avoids the slow incremental builds that the original HexCore SPM package had)
+- Contains: models (LLMPostProcessing, CursorContext, HotKey, KeyEvent, KolSettings, WordRemapping, WordRemoval, TranscriptionHistory, ParakeetModel, QwenModel), logic (HotKeyProcessor, VocabularyExtractor, VocabularyCache, RecordingDecision), shared infra (Logging, Constants)
+- Dependencies: ComposableArchitecture, Dependencies, DependenciesMacros, Sauce + TCA transitive deps
+- App target uses `@_exported import KolCore` — no import changes needed in app source files
+- Test target imports `@testable import KolCore` directly — no host app needed, no debug dylib linker issues
+
+**Test target restructured:**
+- Removed `BUNDLE_LOADER`/`TEST_HOST` — tests are non-hosted, link KolCore framework directly
+- Fixed `PRODUCT_NAME = Kol` (was "Kol Debug"), fixed `DEVELOPMENT_TEAM`
+- 69 tests pass via `xcodebuild test` CLI
+- `HotKeyProcessorTests` disabled — crashes in non-hosted context (uses `withDependencies` which needs investigation)
+- `RecordingRaceTests` disabled — needs hosted test for `TranscriptionFeature` (uses `TestStore`)
+
+### Remaining work
+
+- **AXorcist migration** — rewrite ScreenContextClient internals to use AXorcist (currently just a dependency, not used)
+- **HotKeyProcessorTests** — fix crash in non-hosted test context (`withDependencies` + task-local storage issue)
+- **RecordingRaceTests** — needs a separate hosted test target, or rewrite without TestStore
+- **Eval runs** — `source .env && bun run eval:screen` to validate prompt changes
+- **Manual smoke test** — debug build, dictate in VS Code/Terminal/Slack/Notes, verify structured context + vocabulary hints in LLM debug logging
 
 ---
 

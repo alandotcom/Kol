@@ -21,6 +21,7 @@ public enum KolLog {
     case permissions = "Permissions"
     case llm = "LLM"
     case screenContext = "ScreenContext"
+    case vocabulary = "Vocabulary"
   }
 
   public static func logger(_ category: Category) -> os.Logger {
@@ -43,4 +44,5 @@ public enum KolLog {
   public static let permissions = logger(.permissions)
   public static let llm = logger(.llm)
   public static let screenContext = logger(.screenContext)
+  public static let vocabulary = logger(.vocabulary)
 }

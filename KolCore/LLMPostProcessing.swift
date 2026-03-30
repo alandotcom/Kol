@@ -24,6 +24,8 @@ public struct PostProcessingContext: Sendable {
 	public let customRules: String?
 	public let appContextOverrides: AppContextOverrides?
 	public let screenContext: String?
+	public let structuredContext: CursorContext?
+	public let vocabularyHints: [String]?
 
 	public init(
 		text: String,
@@ -31,7 +33,9 @@ public struct PostProcessingContext: Sendable {
 		sourceApp: String? = nil,
 		customRules: String? = nil,
 		appContextOverrides: AppContextOverrides? = nil,
-		screenContext: String? = nil
+		screenContext: String? = nil,
+		structuredContext: CursorContext? = nil,
+		vocabularyHints: [String]? = nil
 	) {
 		self.text = text
 		self.inputLanguage = inputLanguage
@@ -39,6 +43,8 @@ public struct PostProcessingContext: Sendable {
 		self.customRules = customRules
 		self.appContextOverrides = appContextOverrides
 		self.screenContext = screenContext
+		self.structuredContext = structuredContext
+		self.vocabularyHints = vocabularyHints
 	}
 }
 
@@ -214,6 +220,40 @@ public enum PromptLayers {
 		"""
 	}
 
+	/// Structured screen context layer: text before and after the cursor, with optional selection.
+	/// Used when CursorContext is available (replaces the flat screenContext layer).
+	public static func structuredScreenContext(_ context: CursorContext) -> String {
+		let preamble = context.isTerminal
+			? "The following is recent terminal output visible on the user's screen."
+			: "The following is the text surrounding the user's cursor."
+		var parts = """
+		\(preamble) \
+		Use it ONLY to resolve ambiguous words, technical terms, function names, or variable names \
+		that appear in the transcription. Do NOT add, summarize, or reference this text in your output.
+		"""
+
+		if !context.beforeCursor.isEmpty {
+			parts += "\n--- BEFORE CURSOR ---\n\(context.beforeCursor)"
+		}
+		if let sel = context.selectedText, !sel.isEmpty {
+			parts += "\n--- SELECTED TEXT ---\n\(sel)"
+		}
+		if !context.afterCursor.isEmpty {
+			parts += "\n--- AFTER CURSOR ---\n\(context.afterCursor)"
+		}
+
+		return parts
+	}
+
+	/// Vocabulary hints layer: terms extracted from screen context that the LLM should preserve.
+	public static func vocabularyHints(_ terms: [String]) -> String {
+		let joined = terms.joined(separator: ", ")
+		return """
+		Names and identifiers visible on screen (use their exact spelling and casing when they match spoken words): \
+		\(joined)
+		"""
+	}
+
 	/// Identifies which app context category an app belongs to.
 	/// Returns nil for unknown apps.
 	public static func appContextCategory(for appIdentifier: String?) -> AppContextCategory? {
@@ -278,12 +318,17 @@ public enum PromptAssembler {
 	///   - sourceApp: App name or bundle ID of the frontmost app
 	///   - customRules: User-provided context/facts
 	///   - appContextOverrides: Optional per-category prompt text overrides
+	///   - screenContext: Flat visible text (used as fallback when structuredContext is nil)
+	///   - structuredContext: Cursor-relative text (preferred over screenContext when available)
+	///   - vocabularyHints: Extracted terms to preserve in transcription
 	public static func systemPrompt(
 		language: String?,
 		sourceApp: String?,
 		customRules: String?,
 		appContextOverrides: AppContextOverrides? = nil,
-		screenContext: String? = nil
+		screenContext: String? = nil,
+		structuredContext: CursorContext? = nil,
+		vocabularyHints: [String]? = nil
 	) -> String {
 		var parts: [String] = [PromptLayers.core]
 
@@ -303,11 +348,19 @@ public enum PromptAssembler {
 			parts.append(text)
 		}
 
-		if let ctx = screenContext, !ctx.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+		// Screen context: prefer structured (before/after cursor) over flat string
+		if let structured = structuredContext, !structured.flatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+			parts.append(PromptLayers.structuredScreenContext(structured))
+		} else if let ctx = screenContext, !ctx.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 			parts.append(PromptLayers.screenContext(
 				visibleText: ctx,
 				isTerminal: PromptLayers.isTerminal(sourceApp)
 			))
+		}
+
+		// Vocabulary hints: extracted identifiers and proper nouns
+		if let hints = vocabularyHints, !hints.isEmpty {
+			parts.append(PromptLayers.vocabularyHints(hints))
 		}
 
 		if let rules = customRules, !rules.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

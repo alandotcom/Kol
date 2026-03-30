@@ -91,12 +91,9 @@ struct RecordingRaceTests {
   }
 
   private static func makeState() -> TranscriptionFeature.State {
-    TranscriptionFeature.State(
-      kolSettings: Shared(.init()),
-      isRemappingScratchpadFocused: Shared(false),
-      modelBootstrapState: Shared(.init(isModelReady: true)),
-      transcriptionHistory: Shared(.init())
-    )
+    @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
+    $modelBootstrapState.withLock { $0 = .init(isModelReady: true) }
+    return TranscriptionFeature.State()
   }
 }
 

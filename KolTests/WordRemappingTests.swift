@@ -1,5 +1,5 @@
 import Testing
-@testable import Kol
+@testable import KolCore
 
 struct WordRemappingTests {
 	@Test

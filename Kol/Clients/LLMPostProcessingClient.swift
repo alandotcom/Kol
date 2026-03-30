@@ -22,7 +22,9 @@ extension LLMPostProcessingClient: DependencyKey {
 					sourceApp: context.sourceApp,
 					customRules: context.customRules,
 					appContextOverrides: context.appContextOverrides,
-					screenContext: context.screenContext
+					screenContext: context.screenContext,
+					structuredContext: context.structuredContext,
+					vocabularyHints: context.vocabularyHints
 				)
 				let userMessage = PromptAssembler.userMessage(text: context.text)
 

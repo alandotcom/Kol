@@ -1,5 +1,5 @@
 import XCTest
-@testable import Kol
+@testable import KolCore
 
 final class KolSettingsMigrationTests: XCTestCase {
 	func testV1FixtureMigratesToCurrentDefaults() throws {
@@ -65,10 +65,9 @@ final class KolSettingsMigrationTests: XCTestCase {
 	}
 
 	private func loadFixture(named name: String) throws -> Data {
-		guard let url = Bundle.module.url(
+		guard let url = Bundle(for: KolSettingsMigrationTests.self).url(
 			forResource: name,
-			withExtension: "json",
-			subdirectory: "Fixtures/KolSettings"
+			withExtension: "json"
 		) else {
 			XCTFail("Missing fixture \(name).json")
 			throw NSError(domain: "Fixture", code: 0)

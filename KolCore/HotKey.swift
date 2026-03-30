@@ -15,7 +15,7 @@ public struct Modifier: Identifiable, Codable, Equatable, Hashable, Comparable, 
     case control
     case fn
 
-    var order: Int {
+    public var order: Int {
       switch self {
       case .command: return 0
       case .option: return 1
@@ -64,7 +64,7 @@ public struct Modifier: Identifiable, Codable, Equatable, Hashable, Comparable, 
     case left
     case right
 
-    var order: Int {
+    public var order: Int {
       switch self {
       case .left: return 0
       case .either: return 1
@@ -116,7 +116,7 @@ public struct Modifier: Identifiable, Codable, Equatable, Hashable, Comparable, 
     kind.symbol
   }
 
-  func matches(_ other: Modifier) -> Bool {
+  public func matches(_ other: Modifier) -> Bool {
     guard kind == other.kind else { return false }
     if side == .either || other.side == .either { return true }
     return side == other.side
@@ -149,7 +149,7 @@ public struct Modifier: Identifiable, Codable, Equatable, Hashable, Comparable, 
 }
 
 public struct Modifiers: Codable, Equatable, ExpressibleByArrayLiteral, Sendable {
-  var modifiers: Set<Modifier>
+  public var modifiers: Set<Modifier>
 
   public var sorted: [Modifier] {
     // If this is a hyperkey combination (all four modifiers), 

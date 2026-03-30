@@ -16,7 +16,7 @@ private let transcriptionFeatureLogger = KolLog.transcription
 @Reducer
 struct TranscriptionFeature {
   @ObservableState
-  struct State {
+  struct State: Equatable {
     var isRecording: Bool = false
     var isTranscribing: Bool = false
     var isPrewarming: Bool = false
@@ -27,6 +27,8 @@ struct TranscriptionFeature {
     var sourceAppName: String?
     var resolvedLanguage: String?
     var capturedScreenContext: String?
+    var capturedCursorContext: CursorContext?
+    var capturedVocabulary: [String]?
     @Shared(.kolSettings) var kolSettings: KolSettings
     @Shared(.isRemappingScratchpadFocused) var isRemappingScratchpadFocused: Bool = false
     @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
@@ -74,6 +76,7 @@ struct TranscriptionFeature {
   @Dependency(\.llmPostProcessing) var llmPostProcessing
   @Dependency(\.keychain) var keychain
   @Dependency(\.screenContext) var screenContext
+  @Dependency(\.vocabularyCache) var vocabularyCache
 
   var body: some ReducerOf<Self> {
     Reduce { state, action in
@@ -301,9 +304,27 @@ private extension TranscriptionFeature {
 
     // Capture screen context for LLM post-processing (synchronous AX call)
     if state.kolSettings.llmPostProcessingEnabled && state.kolSettings.llmScreenContextEnabled {
-      state.capturedScreenContext = screenContext.captureVisibleText(state.sourceAppBundleID)
+      // Prefer structured cursor context; fall back to flat capture
+      if let cursor = screenContext.captureCursorContext(state.sourceAppBundleID) {
+        state.capturedCursorContext = cursor
+        state.capturedScreenContext = cursor.flatText
+      } else {
+        state.capturedCursorContext = nil
+        state.capturedScreenContext = screenContext.captureVisibleText(state.sourceAppBundleID)
+      }
+
+      // Extract vocabulary from screen text and merge into persistent cache
+      if let text = state.capturedScreenContext, !text.isEmpty {
+        let vocab = VocabularyExtractor.extract(from: text)
+        vocabularyCache.merge(vocab)
+        state.capturedVocabulary = vocabularyCache.topTerms(30)
+      } else {
+        state.capturedVocabulary = nil
+      }
     } else {
       state.capturedScreenContext = nil
+      state.capturedCursorContext = nil
+      state.capturedVocabulary = nil
     }
     transcriptionFeatureLogger.notice("Recording started at \(startTime.ISO8601Format())")
 
@@ -503,6 +524,8 @@ private extension TranscriptionFeature {
     )
     let resolvedLanguage = state.resolvedLanguage
     let capturedScreenContext = state.capturedScreenContext
+    let capturedCursorContext = state.capturedCursorContext
+    let capturedVocabulary = state.capturedVocabulary
 
     return .run { [llmPostProcessing, keychain] send in
       do {
@@ -521,7 +544,9 @@ private extension TranscriptionFeature {
               sourceApp: sourceAppName ?? sourceAppBundleID,
               customRules: llmCustomRules.isEmpty ? nil : llmCustomRules,
               appContextOverrides: llmAppContextOverrides,
-              screenContext: capturedScreenContext
+              screenContext: capturedScreenContext,
+              structuredContext: capturedCursorContext,
+              vocabularyHints: capturedVocabulary
             )
             do {
               let result = try await llmPostProcessing.process(context, llmConfig, apiKey)
@@ -640,6 +665,8 @@ private extension TranscriptionFeature {
     state.isRecording = false
     state.isPrewarming = false
     state.capturedScreenContext = nil
+    state.capturedCursorContext = nil
+    state.capturedVocabulary = nil
 
     return .merge(
       .cancel(id: CancelID.transcription),
@@ -660,6 +687,8 @@ private extension TranscriptionFeature {
     state.isRecording = false
     state.isPrewarming = false
     state.capturedScreenContext = nil
+    state.capturedCursorContext = nil
+    state.capturedVocabulary = nil
 
     // Silently discard - no sound effect
     return .run { [sleepManagement] _ in

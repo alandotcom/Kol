@@ -7,8 +7,38 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		16847F9110C1C667D621AC45 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E23613B199896A5DD0FC2BB /* Cocoa.framework */; };
+		37798B7E2F7A4B2000FAAFD1 /* AXorcist in Frameworks */ = {isa = PBXBuildFile; productRef = 026BEE407424C5C195DE8F03 /* AXorcist */; };
+		37798B7F2F7A4B2000FAAFD1 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = 15C0465AEB781CAC239453CD /* CasePaths */; };
+		37798B802F7A4B2000FAAFD1 /* IdentifiedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = 1A49FDC9D3A96580756DD5ED /* IdentifiedCollections */; };
+		37798B812F7A4B2000FAAFD1 /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = 214CD0B6112373FF134D3F0C /* Sharing */; };
+		37798B822F7A4B2000FAAFD1 /* Clocks in Frameworks */ = {isa = PBXBuildFile; productRef = 666EE21E76FBCFAFB6CFB6C7 /* Clocks */; };
+		37798B832F7A4B2000FAAFD1 /* ConcurrencyExtras in Frameworks */ = {isa = PBXBuildFile; productRef = F5743EA87D52A3991976EB0E /* ConcurrencyExtras */; };
+		37798B842F7A4B2000FAAFD1 /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = 4303D8322FB668DC38AB6018 /* IssueReporting */; };
+		37798B852F7A4B2000FAAFD1 /* Perception in Frameworks */ = {isa = PBXBuildFile; productRef = CDE567DF5980ADAAA3B5E3E8 /* Perception */; };
+		37798B862F7A4B2000FAAFD1 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = A46E807918773E4595BA1134 /* CustomDump */; };
+		37798B872F7A4B2000FAAFD1 /* SwiftNavigation in Frameworks */ = {isa = PBXBuildFile; productRef = D8214A7E522E16B329D19381 /* SwiftNavigation */; };
+		37798B882F7A4B2000FAAFD1 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = E8AAC6380D96264606627FFE /* ComposableArchitecture */; };
+		37798B892F7A4B2000FAAFD1 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = D8F03E26D6C7C1DADA9EBD5C /* Dependencies */; };
+		37798B8A2F7A4B2000FAAFD1 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = 510DE99898ED98A98EA00074 /* DependenciesMacros */; };
+		37798CB12F7A4B8200FAAFD1 /* Sauce in Frameworks */ = {isa = PBXBuildFile; productRef = CDA7122B55A3E7005199AC18 /* Sauce */; };
+		377990852F7A4CF800FAAFD1 /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = 55EB14581A7A77F45016B74E /* IssueReporting */; };
+		377990862F7A4CF800FAAFD1 /* ConcurrencyExtras in Frameworks */ = {isa = PBXBuildFile; productRef = 308BB8438F4D3B47B457BB1D /* ConcurrencyExtras */; };
+		377990872F7A4CF800FAAFD1 /* Clocks in Frameworks */ = {isa = PBXBuildFile; productRef = B13BCBF62A0026E6C49C8B23 /* Clocks */; };
+		377990882F7A4CF800FAAFD1 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = 5BAEC2B4F7B077AFA58FE153 /* CasePaths */; };
+		377990892F7A4CF800FAAFD1 /* IdentifiedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = ADA9CC764388229BF645AC0D /* IdentifiedCollections */; };
+		3779908A2F7A4CF800FAAFD1 /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = 357C1A50A91F15118BC185C4 /* Sharing */; };
+		3779908B2F7A4CF800FAAFD1 /* Perception in Frameworks */ = {isa = PBXBuildFile; productRef = C68C753588DB5F3169873099 /* Perception */; };
+		3779908C2F7A4CF800FAAFD1 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = 227F0592816A17126D6C6878 /* CustomDump */; };
+		3779908D2F7A4CF800FAAFD1 /* SwiftNavigation in Frameworks */ = {isa = PBXBuildFile; productRef = 47F37C5EC9694CD4D44182EC /* SwiftNavigation */; };
+		3779908E2F7A4CF800FAAFD1 /* CombineSchedulers in Frameworks */ = {isa = PBXBuildFile; productRef = C5562093AA581178D34EC294 /* CombineSchedulers */; };
+		3779908F2F7A4CF800FAAFD1 /* XCTestDynamicOverlay in Frameworks */ = {isa = PBXBuildFile; productRef = 7433F6E64A031D1C4AE440B4 /* XCTestDynamicOverlay */; };
+		377990902F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
+		377990912F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
+		377990922F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
+		377990932F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
+		377990942F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
 		47512ABF2E14D8C9000E25BA /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 47512ABE2E14D8C9000E25BA /* WhisperKit */; };
-
 		4765045E2D45900200C7EA60 /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = 4765045D2D45900200C7EA60 /* Pow */; };
 		47C08AB62DE9F61B00564AE6 /* Inject in Frameworks */ = {isa = PBXBuildFile; productRef = 47C08AB52DE9F61B00564AE6 /* Inject */; };
 		47E05E022D444EE900D26DA6 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E012D444EE900D26DA6 /* ComposableArchitecture */; };
@@ -16,13 +46,22 @@
 		47E05E0A2D44525B00D26DA6 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E092D44525B00D26DA6 /* Dependencies */; };
 		47E05E0C2D44525B00D26DA6 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E0B2D44525B00D26DA6 /* DependenciesMacros */; };
 		47E16A622EC6C9D300885CF7 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 47E16A612EC6C9D300885CF7 /* FluidAudio */; };
-
 		4F0D6A022F1A000100000001 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E012D444EE900D26DA6 /* ComposableArchitecture */; };
 		B5045C972D78DED500D0A119 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = B5045C962D78DED500D0A119 /* MarkdownUI */; };
 		B53356002D7B8D4900E5F542 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B53355FF2D7B8D4900E5F542 /* Localizable.xcstrings */; };
+		C84995FA9130723B621B5575 /* KolCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7F7962AB52729F8E987112D /* KolCore.framework */; };
+		E1A2B3C4D5E6F70812345678 /* KolCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = B7F7962AB52729F8E987112D /* KolCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		FCDB5A11B2A3B902784F1FA1 /* KolCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7F7962AB52729F8E987112D /* KolCore.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		2E71D2DF50AC949E6FEAF1B1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 47E05DE62D444EC600D26DA6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C0F28447D849A6C88523AB5A;
+			remoteInfo = KolCore;
+		};
 		478637A92D48725900319BFA /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 47E05DE62D444EC600D26DA6 /* Project object */;
@@ -30,14 +69,37 @@
 			remoteGlobalIDString = 47E05DED2D444EC600D26DA6;
 			remoteInfo = Kol;
 		};
+		D2F7C41E80D10EF1412734DB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 47E05DE62D444EC600D26DA6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C0F28447D849A6C88523AB5A;
+			remoteInfo = KolCore;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E1A2B3C4D5E6F70800000001 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				E1A2B3C4D5E6F70812345678 /* KolCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		473544502D445936001FBCB5 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		473544542D445959001FBCB5 /* Testing.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Testing.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/Testing.framework; sourceTree = DEVELOPER_DIR; };
 		478637A52D48725900319BFA /* KolTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KolTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		47E05DEE2D444EC600D26DA6 /* Kol Debug.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Kol Debug.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		47E05DEE2D444EC600D26DA6 /* Kol.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kol.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8E23613B199896A5DD0FC2BB /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		B53355FF2D7B8D4900E5F542 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		B7F7962AB52729F8E987112D /* KolCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = KolCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -61,17 +123,55 @@
 		};
 		4F0D6A032F1A000100000001 /* KolTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = KolTests;
+			sourceTree = "<group>";
+		};
+		735738841F0E32A16C6EABCE /* KolCore */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = KolCore;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		1914AD5C7E936089020ED6B9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3779908F2F7A4CF800FAAFD1 /* XCTestDynamicOverlay in Frameworks */,
+				3779908E2F7A4CF800FAAFD1 /* CombineSchedulers in Frameworks */,
+				3779908D2F7A4CF800FAAFD1 /* SwiftNavigation in Frameworks */,
+				3779908C2F7A4CF800FAAFD1 /* CustomDump in Frameworks */,
+				3779908B2F7A4CF800FAAFD1 /* Perception in Frameworks */,
+				3779908A2F7A4CF800FAAFD1 /* Sharing in Frameworks */,
+				377990892F7A4CF800FAAFD1 /* IdentifiedCollections in Frameworks */,
+				377990882F7A4CF800FAAFD1 /* CasePaths in Frameworks */,
+				377990872F7A4CF800FAAFD1 /* Clocks in Frameworks */,
+				377990862F7A4CF800FAAFD1 /* ConcurrencyExtras in Frameworks */,
+				377990852F7A4CF800FAAFD1 /* IssueReporting in Frameworks */,
+				37798CB12F7A4B8200FAAFD1 /* Sauce in Frameworks */,
+				37798B8A2F7A4B2000FAAFD1 /* DependenciesMacros in Frameworks */,
+				37798B892F7A4B2000FAAFD1 /* Dependencies in Frameworks */,
+				37798B882F7A4B2000FAAFD1 /* ComposableArchitecture in Frameworks */,
+				16847F9110C1C667D621AC45 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		478637A22D48725900319BFA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				377990942F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
+				377990932F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
+				377990922F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
+				377990912F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
+				377990902F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
 				4F0D6A022F1A000100000001 /* ComposableArchitecture in Frameworks */,
+				FCDB5A11B2A3B902784F1FA1 /* KolCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,6 +179,16 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				37798B872F7A4B2000FAAFD1 /* SwiftNavigation in Frameworks */,
+				37798B862F7A4B2000FAAFD1 /* CustomDump in Frameworks */,
+				37798B852F7A4B2000FAAFD1 /* Perception in Frameworks */,
+				37798B842F7A4B2000FAAFD1 /* IssueReporting in Frameworks */,
+				37798B832F7A4B2000FAAFD1 /* ConcurrencyExtras in Frameworks */,
+				37798B822F7A4B2000FAAFD1 /* Clocks in Frameworks */,
+				37798B812F7A4B2000FAAFD1 /* Sharing in Frameworks */,
+				37798B802F7A4B2000FAAFD1 /* IdentifiedCollections in Frameworks */,
+				37798B7F2F7A4B2000FAAFD1 /* CasePaths in Frameworks */,
+				37798B7E2F7A4B2000FAAFD1 /* AXorcist in Frameworks */,
 				47E05E0A2D44525B00D26DA6 /* Dependencies in Frameworks */,
 				B5045C972D78DED500D0A119 /* MarkdownUI in Frameworks */,
 				47512ABF2E14D8C9000E25BA /* WhisperKit in Frameworks */,
@@ -88,6 +198,7 @@
 				4765045E2D45900200C7EA60 /* Pow in Frameworks */,
 				47E05E0C2D44525B00D26DA6 /* DependenciesMacros in Frameworks */,
 				47E05E022D444EE900D26DA6 /* ComposableArchitecture in Frameworks */,
+				C84995FA9130723B621B5575 /* KolCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -99,6 +210,7 @@
 			children = (
 				473544542D445959001FBCB5 /* Testing.framework */,
 				473544502D445936001FBCB5 /* XCTest.framework */,
+				E92A0C77CE65D3CD8EFF8132 /* OS X */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -111,19 +223,39 @@
 				4F0D6A032F1A000100000001 /* KolTests */,
 				4735444F2D445936001FBCB5 /* Frameworks */,
 				47E05DEF2D444EC600D26DA6 /* Products */,
+				735738841F0E32A16C6EABCE /* KolCore */,
 			);
 			sourceTree = "<group>";
 		};
 		47E05DEF2D444EC600D26DA6 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				47E05DEE2D444EC600D26DA6 /* Kol Debug.app */,
+				47E05DEE2D444EC600D26DA6 /* Kol.app */,
 				478637A52D48725900319BFA /* KolTests.xctest */,
+				B7F7962AB52729F8E987112D /* KolCore.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
+		E92A0C77CE65D3CD8EFF8132 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				8E23613B199896A5DD0FC2BB /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		4CAE803EE60764898D1298A7 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
 		478637A42D48725900319BFA /* KolTests */ = {
@@ -138,6 +270,7 @@
 			);
 			dependencies = (
 				478637AA2D48725900319BFA /* PBXTargetDependency */,
+				0D55063CF82B0EDF4F84F0DE /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4F0D6A032F1A000100000001 /* KolTests */,
@@ -145,6 +278,11 @@
 			name = KolTests;
 			packageProductDependencies = (
 				47E05E012D444EE900D26DA6 /* ComposableArchitecture */,
+				9B1137862CEB38C43538B9BE /* Dependencies */,
+				D0046C259393F2A4938AB19A /* DependenciesMacros */,
+				F54DF918503E20282D61202F /* Sauce */,
+				3F2D910B1F803177B9C3D83A /* IssueReporting */,
+				93CBD2F56664506274695FFE /* ConcurrencyExtras */,
 			);
 			productName = KolTests;
 			productReference = 478637A52D48725900319BFA /* KolTests.xctest */;
@@ -157,10 +295,12 @@
 				47E05DEA2D444EC600D26DA6 /* Sources */,
 				47E05DEB2D444EC600D26DA6 /* Frameworks */,
 				47E05DEC2D444EC600D26DA6 /* Resources */,
+				E1A2B3C4D5E6F70800000001 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				9943CFB168683AA50D57156D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				47E05DF02D444EC600D26DA6 /* Kol */,
@@ -176,10 +316,58 @@
 				47C08AB52DE9F61B00564AE6 /* Inject */,
 				47512ABE2E14D8C9000E25BA /* WhisperKit */,
 				47E16A612EC6C9D300885CF7 /* FluidAudio */,
+				026BEE407424C5C195DE8F03 /* AXorcist */,
+				15C0465AEB781CAC239453CD /* CasePaths */,
+				1A49FDC9D3A96580756DD5ED /* IdentifiedCollections */,
+				214CD0B6112373FF134D3F0C /* Sharing */,
+				666EE21E76FBCFAFB6CFB6C7 /* Clocks */,
+				F5743EA87D52A3991976EB0E /* ConcurrencyExtras */,
+				4303D8322FB668DC38AB6018 /* IssueReporting */,
+				CDE567DF5980ADAAA3B5E3E8 /* Perception */,
+				A46E807918773E4595BA1134 /* CustomDump */,
+				D8214A7E522E16B329D19381 /* SwiftNavigation */,
 			);
 			productName = Kol;
-			productReference = 47E05DEE2D444EC600D26DA6 /* Kol Debug.app */;
+			productReference = 47E05DEE2D444EC600D26DA6 /* Kol.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C0F28447D849A6C88523AB5A /* KolCore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6AD29015EA26326DE1AE749B /* Build configuration list for PBXNativeTarget "KolCore" */;
+			buildPhases = (
+				4CAE803EE60764898D1298A7 /* Headers */,
+				40B74093F7BAFC8B2B5DFD4C /* Sources */,
+				1914AD5C7E936089020ED6B9 /* Frameworks */,
+				9E2779F24458409A940EA083 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				735738841F0E32A16C6EABCE /* KolCore */,
+			);
+			name = KolCore;
+			packageProductDependencies = (
+				E8AAC6380D96264606627FFE /* ComposableArchitecture */,
+				D8F03E26D6C7C1DADA9EBD5C /* Dependencies */,
+				510DE99898ED98A98EA00074 /* DependenciesMacros */,
+				CDA7122B55A3E7005199AC18 /* Sauce */,
+				55EB14581A7A77F45016B74E /* IssueReporting */,
+				308BB8438F4D3B47B457BB1D /* ConcurrencyExtras */,
+				B13BCBF62A0026E6C49C8B23 /* Clocks */,
+				5BAEC2B4F7B077AFA58FE153 /* CasePaths */,
+				ADA9CC764388229BF645AC0D /* IdentifiedCollections */,
+				357C1A50A91F15118BC185C4 /* Sharing */,
+				C68C753588DB5F3169873099 /* Perception */,
+				227F0592816A17126D6C6878 /* CustomDump */,
+				47F37C5EC9694CD4D44182EC /* SwiftNavigation */,
+				C5562093AA581178D34EC294 /* CombineSchedulers */,
+				7433F6E64A031D1C4AE440B4 /* XCTestDynamicOverlay */,
+			);
+			productName = KolCore;
+			productReference = B7F7962AB52729F8E987112D /* KolCore.framework */;
+			productType = "com.apple.product-type.framework";
 		};
 /* End PBXNativeTarget section */
 
@@ -189,7 +377,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1620;
-				LastUpgradeCheck = 2620;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					478637A42D48725900319BFA = {
 						CreatedOnToolsVersion = 16.2;
@@ -218,6 +406,7 @@
 				47C08AB42DE9F61B00564AE6 /* XCRemoteSwiftPackageReference "Inject" */,
 				47512ABD2E14D8C9000E25BA /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				47E16A602EC6C9D300885CF7 /* XCRemoteSwiftPackageReference "FluidAudio" */,
+				00ACE93179EC4A99179E8CC3 /* XCRemoteSwiftPackageReference "AXorcist" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 47E05DEF2D444EC600D26DA6 /* Products */;
@@ -226,6 +415,7 @@
 			targets = (
 				47E05DED2D444EC600D26DA6 /* Kol */,
 				478637A42D48725900319BFA /* KolTests */,
+				C0F28447D849A6C88523AB5A /* KolCore */,
 			);
 		};
 /* End PBXProject section */
@@ -246,9 +436,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9E2779F24458409A940EA083 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		40B74093F7BAFC8B2B5DFD4C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		478637A12D48725900319BFA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -266,45 +470,97 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		0D55063CF82B0EDF4F84F0DE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = KolCore;
+			target = C0F28447D849A6C88523AB5A /* KolCore */;
+			targetProxy = 2E71D2DF50AC949E6FEAF1B1 /* PBXContainerItemProxy */;
+		};
 		478637AA2D48725900319BFA /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 47E05DED2D444EC600D26DA6 /* Kol */;
 			targetProxy = 478637A92D48725900319BFA /* PBXContainerItemProxy */;
 		};
+		9943CFB168683AA50D57156D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = KolCore;
+			target = C0F28447D849A6C88523AB5A /* KolCore */;
+			targetProxy = D2F7C41E80D10EF1412734DB /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		328E1D880B5A4F84E389F480 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = G365XP38PA;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = com.alandotcom.KolCore;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
 		478637AC2D48725900319BFA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 101;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alandotcom.KolTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kol.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kol";
 			};
 			name = Debug;
 		};
 		478637AD2D48725900319BFA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 101;
 				DEAD_CODE_STRIPPING = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"$(BUILT_PRODUCTS_DIR)",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alandotcom.KolTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kol.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kol";
 			};
 			name = Release;
 		};
@@ -344,7 +600,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = QC99C9JE59;
+				DEVELOPMENT_TEAM = G365XP38PA;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -363,7 +619,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -410,7 +666,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = QC99C9JE59;
+				DEVELOPMENT_TEAM = G365XP38PA;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -423,7 +679,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.2;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -468,14 +724,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.1.0;
-				OTHER_LDFLAGS = (
-					"-Xlinker",
-					"-interposable",
-				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.alandotcom.Kol.debug;
-				PRODUCT_NAME = "Kol Debug";
+				PRODUCT_NAME = Kol;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
 				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
 				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
@@ -522,7 +774,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.alandotcom.Kol;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -536,6 +788,39 @@
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
+		};
+		D227F9F531C9A21710F783E7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = G365XP38PA;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = com.alandotcom.KolCore;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
@@ -567,10 +852,26 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		6AD29015EA26326DE1AE749B /* Build configuration list for PBXNativeTarget "KolCore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				328E1D880B5A4F84E389F480 /* Release */,
+				D227F9F531C9A21710F783E7 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
-
 /* Begin XCRemoteSwiftPackageReference section */
+		00ACE93179EC4A99179E8CC3 /* XCRemoteSwiftPackageReference "AXorcist" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/steipete/AXorcist.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.0;
+			};
+		};
 		47512ABD2E14D8C9000E25BA /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
@@ -638,6 +939,43 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		026BEE407424C5C195DE8F03 /* AXorcist */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 00ACE93179EC4A99179E8CC3 /* XCRemoteSwiftPackageReference "AXorcist" */;
+			productName = AXorcist;
+		};
+		15C0465AEB781CAC239453CD /* CasePaths */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CasePaths;
+		};
+		1A49FDC9D3A96580756DD5ED /* IdentifiedCollections */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = IdentifiedCollections;
+		};
+		214CD0B6112373FF134D3F0C /* Sharing */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Sharing;
+		};
+		227F0592816A17126D6C6878 /* CustomDump */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CustomDump;
+		};
+		308BB8438F4D3B47B457BB1D /* ConcurrencyExtras */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ConcurrencyExtras;
+		};
+		357C1A50A91F15118BC185C4 /* Sharing */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Sharing;
+		};
+		3F2D910B1F803177B9C3D83A /* IssueReporting */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = IssueReporting;
+		};
+		4303D8322FB668DC38AB6018 /* IssueReporting */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = IssueReporting;
+		};
 		47512ABE2E14D8C9000E25BA /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 47512ABD2E14D8C9000E25BA /* XCRemoteSwiftPackageReference "WhisperKit" */;
@@ -678,10 +1016,98 @@
 			package = 47E16A602EC6C9D300885CF7 /* XCRemoteSwiftPackageReference "FluidAudio" */;
 			productName = FluidAudio;
 		};
+		47F37C5EC9694CD4D44182EC /* SwiftNavigation */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SwiftNavigation;
+		};
+		510DE99898ED98A98EA00074 /* DependenciesMacros */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47E05E082D44525B00D26DA6 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
+			productName = DependenciesMacros;
+		};
+		55EB14581A7A77F45016B74E /* IssueReporting */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = IssueReporting;
+		};
+		5BAEC2B4F7B077AFA58FE153 /* CasePaths */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CasePaths;
+		};
+		666EE21E76FBCFAFB6CFB6C7 /* Clocks */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Clocks;
+		};
+		7433F6E64A031D1C4AE440B4 /* XCTestDynamicOverlay */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = XCTestDynamicOverlay;
+		};
+		93CBD2F56664506274695FFE /* ConcurrencyExtras */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ConcurrencyExtras;
+		};
+		9B1137862CEB38C43538B9BE /* Dependencies */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Dependencies;
+		};
+		A46E807918773E4595BA1134 /* CustomDump */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CustomDump;
+		};
+		ADA9CC764388229BF645AC0D /* IdentifiedCollections */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = IdentifiedCollections;
+		};
+		B13BCBF62A0026E6C49C8B23 /* Clocks */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Clocks;
+		};
 		B5045C962D78DED500D0A119 /* MarkdownUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B5045C952D78DED500D0A119 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
 			productName = MarkdownUI;
+		};
+		C5562093AA581178D34EC294 /* CombineSchedulers */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CombineSchedulers;
+		};
+		C68C753588DB5F3169873099 /* Perception */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Perception;
+		};
+		CDA7122B55A3E7005199AC18 /* Sauce */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47E05E032D444EF800D26DA6 /* XCRemoteSwiftPackageReference "Sauce" */;
+			productName = Sauce;
+		};
+		CDE567DF5980ADAAA3B5E3E8 /* Perception */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Perception;
+		};
+		D0046C259393F2A4938AB19A /* DependenciesMacros */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DependenciesMacros;
+		};
+		D8214A7E522E16B329D19381 /* SwiftNavigation */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SwiftNavigation;
+		};
+		D8F03E26D6C7C1DADA9EBD5C /* Dependencies */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47E05E082D44525B00D26DA6 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
+			productName = Dependencies;
+		};
+		E8AAC6380D96264606627FFE /* ComposableArchitecture */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47E05E002D444EE900D26DA6 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
+			productName = ComposableArchitecture;
+		};
+		F54DF918503E20282D61202F /* Sauce */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Sauce;
+		};
+		F5743EA87D52A3991976EB0E /* ConcurrencyExtras */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ConcurrencyExtras;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
