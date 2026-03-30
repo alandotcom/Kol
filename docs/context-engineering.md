@@ -764,11 +764,54 @@ High overall, but each adapter is independent and can be built incrementally. St
 - `HotKeyProcessorTests` disabled — crashes in non-hosted context (uses `withDependencies` which needs investigation)
 - `RecordingRaceTests` disabled — needs hosted test for `TranscriptionFeature` (uses `TestStore`)
 
+### Phase B — done
+
+**§6A Post-ASR Text Rescoring — tried and removed**
+- Ported FluidAudio's `VocabularyRescorer` (Levenshtein similarity, stopword/length guards, compound matching) as `TextRescorer` in KolCore.
+- **Removed from codebase.** Testing showed that string-similarity rescoring produces too many false positives in practice (e.g. "Cloudflare proxy" matched to "Claude Max"). The vocabulary hints to the LLM are sufficient — the LLM can make semantic judgments that pure string matching cannot.
+- **Lesson learned:** Pre-LLM text manipulation is risky. The LLM already handles vocabulary-aware correction well when given screen context and vocabulary hints. Adding a second correction layer before it introduces compounding errors.
+
+**§6B WhisperKit Prompt Token Biasing — done**
+- `TranscriptionClient.transcribe` extended with optional `vocabularyHints: [String]?` parameter
+- WhisperKit path encodes vocabulary as prompt tokens via `whisperKit.tokenizer.encode()`, filtered for special tokens
+- Sets `DecodingOptions.promptTokens` and `usePrefillPrompt = true` when vocabulary available
+- Parakeet and Qwen paths pass through unaffected (CTC/autoregressive biasing N/A)
+- `TranscriptionFeature.handleStopRecording()` passes `capturedVocabulary` to transcription call
+
+**§6C LLM Correction Hints — tried and removed**
+- Built `PromptLayers.correctionHints()` and `PostProcessingContext.correctionHints` field to pass TextRescorer matches to the LLM.
+- **Removed from codebase** along with TextRescorer. Correction hints fed TextRescorer false positives directly to the LLM (e.g. `"Cloudflare proxy" might be "Claude Max"`), which the LLM then applied as corrections.
+- **Lesson learned:** Presenting "X might be Y" to an instruction-following LLM is effectively telling it to do the replacement. The correction hints format is too authoritative for low-confidence matches.
+
+**§8 Continuous Context Updates — done**
+- 1-second timer effect during recording, gated by `llmPostProcessingEnabled && llmScreenContextEnabled`
+- New actions: `contextRefreshTick` (fires timer), `contextRefreshed` (updates state with fresh context)
+- AX calls dispatched to main thread via `MainActor.run { ... }`
+- Re-extracts vocabulary, merges into cache, updates `capturedVocabulary` with latest terms
+- Timer cancelled in `handleStopRecording`, `handleCancel`, `handleDiscard` via `CancelID.contextRefresh`
+- `state.contextUpdateCount` tracks refresh count per recording (logged on stop)
+
+**§4 IDE-Specific Context (Phase 1) — done**
+- `IDEContext` model in `KolCore/IDEContext.swift` — `openFileNames`, `detectedLanguage` (auto-detected from file extensions)
+- `IDEContextClient` in `Kol/Clients/IDEContextClient.swift` — raw AX API (same approach as ScreenContextClient), walks window AX tree for tab-like elements (AXRadioButton, AXTab), filters by `looksLikeFileName` heuristic
+- `PromptLayers.ideContext()` — new prompt layer: "Open files: ... \nLanguage: Swift"
+- Integrated in `handleStartRecording()` for code editors (detected via `appContextCategory == .code`)
+- Tab file names merged into vocabulary cache for ASR biasing
+- 7 IDEContextTests (language detection from extensions, auto-detect in init, edge cases)
+
+**Prompt changes:**
+- Core prompt: added "Do NOT rephrase, restructure, or reword sentences" rule to prevent LLM paraphrasing
+- Vocabulary hints: changed wording from "use their exact spelling and casing when they match spoken words" to "use their exact spelling and casing when they appear in the transcription" — less aggressive matching instruction
+- Layer ordering: core → language → app context → IDE context → screen context → vocabulary hints → custom rules
+
+**No new settings added.** All Phase B features piggyback on existing gates (`llmPostProcessingEnabled`, `llmScreenContextEnabled`).
+
 ### Remaining work
 
-- **AXorcist migration** — rewrite ScreenContextClient internals to use AXorcist (currently just a dependency, not used). Deferred to Phase B when a feature actually needs AXorcist's query/observation APIs (§8 continuous context updates or §4 IDE context)
-- **RecordingRaceTests** — disabled (`RecordingRaceTests.swift.disabled`), needs a hosted test target with BUNDLE_LOADER/TEST_HOST pointing at Kol.app. Current KolTests is a standalone non-hosted bundle. Low priority — the race condition it guards is stable
-- **Manual smoke test** — debug build, dictate in VS Code/Terminal/Slack/Notes, verify structured context + vocabulary hints in LLM debug logging
+- **AXorcist migration** — ScreenContextClient and IDEContextClient both use raw `AXUIElement` C API. AXorcist is an SPM dependency but not yet imported. Migration deferred to when observation APIs (§8 real-time AX notifications) are needed.
+- **IDE tab AX tree tuning** — IDEContextClient's tab extraction heuristic needs verification per editor (VS Code, Cursor, Xcode, Zed) via Accessibility Inspector
+- **RecordingRaceTests** — disabled, needs hosted test target. Low priority.
+- **Manual smoke test** — debug build, dictate in VS Code/Terminal/Slack/Notes, verify continuous context and IDE context in logs
 
 ---
 

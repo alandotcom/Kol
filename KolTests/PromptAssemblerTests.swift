@@ -112,13 +112,13 @@ struct PromptAssemblerTests {
 		)
 		#expect(prompt.contains("My name is Alan"))
 		#expect(prompt.contains("Fountain Bio"))
-		#expect(prompt.contains("Facts about the speaker"))
+		#expect(prompt.contains("Background context about the speaker"))
 	}
 
 	@Test("Empty custom rules not appended")
 	func emptyCustomRules() {
 		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: nil, customRules: "  \n  ")
-		#expect(!prompt.contains("Facts about the speaker"))
+		#expect(!prompt.contains("Background context about the speaker"))
 	}
 
 	@Test("User message is just the text")
@@ -264,7 +264,7 @@ struct PromptAssemblerTests {
 		)
 		let appContextRange = prompt.range(of: "code editor or terminal")!
 		let screenRange = prompt.range(of: "recent terminal output")!
-		let rulesRange = prompt.range(of: "Facts about the speaker")!
+		let rulesRange = prompt.range(of: "Background context about the speaker")!
 		#expect(appContextRange.lowerBound < screenRange.lowerBound)
 		#expect(screenRange.lowerBound < rulesRange.lowerBound)
 	}
@@ -392,9 +392,80 @@ struct PromptAssemblerTests {
 		)
 		let structuredRange = prompt.range(of: "--- BEFORE CURSOR ---")!
 		let vocabRange = prompt.range(of: "Names and identifiers visible on screen")!
-		let rulesRange = prompt.range(of: "Facts about the speaker")!
+		let rulesRange = prompt.range(of: "Background context about the speaker")!
 		#expect(structuredRange.lowerBound < vocabRange.lowerBound)
 		#expect(vocabRange.lowerBound < rulesRange.lowerBound)
+	}
+
+	// MARK: - IDE Context Tests
+
+	@Test("IDE context included when provided for code app")
+	func ideContextIncluded() {
+		let ide = IDEContext(openFileNames: ["TranscriptionFeature.swift", "AppDelegate.swift"])
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "com.microsoft.VSCode", customRules: nil,
+			ideContext: ide
+		)
+		#expect(prompt.contains("Open files:"))
+		#expect(prompt.contains("TranscriptionFeature.swift"))
+		#expect(prompt.contains("AppDelegate.swift"))
+		#expect(prompt.contains("Language: Swift"))
+	}
+
+	@Test("IDE context excluded when nil")
+	func ideContextExcludedNil() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "com.microsoft.VSCode", customRules: nil,
+			ideContext: nil
+		)
+		#expect(!prompt.contains("Open files:"))
+	}
+
+	@Test("IDE context excluded when openFileNames is empty")
+	func ideContextExcludedEmpty() {
+		let ide = IDEContext(openFileNames: [])
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "com.microsoft.VSCode", customRules: nil,
+			ideContext: ide
+		)
+		#expect(!prompt.contains("Open files:"))
+	}
+
+	@Test("IDE context ordering: between app context and screen context")
+	func ideContextOrdering() {
+		let ide = IDEContext(openFileNames: ["App.swift"])
+		let ctx = CursorContext(
+			beforeCursor: "let x = 42",
+			afterCursor: "",
+			selectedText: nil,
+			isTerminal: false
+		)
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en",
+			sourceApp: "Terminal",
+			customRules: "My name is Alan",
+			ideContext: ide,
+			structuredContext: ctx,
+			vocabularyHints: ["someIdentifier"]
+		)
+		let appContextRange = prompt.range(of: "code editor or terminal")!
+		let ideRange = prompt.range(of: "Open files:")!
+		let screenRange = prompt.range(of: "--- BEFORE CURSOR ---")!
+		let vocabRange = prompt.range(of: "Names and identifiers visible on screen")!
+		let rulesRange = prompt.range(of: "Background context about the speaker")!
+		#expect(appContextRange.lowerBound < ideRange.lowerBound)
+		#expect(ideRange.lowerBound < screenRange.lowerBound)
+		#expect(screenRange.lowerBound < vocabRange.lowerBound)
+		#expect(vocabRange.lowerBound < rulesRange.lowerBound)
+	}
+
+	// MARK: - Anti-Rephrase Rule
+
+	@Test("Core prompt includes anti-rephrase rule")
+	func antiRephraseRule() {
+		let prompt = PromptAssembler.systemPrompt(language: nil, sourceApp: nil, customRules: nil)
+		#expect(prompt.contains("Do NOT rephrase, restructure, or reword sentences"))
+		#expect(prompt.contains("Keep the speaker's original sentence structure"))
 	}
 }
 

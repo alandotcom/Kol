@@ -31,6 +31,8 @@ struct TranscriptionFeature {
     var capturedScreenContext: String?
     var capturedCursorContext: CursorContext?
     var capturedVocabulary: [String]?
+    var capturedIDEContext: IDEContext?
+    var contextUpdateCount: Int = 0
     @Shared(.kolSettings) var kolSettings: KolSettings
     @Shared(.isRemappingScratchpadFocused) var isRemappingScratchpadFocused: Bool = false
     @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
@@ -57,6 +59,10 @@ struct TranscriptionFeature {
     case transcriptionResult(String, URL)
     case transcriptionError(Error, URL?)
 
+    // Context refresh during recording
+    case contextRefreshTick
+    case contextRefreshed(CursorContext?, String?, [String]?)
+
     // Model availability
     case modelMissing
   }
@@ -65,6 +71,7 @@ struct TranscriptionFeature {
     case metering
     case recordingCleanup
     case transcription
+    case contextRefresh
   }
 
   @Dependency(\.transcription) var transcription
@@ -79,6 +86,7 @@ struct TranscriptionFeature {
   @Dependency(\.keychain) var keychain
   @Dependency(\.screenContext) var screenContext
   @Dependency(\.vocabularyCache) var vocabularyCache
+  @Dependency(\.ideContext) var ideContext
 
   var body: some ReducerOf<Self> {
     Reduce { state, action in
@@ -133,6 +141,46 @@ struct TranscriptionFeature {
       case .modelMissing:
         return .none
 
+      // MARK: - Context Refresh During Recording
+
+      case .contextRefreshTick:
+        guard state.isRecording else { return .none }
+        let bundleID = state.sourceAppBundleID
+        return .run { [screenContext, vocabularyCache] send in
+          let cursor = await MainActor.run {
+            screenContext.captureCursorContext(bundleID)
+          }
+          let flatText: String?
+          if let cursorText = cursor?.flatText {
+            flatText = cursorText
+          } else {
+            flatText = await MainActor.run {
+              screenContext.captureVisibleText(bundleID)
+            }
+          }
+          var vocabulary: [String]?
+          if let text = flatText, !text.isEmpty {
+            let vocab = VocabularyExtractor.extract(from: text)
+            vocabularyCache.merge(vocab)
+            vocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+          }
+          await send(.contextRefreshed(cursor, flatText, vocabulary))
+        }
+
+      case let .contextRefreshed(cursor, flatText, vocabulary):
+        guard state.isRecording else { return .none }
+        if let cursor {
+          state.capturedCursorContext = cursor
+          state.capturedScreenContext = cursor.flatText
+        } else if let flatText {
+          state.capturedCursorContext = nil
+          state.capturedScreenContext = flatText
+        }
+        if let vocabulary {
+          state.capturedVocabulary = vocabulary
+        }
+        state.contextUpdateCount += 1
+        return .none
 
       // MARK: - Cancel/Discard Flow
 
@@ -328,10 +376,33 @@ private extension TranscriptionFeature {
       state.capturedCursorContext = nil
       state.capturedVocabulary = nil
     }
+
+    // Capture IDE context (open file names) for code editors
+    // Only when LLM post-processing and screen context are enabled (same gate as screen context above)
+    if state.kolSettings.llmPostProcessingEnabled && state.kolSettings.llmScreenContextEnabled,
+       PromptLayers.appContextCategory(for: state.sourceAppBundleID) == .code,
+       let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+      let tabTitles = ideContext.extractTabTitles(pid)
+      if !tabTitles.isEmpty {
+        let ide = IDEContext(openFileNames: tabTitles)
+        state.capturedIDEContext = ide
+        // Merge file names into vocabulary cache
+        let fileVocab = VocabularyExtractor.Result(properNouns: [], identifiers: [], fileNames: tabTitles)
+        vocabularyCache.merge(fileVocab)
+        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+        transcriptionFeatureLogger.info("IDE context: \(tabTitles.count) tab(s), language: \(ide.detectedLanguage ?? "unknown")")
+      } else {
+        state.capturedIDEContext = nil
+      }
+    } else {
+      state.capturedIDEContext = nil
+    }
+
+    state.contextUpdateCount = 0
     transcriptionFeatureLogger.notice("Recording started at \(startTime.ISO8601Format())")
 
     // Prevent system sleep during recording
-    return .merge(
+    let startRecordingEffect: Effect<Action> = .merge(
       .cancel(id: CancelID.recordingCleanup),
       .run { [sleepManagement, preventSleep = state.kolSettings.preventSystemSleep] _ in
         // Play sound immediately for instant feedback
@@ -343,11 +414,32 @@ private extension TranscriptionFeature {
         await recording.startRecording()
       }
     )
+
+    // Start periodic context refresh during recording (1s interval)
+    let shouldRefreshContext = state.kolSettings.llmPostProcessingEnabled
+      && state.kolSettings.llmScreenContextEnabled
+    guard shouldRefreshContext else {
+      return startRecordingEffect
+    }
+
+    let contextRefreshEffect: Effect<Action> = .run { send in
+      while !Task.isCancelled {
+        try await Task.sleep(for: .seconds(1))
+        await send(.contextRefreshTick)
+      }
+    }
+    .cancellable(id: CancelID.contextRefresh, cancelInFlight: true)
+
+    return .merge(startRecordingEffect, contextRefreshEffect)
   }
 
   func handleStopRecording(_ state: inout State) -> Effect<Action> {
     state.isRecording = false
-    
+    let contextUpdates = state.contextUpdateCount
+    if contextUpdates > 0 {
+      transcriptionFeatureLogger.info("Context refreshed \(contextUpdates) time(s) during recording")
+    }
+
     let stopTime = now
     let startTime = state.recordingStartTime
     let duration = startTime.map { stopTime.timeIntervalSince($0) } ?? 0
@@ -373,12 +465,15 @@ private extension TranscriptionFeature {
       // If the user recorded for less than minimumKeyTime and the hotkey is modifier-only,
       // discard the audio to avoid accidental triggers.
       transcriptionFeatureLogger.notice("Discarding short recording per decision \(String(describing: decision))")
-      return .run { _ in
-        let url = await recording.stopRecording()
-        guard !Task.isCancelled else { return }
-        try? FileManager.default.removeItem(at: url)
-      }
-      .cancellable(id: CancelID.recordingCleanup, cancelInFlight: true)
+      return .merge(
+        .cancel(id: CancelID.contextRefresh),
+        .run { _ in
+          let url = await recording.stopRecording()
+          guard !Task.isCancelled else { return }
+          try? FileManager.default.removeItem(at: url)
+        }
+        .cancellable(id: CancelID.recordingCleanup, cancelInFlight: true)
+      )
     }
 
     // Otherwise, proceed to transcription
@@ -395,35 +490,39 @@ private extension TranscriptionFeature {
 
     state.isPrewarming = true
     let vadEnabled = state.kolSettings.vadSilenceDetectionEnabled
+    let capturedVocabulary = state.capturedVocabulary
 
-    return .run { [sleepManagement] send in
-      // Allow system to sleep again
-      await sleepManagement.allowSleep()
+    return .merge(
+      .cancel(id: CancelID.contextRefresh),
+      .run { [sleepManagement] send in
+        // Allow system to sleep again
+        await sleepManagement.allowSleep()
 
-      var audioURL: URL?
-      do {
-        let capturedURL = await recording.stopRecording()
-        guard !Task.isCancelled else { return }
-        audioURL = capturedURL
+        var audioURL: URL?
+        do {
+          let capturedURL = await recording.stopRecording()
+          guard !Task.isCancelled else { return }
+          audioURL = capturedURL
 
-        // Create transcription options with the selected language
-        // Note: cap concurrency to avoid audio I/O overloads on some Macs
-        let decodeOptions = DecodingOptions(
-          language: language,
-          detectLanguage: language == nil, // Only auto-detect if no language specified
-          chunkingStrategy: .vad,
-        )
+          // Create transcription options with the selected language
+          // Note: cap concurrency to avoid audio I/O overloads on some Macs
+          let decodeOptions = DecodingOptions(
+            language: language,
+            detectLanguage: language == nil, // Only auto-detect if no language specified
+            chunkingStrategy: .vad,
+          )
 
-        let result = try await transcription.transcribe(capturedURL, model, decodeOptions, vadEnabled) { _ in }
-        
-        transcriptionFeatureLogger.notice("Transcribed audio from \(capturedURL.lastPathComponent) to text length \(result.count)")
-        await send(.transcriptionResult(result, capturedURL))
-      } catch {
-        transcriptionFeatureLogger.error("Transcription failed: \(error.localizedDescription)")
-        await send(.transcriptionError(error, audioURL))
+          let result = try await transcription.transcribe(capturedURL, model, decodeOptions, vadEnabled, capturedVocabulary) { _ in }
+
+          transcriptionFeatureLogger.notice("Transcribed audio from \(capturedURL.lastPathComponent) to text length \(result.count)")
+          await send(.transcriptionResult(result, capturedURL))
+        } catch {
+          transcriptionFeatureLogger.error("Transcription failed: \(error.localizedDescription)")
+          await send(.transcriptionError(error, audioURL))
+        }
       }
-    }
-    .cancellable(id: CancelID.transcription)
+      .cancellable(id: CancelID.transcription)
+    )
   }
 
   /// Checks the current macOS keyboard input source and routes to the appropriate model.
@@ -528,6 +627,7 @@ private extension TranscriptionFeature {
     let capturedScreenContext = state.capturedScreenContext
     let capturedCursorContext = state.capturedCursorContext
     let capturedVocabulary = state.capturedVocabulary
+    let capturedIDEContext = state.capturedIDEContext
 
     return .run { [llmPostProcessing, keychain] send in
       do {
@@ -546,6 +646,7 @@ private extension TranscriptionFeature {
               sourceApp: sourceAppName ?? sourceAppBundleID,
               customRules: llmCustomRules.isEmpty ? nil : llmCustomRules,
               appContextOverrides: llmAppContextOverrides,
+              ideContext: capturedIDEContext,
               screenContext: capturedScreenContext,
               structuredContext: capturedCursorContext,
               vocabularyHints: capturedVocabulary
@@ -669,9 +770,11 @@ private extension TranscriptionFeature {
     state.capturedScreenContext = nil
     state.capturedCursorContext = nil
     state.capturedVocabulary = nil
+    state.capturedIDEContext = nil
 
     return .merge(
       .cancel(id: CancelID.transcription),
+      .cancel(id: CancelID.contextRefresh),
       .run { [sleepManagement] _ in
         // Allow system to sleep again
         await sleepManagement.allowSleep()
@@ -691,16 +794,20 @@ private extension TranscriptionFeature {
     state.capturedScreenContext = nil
     state.capturedCursorContext = nil
     state.capturedVocabulary = nil
+    state.capturedIDEContext = nil
 
     // Silently discard - no sound effect
-    return .run { [sleepManagement] _ in
-      // Allow system to sleep again
-      await sleepManagement.allowSleep()
-      let url = await recording.stopRecording()
-      guard !Task.isCancelled else { return }
-      try? FileManager.default.removeItem(at: url)
-    }
-    .cancellable(id: CancelID.recordingCleanup, cancelInFlight: true)
+    return .merge(
+      .cancel(id: CancelID.contextRefresh),
+      .run { [sleepManagement] _ in
+        // Allow system to sleep again
+        await sleepManagement.allowSleep()
+        let url = await recording.stopRecording()
+        guard !Task.isCancelled else { return }
+        try? FileManager.default.removeItem(at: url)
+      }
+      .cancellable(id: CancelID.recordingCleanup, cancelInFlight: true)
+    )
   }
 }
 

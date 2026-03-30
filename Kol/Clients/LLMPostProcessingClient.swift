@@ -22,6 +22,7 @@ extension LLMPostProcessingClient: DependencyKey {
 					sourceApp: context.sourceApp,
 					customRules: context.customRules,
 					appContextOverrides: context.appContextOverrides,
+					ideContext: context.ideContext,
 					screenContext: context.screenContext,
 					structuredContext: context.structuredContext,
 					vocabularyHints: context.vocabularyHints

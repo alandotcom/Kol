@@ -27,12 +27,15 @@ Kol (קול, Hebrew for "voice") is a macOS menu bar application for on‑device
   - `PromptLayers.core` — always present (punctuation, filler removal)
   - `PromptLayers.hebrew` / `.english` — language-specific, selected based on detected language
   - `PromptLayers.appContextCode` / `.appContextMessaging` / `.appContextDocument` — adapts to target app
-  - `PromptLayers.screenContext(visibleText:)` — opt-in, captures text near cursor via Accessibility API
+  - `PromptLayers.ideContext(fileNames:language:)` — open file names from IDE tab bar (code editors only)
+  - `PromptLayers.screenContext(visibleText:)` / `.structuredScreenContext(context:)` — opt-in, captures text near cursor via Accessibility API
+  - `PromptLayers.vocabularyHints(terms:)` — extracted identifiers and proper nouns from screen text
   - Custom rules — user-provided facts (name, company, common terms)
-  - `PromptAssembler.systemPrompt()` composes applicable layers in order: core → language → app context → screen context → custom rules
-- **Key files**: `Kol/Core/Models/LLMPostProcessing.swift`, `LLMPostProcessingClient.swift`, `ScreenContextClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
+  - `PromptAssembler.systemPrompt()` composes applicable layers in order: core → language → app context → IDE context → screen context → vocabulary hints → custom rules
+- **Key files**: `KolCore/LLMPostProcessing.swift`, `LLMPostProcessingClient.swift`, `ScreenContextClient.swift`, `IDEContextClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
 - **Insertion point**: `TranscriptionFeature.handleTranscriptionResult()`, after word removals/remappings, before `finalizeRecordingAndStoreTranscript()`
-- **Screen context capture**: `ScreenContextClient` uses AX APIs at recording start (synchronous). State stored in `TranscriptionFeature.State.capturedScreenContext`, cleared on cancel/discard.
+- **Screen context capture**: `ScreenContextClient` uses AX APIs at recording start (synchronous), then refreshes every 1s during recording via `contextRefreshTick` timer effect. State stored in `TranscriptionFeature.State.capturedScreenContext` / `capturedCursorContext`, cleared on cancel/discard.
+- **IDE context capture**: `IDEContextClient` extracts open file tab titles from code editors (VS Code, Cursor, Xcode, Zed) via AX tree walk. File names feed into vocabulary cache and a dedicated prompt layer. Captured at recording start only.
 - **Graceful fallback**: on any LLM error, original text is pasted
 - **API key**: stored in macOS Keychain via `KeychainClient`, NOT in settings JSON
 - **Tests**: `PromptAssemblerTests.swift` for prompt composition
@@ -45,7 +48,7 @@ When modifying any prompt in `LLMPostProcessing.swift`:
 1. **Update the eval prompt files** — `evals/prompts/*.txt` are static copies of the assembled system prompts. They must be kept in sync manually. If you change `appContextCode`, update `evals/prompts/english-code.txt` and `evals/prompts/english-code-screen.txt`.
 2. **Run evals before building** — see Eval Workflow below.
 3. **Run unit tests** — `xcodebuild test -scheme Kol -destination 'platform=macOS'`
-4. **Then build** — `killall Kol 2>/dev/null; ./scripts/build-install.sh`
+4. **Then build** — `./scripts/build-install.sh --debug`
 
 ## Build & Development Commands
 
@@ -87,7 +90,8 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 - `ParakeetClient`: FluidAudio ASR for Parakeet models
 - `QwenClient`: FluidAudio Qwen3AsrManager for Caspi Hebrew model
 - `LLMPostProcessingClient`: OpenAI-compatible API for transcription cleanup
-- `ScreenContextClient`: Captures focused text field content via macOS Accessibility API for LLM context
+- `ScreenContextClient`: Captures focused text field content via macOS Accessibility API for LLM context; refreshed every 1s during recording
+- `IDEContextClient`: Extracts open file tab titles from code editors via AX tree walk
 - `KeychainClient`: macOS Keychain for API key storage
 - `RecordingClient`: AVAudioRecorder wrapper for audio capture
 - `PasteboardClient`: Clipboard operations
@@ -115,9 +119,13 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 
 4. **Window Management**: Uses an `InvisibleWindow` for the transcription indicator overlay
 
-5. **Permissions**: Requires audio input and automation entitlements (see `Kol.entitlements`)
+5. **Continuous Context Refresh**: During recording, a 1-second timer (`contextRefreshTick`) re-captures screen text via AX APIs and updates the vocabulary cache. Gated by `llmPostProcessingEnabled && llmScreenContextEnabled`. Timer cancelled on stop/cancel/discard via `CancelID.contextRefresh`.
 
-6. **Logging**: All diagnostics should use the unified logging helper `KolLog` (`Kol/Core/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
+6. **WhisperKit Vocabulary Biasing**: When vocabulary hints are available, they're encoded as prompt tokens via `whisperKit.tokenizer.encode()` and set on `DecodingOptions.promptTokens`. Only applies to WhisperKit models (Parakeet and Qwen paths are unaffected).
+
+7. **Permissions**: Requires audio input and automation entitlements (see `Kol.entitlements`)
+
+8. **Logging**: All diagnostics should use the unified logging helper `KolLog` (`Kol/Core/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
 
 ## Models
 

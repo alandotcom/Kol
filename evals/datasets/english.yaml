@@ -71,12 +71,12 @@
   assert:
     - type: not-contains
       value: " um "
-    - type: contains
-      value: "?"
     - type: javascript
       value: "output.includes('option A') || output.includes('Option A')"
     - type: javascript
       value: "output.includes('option B') || output.includes('Option B')"
+    - type: javascript
+      value: "output.toLowerCase().startsWith('do you think')"
 
 - description: "Short utterance - yes"
   vars:

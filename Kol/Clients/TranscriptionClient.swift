@@ -26,7 +26,7 @@ struct TranscriptionClient {
   /// Transcribes an audio file at the specified `URL` using the named `model`.
   /// When `skipSilence` is true, runs Silero VAD first and returns empty string if no speech detected.
   /// Reports transcription progress via `progressCallback`.
-  var transcribe: @Sendable (URL, String, DecodingOptions, Bool, @escaping (Progress) -> Void) async throws -> String
+  var transcribe: @Sendable (URL, String, DecodingOptions, Bool, [String]?, @escaping (Progress) -> Void) async throws -> String
 
   /// Ensures a model is downloaded (if missing) and loaded into memory, reporting progress via `progressCallback`.
   var downloadModel: @Sendable (String, @escaping (Progress) -> Void) async throws -> Void
@@ -48,7 +48,7 @@ extension TranscriptionClient: DependencyKey {
   static var liveValue: Self {
     let live = TranscriptionClientLive()
     return Self(
-      transcribe: { try await live.transcribe(url: $0, model: $1, options: $2, skipSilence: $3, progressCallback: $4) },
+      transcribe: { try await live.transcribe(url: $0, model: $1, options: $2, skipSilence: $3, vocabularyHints: $4, progressCallback: $5) },
       downloadModel: { try await live.downloadAndLoadModel(variant: $0, progressCallback: $1) },
       deleteModel: { try await live.deleteModel(variant: $0) },
       isModelDownloaded: { await live.isModelDownloaded($0) },
@@ -252,6 +252,7 @@ actor TranscriptionClientLive {
     model: String,
     options: DecodingOptions,
     skipSilence: Bool,
+    vocabularyHints: [String]?,
     progressCallback: @escaping (Progress) -> Void
   ) async throws -> String {
     let startAll = Date()
@@ -311,6 +312,21 @@ actor TranscriptionClientLive {
           NSLocalizedDescriptionKey: "Failed to initialize WhisperKit for model: \(model)",
         ]
       )
+    }
+
+    // Apply vocabulary hints as prompt tokens for WhisperKit decoder biasing
+    var options = options
+    if let hints = vocabularyHints, !hints.isEmpty,
+       let tokenizer = whisperKit.tokenizer {
+      let promptText = " " + hints.joined(separator: ", ")
+      let tokens = tokenizer.encode(text: promptText).filter {
+        $0 < tokenizer.specialTokens.specialTokenBegin
+      }
+      if !tokens.isEmpty {
+        options.promptTokens = tokens
+        options.usePrefillPrompt = true
+        transcriptionLogger.info("WhisperKit prompt biasing: \(hints.count) terms → \(tokens.count) tokens")
+      }
     }
 
     // Perform the transcription.
