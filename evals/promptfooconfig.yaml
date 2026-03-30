@@ -1,8 +1,8 @@
-# Hex LLM Post-Processing Eval Suite
+# Kol LLM Post-Processing Eval Suite
 # Run: GROQ_API_KEY=xxx npx promptfoo@latest eval
 # View: npx promptfoo@latest view
 
-description: "Hex ASR post-processing quality evaluation"
+description: "Kol ASR post-processing quality evaluation"
 
 maxConcurrency: 1
 

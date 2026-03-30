@@ -749,7 +749,7 @@ High overall, but each adapter is independent and can be built incrementally. St
 ### Architecture changes
 
 **KolCore framework target** — extracted from the app target to fix test infrastructure:
-- Native Xcode framework target (not SPM package — avoids the slow incremental builds that the original HexCore SPM package had)
+- Native Xcode framework target (not SPM package — avoids the slow incremental builds that the original Hex SPM package had)
 - Contains: models (LLMPostProcessing, CursorContext, HotKey, KeyEvent, KolSettings, WordRemapping, WordRemoval, TranscriptionHistory, ParakeetModel, QwenModel), logic (HotKeyProcessor, VocabularyExtractor, VocabularyCache, RecordingDecision), shared infra (Logging, Constants)
 - Dependencies: ComposableArchitecture, Dependencies, DependenciesMacros, Sauce + TCA transitive deps
 - App target uses `@_exported import KolCore` — no import changes needed in app source files
@@ -764,10 +764,8 @@ High overall, but each adapter is independent and can be built incrementally. St
 
 ### Remaining work
 
-- **AXorcist migration** — rewrite ScreenContextClient internals to use AXorcist (currently just a dependency, not used)
-- **HotKeyProcessorTests** — fix crash in non-hosted test context (`withDependencies` + task-local storage issue)
-- **RecordingRaceTests** — needs a separate hosted test target, or rewrite without TestStore
-- **Eval runs** — `source .env && bun run eval:screen` to validate prompt changes
+- **AXorcist migration** — rewrite ScreenContextClient internals to use AXorcist (currently just a dependency, not used). Deferred to Phase B when a feature actually needs AXorcist's query/observation APIs (§8 continuous context updates or §4 IDE context)
+- **RecordingRaceTests** — disabled (`RecordingRaceTests.swift.disabled`), needs a hosted test target with BUNDLE_LOADER/TEST_HOST pointing at Kol.app. Current KolTests is a standalone non-hosted bundle. Low priority — the race condition it guards is stable
 - **Manual smoke test** — debug build, dictate in VS Code/Terminal/Slack/Notes, verify structured context + vocabulary hints in LLM debug logging
 
 ---

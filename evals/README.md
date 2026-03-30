@@ -1,4 +1,4 @@
-# Hex LLM Post-Processing Evals
+# Kol LLM Post-Processing Evals
 
 Evaluation suite for the LLM post-processing pipeline that cleans up raw ASR (speech-to-text) output.
 
@@ -46,7 +46,6 @@ Each file is the exact system prompt sent to the LLM, matching what `PromptAssem
 - `english-messaging.txt` — English, messaging app
 - `english-document.txt` — English, document/email
 - `hebrew-general.txt` — Hebrew, no app context
-- `hebrew-code.txt` — Hebrew, code editor
 - `hebrew-messaging.txt` — Hebrew, messaging
 
 ## Adding Test Cases
@@ -87,7 +86,7 @@ Add a new entry to the appropriate dataset YAML:
 
 ## Updating Prompts
 
-If you change `PromptLayers` in `HexCore/Sources/HexCore/Models/LLMPostProcessing.swift`, regenerate the prompt template files to match. The eval tests the actual prompt text the LLM receives, not the Swift assembly logic (that's covered by `PromptAssemblerTests.swift`).
+If you change `PromptLayers` in `Kol/Core/Models/LLMPostProcessing.swift`, regenerate the prompt template files to match. The eval tests the actual prompt text the LLM receives, not the Swift assembly logic (that's covered by `PromptAssemblerTests.swift`).
 
 ## Comparing Providers / Models
 

@@ -214,7 +214,7 @@
     input: "אני צריך לעשות deploy ל production"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: contains
       value: "deploy"
@@ -230,7 +230,7 @@
     input: "אני עובד עם React ו TypeScript בפרויקט הזה"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: contains
       value: "React"
@@ -244,7 +244,7 @@
     input: "תריץ npm install ואחרי זה npm run build"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: contains
       value: "npm install"
@@ -258,7 +258,7 @@
     input: "יש לי error ב component של ה header"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: contains
       value: "error"
@@ -274,7 +274,7 @@
     input: "אני משתמש ב Claude Code לעשות refactoring"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: contains
       value: "Claude Code"
@@ -288,7 +288,7 @@
     input: "תעשה commit ואחרי זה push ל main"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: contains
       value: "commit"
@@ -304,7 +304,7 @@
     input: "ה endpoint הוא slash api slash users"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: javascript
       value: "/[\u0590-\u05FF]/.test(output)"
@@ -318,7 +318,7 @@
     input: "ה function הזה מחזיר null במקום undefined"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: contains
       value: "null"
@@ -332,7 +332,7 @@
     input: "אני צריך לבדוק את ה pull request לפני ה merge"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: contains
       value: "pull request"
@@ -346,7 +346,7 @@
     input: "שנה את ה max retries ל 5"
   options:
     prompt:
-      raw: file://prompts/hebrew-code.txt
+      raw: file://prompts/hebrew-general.txt
   assert:
     - type: javascript
       value: "/[\u0590-\u05FF]/.test(output)"
