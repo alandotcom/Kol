@@ -74,6 +74,45 @@ Kol's `ScreenContextClient` (~260 lines) uses raw `AXUIElement` C API calls for 
 3. New features (§4, §5, §8, §10) build directly on AXorcist from the start
 4. Remove raw `AXUIElement` C API calls as features migrate
 
+### AX Performance & Tree Walking Best Practices
+
+Kol's current AX walks have no explicit limits — they read attributes one at a time with no timeout or node cap. For the features planned below (§5, §8, §10), this needs to change.
+
+**Batch attribute reading:** Use `AXUIElementCopyMultipleAttributeValues` to read multiple attributes (AXValue, AXRole, AXDescription, AXTitle, AXPosition, AXSize, AXChildren, AXVisibleChildren, AXSelectedTextRange, AXNumberOfCharacters) in a single call per element, rather than 10 individual `AXUIElementCopyAttributeValue` calls. AXorcist's `AXElementData` may already batch internally — verify before migrating.
+
+**Hard limits on tree walks:**
+- **Timeout:** Configurable per-walk, e.g. 2-5 seconds. Check `CFAbsoluteTimeGetCurrent()` in the walk loop and abort if exceeded.
+- **Max node count:** Cap total elements processed (e.g. 500-1000). Complex UIs (Slack, VS Code) can have thousands of AX nodes.
+- **Visibility filtering:** Skip children with width ≤ 3px or height ≤ 3px. Use `CGRectIntersectsRect(childRect, parentVisibleRect)` to prune off-screen children entirely — this is the single biggest performance win for large scrollable views.
+
+**Performance budget:** AX tree walks should complete in 50-200ms. Anything slower risks blocking context delivery for short dictations. The continuous refresh timer (§8) runs at 1Hz, so each capture must complete well under 1 second.
+
+**Stack-based traversal:** Use an explicit stack (not recursion) for tree walking to prevent stack overflow on deep AX trees and to make timeout/node-count checks straightforward.
+
+**Prefer AXVisibleChildren over AXChildren:** When available, `AXVisibleChildren` returns only on-screen elements. This avoids walking hundreds of off-screen nodes in scrollable views (messaging history, long files, terminal scrollback). Fall back to `AXChildren` when `AXVisibleChildren` is not supported by the element.
+
+**Element change detection:** Hash the focused element identity (role + title + position, or AXUIElement pointer) and skip re-capture if nothing changed since the last tick. Avoids redundant AX work during the 1Hz refresh when the user hasn't scrolled or switched context.
+
+**Placeholder text filtering:** Skip textbox contents that match common placeholder strings ("Message #channel", "Type a message", "Search...", "Reply..."). These pollute vocabulary extraction with UI chrome rather than real content. Maintain a short blocklist, not an exhaustive one — false negatives are fine.
+
+### Future Optimizations
+
+Lower-priority improvements to revisit once the core pipeline (§1-§8) is stable:
+
+**Pre-warming AX capture:** Start the AX tree walk on hotkey press, *before* the recording threshold is met (currently 0.2-0.3s). By the time the user starts speaking, context is already captured. This shaves 50-200ms off the critical path for short dictations.
+
+**Notification-driven context updates:** Replace the 1Hz polling timer (§8) with AX observer notifications (`AXValueChanged`, `AXFocusedUIElementChanged`, `AXSelectedTextChanged`). Only re-capture when something actually changed. AXorcist's `observe` command makes this straightforward. Reduces CPU usage during long recordings where the screen is mostly static.
+
+**Diff-based vocabulary updates:** On each refresh tick, diff the new vocabulary set against the previous one. Only merge genuinely new terms into the cache. Saves lock contention on `VocabularyCache` and avoids bumping timestamps on unchanged terms.
+
+**Context coalescing:** If notification-driven updates produce bursts of AX changes (e.g., rapid scrolling), coalesce them into a single context snapshot rather than re-capturing on every notification. Debounce with a short window (100-200ms).
+
+**Delayed clipboard rendering:** Use `NSPasteboardItem` with a data provider instead of writing text to the clipboard immediately. The data is only materialized when the target app reads the clipboard (with a ~0.75s timeout). Avoids clipboard pollution if the user cancels or discards the recording.
+
+**VS Code screen reader mode:** VS Code and Cursor expose a richer AX tree when screen reader mode is active. Simulating `Shift+Option+F1` before AX capture could unlock better context (function names, symbol info, diagnostics). Trade-off: this is a visible side effect (status bar indicator). Investigate whether the AX tree difference justifies the UX cost.
+
+**Personalization styles:** Beyond code/messaging/document categories, map apps to formatting styles: formal (email, docs), casual (Slack, Discord), very casual (iMessage, WhatsApp). Affects trailing period behavior, capitalization aggressiveness, and punctuation density. The current prompt layers partially cover this but it's not systematic.
+
 ### Complementary: CursorBounds
 
 **[Aeastr/CursorBounds](https://github.com/Aeastr/CursorBounds)** — 111 stars, SPM, macOS, last push Jan 2026. Provides:
@@ -173,11 +212,14 @@ struct ExtractedVocabulary {
 - Fire-and-forget async call to the LLM endpoint at recording start:
   ```
   System: Extract proper nouns, names, and technical identifiers from this text. Return as comma-separated list. If none, return "EMPTY".
-  User: <screen context text>
+  User: <conversationId>\n<screen context text>
   ```
+- Prefix with conversation ID (channel name, window title context) so the LLM can distinguish names from topics
 - Use the fastest available model (e.g., Cerebras inference)
 - Race with the transcription — if extraction finishes before transcription, include results in LLM post-processing prompt; otherwise skip
-- Pros: Higher accuracy
+- **Response limit:** Cap at 140 chars; if exceeded, drop the last comma-separated item (avoids truncated names)
+- **Cache results:** For messaging apps, persist extracted names in a per-app LRU (max 50) so they're available immediately on the next dictation without waiting for the LLM round-trip
+- Pros: Higher accuracy, catches names that regex can't (e.g., "Alice", "Anthropic")
 - Cons: Adds latency, requires API, costs tokens
 
 **Recommended: Start with Option A, add Option B as enhancement**
@@ -312,20 +354,23 @@ struct ChatMessage {
 
 ### Implementation
 
-**Phase 1: Participant extraction from AX tree**
-- In messaging apps, the AX tree contains sender names as `AXStaticText` elements with specific roles/subroles
-- Walk the AX tree from the focused text input upward to find the conversation container
-- Extract unique names from text elements that appear to be message headers/sender labels
-- Heuristic: look for repeated patterns like `Name:` or elements with `AXRoleDescription == "heading"` near message content
+**Phase 1: Conversation ID + participant names**
+- Extract conversation/channel name from window title — most messaging apps (Slack, Discord, Teams, Telegram) use a `Title - Context` format; split on " - " separator
+- Walk AX tree from focused text input upward to find the message container
+- Extract sender names from `AXStaticText` elements with heading-like roles/subroles
+- Cache names per conversation ID in a persistent LRU (max 50 per app, survives across dictations but not app launches)
+- Fallback: generic vocabulary extraction already catches some names via proper noun regex
 
 **Phase 2: Message content extraction**
 - Read message content from AX tree elements below sender labels
 - Build a chronological message list
 - Limit to last 5-10 messages to control prompt size
 
-**Phase 3: Conversation ID tracking**
-- Hash the participant list + app + channel name to create a stable conversation ID
-- Use this to cache participant names across dictation sessions
+**Phase 3: @-mention support**
+- When dictating in messaging apps, detect "at [Name]" pattern in transcription
+- Match against cached participant names from conversation context
+- Replace with `@Name` in output text
+- Gate behind a feature flag (`atMentionInsertionEnabled`, default off)
 
 ### Prompt Integration
 New prompt layer `PromptLayers.conversationContext`:
@@ -548,15 +593,16 @@ struct Correction {
 ### Implementation
 
 **Phase 1: Basic edit detection**
-- After paste, poll the focused AX text element (e.g., every 500ms for 5 seconds)
-- Compare current textbox content with pasted text
-- Use the before/after text (from structured cursor context) as anchors to isolate the pasted region
-- If the region has changed, compute word-level diff
+- After paste, monitor the focused AX text element — poll every 500ms for up to 10 seconds, or until the user switches apps / starts a new recording
+- Use `AXValue` to read the full text field contents; use the before/after text (from structured cursor context) as anchors to isolate the pasted region
+- Track the text field via `focusedElementHash` (hash of AX element identity) to detect if the user moves to a different field
+- If the pasted region has changed, compute word-level diff
 
 **Phase 2: Edit vector computation**
 - Align original and edited word arrays using edit distance algorithm
 - Produce a character-per-word vector: `M`atch, `S`ubstitution, `I`nsert, `D`elete, `C`asing-only
 - Store in `TranscriptionHistory` alongside existing metadata
+- Truncate text field reads to 500 chars on each side of the pasted region (word-boundary truncation) to avoid excessive AX data
 
 **Phase 3: Auto-learn from corrections**
 - Extract single-word substitutions (the highest-confidence corrections)
@@ -665,6 +711,26 @@ Medium. Vision framework API is well-documented. Main challenge is performance t
 ### Problem
 Different app categories expose context differently. A one-size-fits-all AX walker misses app-specific signals (e.g., Slack channel names, Xcode build errors, browser URL context).
 
+### Structured AX Tree Representation
+
+Today Kol extracts flat text from the AX tree. A richer approach is to build a **structured HTML representation** that preserves spatial layout and semantic roles:
+
+```html
+<div style="left: 220px; top: 44px; width: 800px; height: 40px" data-role="AXStaticText">
+    #engineering
+</div>
+<div data-role="AXStaticText">Jane Smith</div>
+<div data-role="AXStaticText">Hey team, the deploy looks good</div>
+<input data-role="AXTextArea" value="{{CURSOR}}"/>
+```
+
+This gives the LLM:
+- **Spatial layout** — where text appears relative to other elements and the cursor
+- **Role information** — distinguish message content from UI chrome, sender names from message text
+- **Conversation structure** — ordered sequence of senders and messages without app-specific parsing
+
+The HTML tree is more expensive to capture than flat text (requires position/size reads per element) but provides dramatically better context for messaging and document apps where structure matters. Consider capturing it only for apps where flat text is insufficient (messaging, browsers) and only when LLM post-processing is enabled.
+
 ### Design
 Pluggable context adapters per app category:
 
@@ -683,10 +749,12 @@ struct AppSpecificContext {
 
 ### Implementation
 
-**SlackAdapter:**
-- Extract channel name from window title or AX tree
-- Extract participant names from message headers
-- Cache names per channel
+**MessagingAdapter** (Slack, Discord, Teams, Telegram, iMessage, WhatsApp):
+- Extract conversation/channel name from window title (split on " - " separator — common across messaging apps)
+- Walk AX tree for participant names in message headers
+- Maintain a persistent per-app name cache (LRU, max 50) that survives across dictation sessions
+- Feed cached names into vocabulary hints and @-mention insertion (§5 Phase 3)
+- Generic approach — avoid app-specific AX structure assumptions; fall back to vocabulary extraction when structured parsing fails
 
 **XcodeAdapter:**
 - Extract file name from navigator or tab bar
@@ -694,10 +762,17 @@ struct AppSpecificContext {
 - Extract symbol names from the current scope
 
 **BrowserAdapter:**
-- Extract page title and URL from AX window title
-- Use URL to determine sub-context (e.g., `docs.google.com` → document mode, `mail.google.com` → email mode)
+- Extract page URL from browser AX attributes (no extension needed — macOS exposes the URL bar content via `AXTextField` or `AXStaticText` in the browser's AX tree)
+- Use URL to reclassify app context — the same browser bundle ID can be email (`mail.google.com`, `outlook.live.com`), messaging (`app.slack.com`, `discord.com`), document (`docs.google.com`, `notion.so`), or code (`github.com`). This is the key insight: **bundle ID alone is insufficient for browsers; URL determines the real app category**
+- Merge with native app detection: `com.google.Gmail` (native) and Chrome at `mail.google.com` (browser) should both resolve to email context. Maintain a URL → category mapping alongside the existing bundle ID → category mapping
 - Walk `AXWebArea` subtree to extract visible page content (headings, static text, links) for vocabulary and surrounding context
 - Use role filters (`AXHeading`, `AXStaticText`, `AXLink`) to prioritize content near the focused element
+
+**EmailAdapter** (Gmail, Mail, Outlook, Superhuman, Mimestream, Thunderbird + browser URLs):
+- Detect via native bundle IDs (`com.apple.mail`, `com.google.Gmail`, `com.microsoft.Outlook`, `com.superhuman.electron`, `com.mimestream.Mimestream`) OR browser URLs (`mail.google.com`, `outlook.live.com`, `outlook.office.com`, `mail.superhuman.com`)
+- Keep trailing periods (formal tone) — distinct from messaging which strips them
+- Extract thread participants from AX tree (To/CC/From fields or visible message headers)
+- Feed participant names into vocabulary cache for proper noun preservation
 
 **TerminalAdapter:**
 - Extract recent command output (last N lines)
@@ -808,10 +883,16 @@ High overall, but each adapter is independent and can be built incrementally. St
 
 ### Remaining work
 
+**Deferred from Phase A/B:**
 - **AXorcist migration** — ScreenContextClient and IDEContextClient both use raw `AXUIElement` C API. AXorcist is an SPM dependency but not yet imported. Migration deferred to when observation APIs (§8 real-time AX notifications) are needed.
 - **IDE tab AX tree tuning** — IDEContextClient's tab extraction heuristic needs verification per editor (VS Code, Cursor, Xcode, Zed) via Accessibility Inspector
 - **RecordingRaceTests** — disabled, needs hosted test target. Low priority.
 - **Manual smoke test** — debug build, dictate in VS Code/Terminal/Slack/Notes, verify continuous context and IDE context in logs
+
+**Phase C — next priorities:**
+- **§5 Conversation awareness** — window title parsing for conversation ID, AX tree walk for participant names, persistent per-app name cache (LRU 50), @-mention insertion from cached names
+- **§7 Post-paste edit tracking** — AX polling after paste with element identity tracking, word-level edit vectors (M/S/D/I/C), auto-learn word remappings from repeated corrections
+- **§10 App-specific adapters** — MessagingAdapter (generic window title + name extraction across Slack/Discord/Teams/etc.), BrowserAdapter (URL-based sub-context detection)
 
 ---
 
