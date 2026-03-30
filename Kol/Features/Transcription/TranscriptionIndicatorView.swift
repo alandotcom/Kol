@@ -1,6 +1,6 @@
 //
 //  TranscriptionIndicatorView.swift
-//  Hex
+//  Kol
 //
 //  Originally by Kit Langton on 1/25/25.
 //  Redesigned: frosted glass panel with Super Whisper-style waveform.

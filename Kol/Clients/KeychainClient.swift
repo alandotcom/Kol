@@ -14,40 +14,6 @@ extension KeychainClient: DependencyKey {
 	static var liveValue: Self {
 		let service = "com.alandotcom.Kol"
 
-			// Migrate keys from old Hex keychain service
-			let oldService = "com.kitlangton.Hex"
-			func migrateFromOldService(key: String) {
-				let query: [String: Any] = [
-					kSecClass as String: kSecClassGenericPassword,
-					kSecAttrService as String: oldService,
-					kSecAttrAccount as String: key,
-					kSecReturnData as String: true,
-					kSecMatchLimit as String: kSecMatchLimitOne,
-				]
-				var result: AnyObject?
-				guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-					  let data = result as? Data else { return }
-				// Check if new service already has this key
-				let newQuery: [String: Any] = [
-					kSecClass as String: kSecClassGenericPassword,
-					kSecAttrService as String: service,
-					kSecAttrAccount as String: key,
-					kSecReturnData as String: true,
-					kSecMatchLimit as String: kSecMatchLimitOne,
-				]
-				var existing: AnyObject?
-				if SecItemCopyMatching(newQuery as CFDictionary, &existing) == errSecSuccess { return }
-				// Copy to new service
-				let addQuery: [String: Any] = [
-					kSecClass as String: kSecClassGenericPassword,
-					kSecAttrService as String: service,
-					kSecAttrAccount as String: key,
-					kSecValueData as String: data,
-				]
-				SecItemAdd(addQuery as CFDictionary, nil)
-			}
-			migrateFromOldService(key: "llm_api_key")
-
 		return Self(
 			save: { key, value in
 				guard let data = value.data(using: .utf8) else { return }

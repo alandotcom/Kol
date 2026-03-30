@@ -1,6 +1,6 @@
 //
 //  HotKeyProcessor.swift
-//  Hex
+//  Kol
 //
 //  Created by Kit Langton on 1/28/25.
 //

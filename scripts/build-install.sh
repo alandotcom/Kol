@@ -35,7 +35,10 @@ fi
 echo "Signing..."
 codesign --deep --force --sign "Developer ID Application: Alan Cohen (G365XP38PA)" "$APP_PATH"
 
-echo "Installing to /Applications/Kol.app..."
-rsync -a --delete "$APP_PATH/" /Applications/Kol.app/
-
-echo "Done. Launch with: open /Applications/Kol.app"
+if [[ "$CONFIG" == "Debug" ]]; then
+  echo "Done. Launch with: open \"$APP_PATH\""
+else
+  echo "Installing to /Applications/Kol.app..."
+  rsync -a --delete "$APP_PATH/" /Applications/Kol.app/
+  echo "Done. Launch with: open /Applications/Kol.app"
+fi

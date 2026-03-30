@@ -1,6 +1,6 @@
 //
 //  TranscriptionFeature.swift
-//  Hex
+//  Kol
 //
 //  Created by Kit Langton on 1/24/25.
 //

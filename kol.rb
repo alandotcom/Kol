@@ -20,12 +20,8 @@ cask "kol" do
 
   zap trash: [
     "~/Library/Application Support/com.alandotcom.Kol",
-    "~/Library/Application Support/com.kitlangton.Hex",
     "~/Library/Caches/com.alandotcom.Kol",
-    "~/Library/Caches/com.kitlangton.Hex",
     "~/Library/Containers/com.alandotcom.Kol",
-    "~/Library/Containers/com.kitlangton.Hex",
     "~/Library/Preferences/com.alandotcom.Kol.plist",
-    "~/Library/Preferences/com.kitlangton.Hex.plist",
   ]
 end

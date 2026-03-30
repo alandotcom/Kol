@@ -20,29 +20,11 @@ public extension URL {
 		FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 	}
 
-	/// Legacy Hex Application Support directory for migration.
-	static var legacyHexApplicationSupport: URL? {
-		let fm = FileManager.default
-		guard let appSupport = try? fm.url(
-			for: .applicationSupportDirectory,
-			in: .userDomainMask,
-			appropriateFor: nil,
-			create: false
-		) else { return nil }
-		let hexDir = appSupport.appendingPathComponent("com.kitlangton.Hex", isDirectory: true)
-		return fm.fileExists(atPath: hexDir.path) ? hexDir : nil
-	}
-
 	static func kolMigratedFileURL(named fileName: String) -> URL {
 		let newURL = (try? kolApplicationSupport.appending(component: fileName))
 			?? documentsDirectory.appending(component: fileName)
 		let legacyURL = legacyDocumentsDirectory.appending(component: fileName)
 		FileManager.default.migrateIfNeeded(from: legacyURL, to: newURL)
-		// Also migrate from old Hex Application Support path
-		if let hexDir = legacyHexApplicationSupport {
-			let hexURL = hexDir.appending(component: fileName)
-			FileManager.default.migrateIfNeeded(from: hexURL, to: newURL)
-		}
 		return newURL
 	}
 

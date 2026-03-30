@@ -16,8 +16,6 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 
 	func applicationDidFinishLaunching(_: Notification) {
 		DiagnosticsLogging.bootstrapIfNeeded()
-		// Migrate data from old Hex paths if needed
-		migrateFromHexIfNeeded()
 		// Ensure Parakeet/FluidAudio caches live under Application Support, not ~/.cache
 		configureLocalCaches()
 		if isTesting {
@@ -75,22 +73,6 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 		Task { @MainActor in
 			await KolApp.appStore.send(.task).finish()
 		}
-	}
-
-	/// Migrates data from old Hex Application Support directory to new Kol location.
-	private func migrateFromHexIfNeeded() {
-		guard let hexDir = URL.legacyHexApplicationSupport else { return }
-		guard let kolDir = try? URL.kolApplicationSupport else { return }
-		let fm = FileManager.default
-		// Copy subdirectories (models, Recordings, cache) from old Hex dir
-		guard let contents = try? fm.contentsOfDirectory(at: hexDir, includingPropertiesForKeys: nil) else { return }
-		for item in contents {
-			let dest = kolDir.appendingPathComponent(item.lastPathComponent)
-			if !fm.fileExists(atPath: dest.path) {
-				try? fm.copyItem(at: item, to: dest)
-			}
-		}
-		appLogger.notice("Migrated data from old Hex Application Support directory")
 	}
 
 	/// Sets XDG_CACHE_HOME so FluidAudio stores models under our app's

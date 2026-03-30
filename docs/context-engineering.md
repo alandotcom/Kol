@@ -696,6 +696,8 @@ struct AppSpecificContext {
 **BrowserAdapter:**
 - Extract page title and URL from AX window title
 - Use URL to determine sub-context (e.g., `docs.google.com` → document mode, `mail.google.com` → email mode)
+- Walk `AXWebArea` subtree to extract visible page content (headings, static text, links) for vocabulary and surrounding context
+- Use role filters (`AXHeading`, `AXStaticText`, `AXLink`) to prioritize content near the focused element
 
 **TerminalAdapter:**
 - Extract recent command output (last N lines)

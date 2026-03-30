@@ -1,6 +1,6 @@
 //
 //  AudioWaveformView.swift
-//  Hex
+//  Kol
 //
 //  Continuous sine waveform: multiple overlapping sine waves summed together
 //  into smooth flowing lines. Amplitude responds to microphone input with

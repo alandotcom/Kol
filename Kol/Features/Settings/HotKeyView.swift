@@ -1,6 +1,6 @@
 //
 //  HotKeyView.swift
-//  Hex
+//  Kol
 //
 //  Created by Kit Langton on 1/30/25.
 //

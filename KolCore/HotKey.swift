@@ -1,6 +1,6 @@
 //
 //  Modifier.swift
-//  Hex
+//  Kol
 //
 //  Created by Kit Langton on 1/26/25.
 //
