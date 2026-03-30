@@ -40,6 +40,38 @@ public enum VocabularyExtractor {
 		"zsh", "fish", "sql", "graphql", "proto", "vue", "svelte",
 	]
 
+	// MARK: - Precompiled Regex Patterns
+
+	/// camelCase: starts lowercase, has at least one uppercase transition
+	/// e.g., handleStartRecording, capturedScreenContext
+	private static let camelCaseRegex = try! NSRegularExpression(
+		pattern: #"\b[a-z][a-zA-Z0-9]*(?:[A-Z][a-zA-Z0-9]*)+\b"#
+	)
+
+	/// PascalCase: starts uppercase, has at least one additional uppercase transition
+	/// e.g., ScreenContextClient, TranscriptionFeature
+	private static let pascalCaseRegex = try! NSRegularExpression(
+		pattern: #"\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+\b"#
+	)
+
+	/// snake_case: lowercase with underscores
+	/// e.g., source_app_bundle_id, max_context_length
+	private static let snakeCaseRegex = try! NSRegularExpression(
+		pattern: #"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b"#
+	)
+
+	/// Sequences of capitalized words (2+ words)
+	/// e.g., "Alan Cohen", "Claude Code", "Fountain Bio"
+	private static let properNounRegex = try! NSRegularExpression(
+		pattern: #"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b"#
+	)
+
+	/// File names with known extensions
+	/// e.g., "AppFeature.swift", "package.json", "README.md"
+	private static let fileNameRegex = try! NSRegularExpression(
+		pattern: #"\b[\w][\w.-]*\.(\w{1,5})\b"#
+	)
+
 	public static func extract(from text: String) -> Result {
 		guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
 			return Result(properNouns: [], identifiers: [], fileNames: [])
@@ -65,26 +97,8 @@ public enum VocabularyExtractor {
 		var results: [String] = []
 		var seen = Set<String>()
 
-		// camelCase: starts lowercase, has at least one uppercase transition
-		// e.g., handleStartRecording, capturedScreenContext
-		let camelCase = try! NSRegularExpression(
-			pattern: #"\b[a-z][a-zA-Z0-9]*(?:[A-Z][a-zA-Z0-9]*)+\b"#
-		)
-
-		// PascalCase: starts uppercase, has at least one additional uppercase transition
-		// e.g., ScreenContextClient, TranscriptionFeature
-		let pascalCase = try! NSRegularExpression(
-			pattern: #"\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+\b"#
-		)
-
-		// snake_case: lowercase with underscores
-		// e.g., source_app_bundle_id, max_context_length
-		let snakeCase = try! NSRegularExpression(
-			pattern: #"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b"#
-		)
-
 		let range = NSRange(text.startIndex..., in: text)
-		for regex in [camelCase, pascalCase, snakeCase] {
+		for regex in [camelCaseRegex, pascalCaseRegex, snakeCaseRegex] {
 			for match in regex.matches(in: text, range: range) {
 				if let matchRange = Range(match.range, in: text) {
 					let term = String(text[matchRange])
@@ -103,14 +117,11 @@ public enum VocabularyExtractor {
 	/// Matches sequences of capitalized words (2+ words).
 	/// e.g., "Alan Cohen", "Claude Code", "Fountain Bio"
 	private static func extractProperNouns(from text: String) -> [String] {
-		let pattern = try! NSRegularExpression(
-			pattern: #"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b"#
-		)
 		let range = NSRange(text.startIndex..., in: text)
 		var results: [String] = []
 		var seen = Set<String>()
 
-		for match in pattern.matches(in: text, range: range) {
+		for match in properNounRegex.matches(in: text, range: range) {
 			if let matchRange = Range(match.range, in: text) {
 				let term = String(text[matchRange])
 				let key = term.lowercased()
@@ -141,14 +152,11 @@ public enum VocabularyExtractor {
 	/// Matches file names with known extensions.
 	/// e.g., "AppFeature.swift", "package.json", "README.md"
 	private static func extractFileNames(from text: String) -> [String] {
-		let pattern = try! NSRegularExpression(
-			pattern: #"\b[\w][\w.-]*\.(\w{1,5})\b"#
-		)
 		let range = NSRange(text.startIndex..., in: text)
 		var results: [String] = []
 		var seen = Set<String>()
 
-		for match in pattern.matches(in: text, range: range) {
+		for match in fileNameRegex.matches(in: text, range: range) {
 			guard let fullRange = Range(match.range, in: text),
 				  let extRange = Range(match.range(at: 1), in: text)
 			else { continue }

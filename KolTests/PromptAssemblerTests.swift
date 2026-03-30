@@ -281,6 +281,121 @@ struct PromptAssemblerTests {
 		#expect(prompt.contains("My name is Test"))
 		#expect(!prompt.contains("camelCase"))
 	}
+
+	@Test("Structured screen context is included")
+	func structuredScreenContextIncluded() {
+		let ctx = CursorContext(
+			beforeCursor: "let x = ",
+			afterCursor: "\nprint(x)",
+			selectedText: nil,
+			isTerminal: false
+		)
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "com.apple.dt.Xcode",
+			customRules: nil, structuredContext: ctx
+		)
+		#expect(prompt.contains("--- BEFORE CURSOR ---"))
+		#expect(prompt.contains("--- AFTER CURSOR ---"))
+	}
+
+	@Test("Structured context takes precedence over flat screenContext")
+	func structuredContextPrecedence() {
+		let ctx = CursorContext(
+			beforeCursor: "structured",
+			afterCursor: "content",
+			selectedText: nil,
+			isTerminal: false
+		)
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil, customRules: nil,
+			screenContext: "flat text",
+			structuredContext: ctx
+		)
+		#expect(prompt.contains("--- BEFORE CURSOR ---"))
+		#expect(!prompt.contains("flat text"))
+	}
+
+	@Test("Fallback to flat screenContext when structuredContext is nil")
+	func fallbackToFlatScreenContext() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil, customRules: nil,
+			screenContext: "some visible text",
+			structuredContext: nil
+		)
+		#expect(prompt.contains("some visible text"))
+	}
+
+	@Test("Fallback to flat screenContext when structuredContext has empty flatText")
+	func fallbackWhenStructuredContextEmpty() {
+		let ctx = CursorContext(
+			beforeCursor: "",
+			afterCursor: "",
+			selectedText: nil,
+			isTerminal: false
+		)
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil, customRules: nil,
+			screenContext: "fallback text",
+			structuredContext: ctx
+		)
+		#expect(prompt.contains("fallback text"))
+	}
+
+	@Test("Terminal preamble in structured context")
+	func structuredContextTerminalPreamble() {
+		let ctx = CursorContext(
+			beforeCursor: "$ git status",
+			afterCursor: "",
+			selectedText: nil,
+			isTerminal: true
+		)
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil, customRules: nil,
+			structuredContext: ctx
+		)
+		#expect(prompt.contains("terminal output"))
+	}
+
+	@Test("Vocabulary hints included")
+	func vocabularyHintsIncluded() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil, customRules: nil,
+			vocabularyHints: ["handleStartRecording", "CursorContext"]
+		)
+		#expect(prompt.contains("handleStartRecording"))
+		#expect(prompt.contains("CursorContext"))
+		#expect(prompt.contains("Names and identifiers visible on screen"))
+	}
+
+	@Test("Empty vocabulary hints array excluded")
+	func vocabularyHintsEmptyExcluded() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil, customRules: nil,
+			vocabularyHints: []
+		)
+		#expect(!prompt.contains("Names and identifiers"))
+	}
+
+	@Test("Ordering: structuredContext before vocabularyHints before customRules")
+	func structuredContextVocabCustomRulesOrdering() {
+		let ctx = CursorContext(
+			beforeCursor: "let x = 42",
+			afterCursor: "",
+			selectedText: nil,
+			isTerminal: false
+		)
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: nil,
+			customRules: "My name is Alan",
+			structuredContext: ctx,
+			vocabularyHints: ["handleStartRecording"]
+		)
+		let structuredRange = prompt.range(of: "--- BEFORE CURSOR ---")!
+		let vocabRange = prompt.range(of: "Names and identifiers visible on screen")!
+		let rulesRange = prompt.range(of: "Facts about the speaker")!
+		#expect(structuredRange.lowerBound < vocabRange.lowerBound)
+		#expect(vocabRange.lowerBound < rulesRange.lowerBound)
+	}
 }
 
 @Suite("PromptLayers.appContextCategory")

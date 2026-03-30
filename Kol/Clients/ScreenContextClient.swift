@@ -18,35 +18,60 @@ extension ScreenContextClient: DependencyKey {
     /// Maximum characters to extract, centered on cursor position.
     private static let maxContextLength = 3000
 
-    /// Terminal bundle IDs — used for tail-windowing (take last N chars instead of first).
-    private static let terminalBundleIDs: Set<String> = [
-        "com.mitchellh.ghostty", "com.apple.Terminal",
-        "com.googlecode.iterm2", "dev.warp.warp-stable",
-        "net.kovidgoyal.kitty", "org.alacritty",
-    ]
+    /// Terminal bundle IDs — delegates to the shared set in KolCoreConstants.
+    private static let terminalBundleIDs = KolCoreConstants.terminalBundleIDs
+
+    /// Gets the focused AX element via the system-wide accessibility object.
+    /// Returns nil (and logs) if the focused element cannot be obtained.
+    private static func getFocusedElement(caller: String, bundleID: String) -> AXUIElement? {
+        let systemWide = AXUIElementCreateSystemWide()
+
+        var focusedRef: CFTypeRef?
+        let focusStatus = AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedRef
+        )
+        guard focusStatus == .success, let focusedRef else {
+            logger.warning("\(caller): failed to get focused element for \(bundleID, privacy: .public) (status \(focusStatus.rawValue))")
+            return nil
+        }
+
+        let focused = focusedRef as! AXUIElement
+        let role = axStringAttribute(focused, kAXRoleAttribute) ?? "unknown"
+        logger.debug("\(caller): focused element role: \(role, privacy: .public)")
+        return focused
+    }
+
+    /// Finds text by trying the focused element's value, then children, then parent chain.
+    /// Returns the raw (un-windowed) text, or nil if nothing found.
+    private static func findText(
+        from focused: AXUIElement,
+        sourceAppBundleID: String?
+    ) -> String? {
+        // 1. Try focused element value
+        if let text = axStringAttribute(focused, kAXValueAttribute),
+           !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return text
+        }
+        // 2. Walk children
+        if let text = findTextInChildren(of: focused, sourceAppBundleID: sourceAppBundleID) {
+            return text
+        }
+        // 3. Walk parent chain
+        if let text = findTextInParentChain(from: focused, sourceAppBundleID: sourceAppBundleID) {
+            return text
+        }
+        return nil
+    }
 
     static var liveValue: Self {
         Self(
             captureVisibleText: { sourceAppBundleID in
                 let bundleID = sourceAppBundleID ?? "unknown"
-                logger.debug("Capturing screen context for app: \(bundleID, privacy: .public)")
-
-                let systemWide = AXUIElementCreateSystemWide()
-
-                var focusedRef: CFTypeRef?
-                let focusStatus = AXUIElementCopyAttributeValue(
-                    systemWide,
-                    kAXFocusedUIElementAttribute as CFString,
-                    &focusedRef
-                )
-                guard focusStatus == .success, let focusedRef else {
-                    logger.warning("Failed to get focused element: \(focusStatus.rawValue)")
+                guard let focused = getFocusedElement(caller: "captureVisibleText", bundleID: bundleID) else {
                     return nil
                 }
-
-                let focused = focusedRef as! AXUIElement
-                let role = axStringAttribute(focused, kAXRoleAttribute) ?? "unknown"
-                logger.debug("Focused element role: \(role, privacy: .public)")
 
                 // 1. Try selected text first — strongest signal
                 if let selected = axStringAttribute(focused, kAXSelectedTextAttribute),
@@ -56,19 +81,15 @@ extension ScreenContextClient: DependencyKey {
                     return String(selected.prefix(maxContextLength))
                 }
 
-                // 2. Try full text value on focused element
+                // 2. Try full text via AX traversal (value, children, parents)
                 if let text = extractValue(from: focused, sourceAppBundleID: sourceAppBundleID) {
                     logger.info("Got text from focused element: \(text.count) chars")
                     return text
                 }
-
-                // 3. Walk children of focused element (for terminals that expose text on child elements)
                 if let text = findTextInChildren(of: focused, sourceAppBundleID: sourceAppBundleID) {
                     logger.info("Got text from child element: \(text.count) chars")
                     return text
                 }
-
-                // 4. Walk parent chain and try siblings
                 if let text = findTextInParentChain(from: focused, sourceAppBundleID: sourceAppBundleID) {
                     logger.info("Got text from parent/sibling: \(text.count) chars")
                     return text
@@ -82,37 +103,11 @@ extension ScreenContextClient: DependencyKey {
                 let isTerminal = sourceAppBundleID.map { terminalBundleIDs.contains($0) } ?? false
                 let half = maxContextLength / 2
 
-                let systemWide = AXUIElementCreateSystemWide()
-
-                var focusedRef: CFTypeRef?
-                guard AXUIElementCopyAttributeValue(
-                    systemWide,
-                    kAXFocusedUIElementAttribute as CFString,
-                    &focusedRef
-                ) == .success, let focusedRef else {
-                    logger.warning("captureCursorContext: failed to get focused element for \(bundleID, privacy: .public)")
+                guard let focused = getFocusedElement(caller: "captureCursorContext", bundleID: bundleID) else {
                     return nil
                 }
 
-                let focused = focusedRef as! AXUIElement
-
-                // Try to get full text from focused element or children/parents
-                let fullText: String? = {
-                    // 1. Try focused element value
-                    if let text = axStringAttribute(focused, kAXValueAttribute),
-                       !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        return text
-                    }
-                    // 2. Try children
-                    if let text = findTextInChildren(of: focused, sourceAppBundleID: sourceAppBundleID) {
-                        return text
-                    }
-                    // 3. Try parent chain
-                    if let text = findTextInParentChain(from: focused, sourceAppBundleID: sourceAppBundleID) {
-                        return text
-                    }
-                    return nil
-                }()
+                let fullText = findText(from: focused, sourceAppBundleID: sourceAppBundleID)
 
                 guard let fullText, !fullText.isEmpty else {
                     // No text found — check for selected text as last resort
@@ -148,11 +143,15 @@ extension ScreenContextClient: DependencyKey {
                 ) == .success, let rangeRef {
                     var cfRange = CFRange(location: 0, length: 0)
                     if AXValueGetValue(rangeRef as! AXValue, .cfRange, &cfRange) {
-                        let cursorStart = max(0, min(cfRange.location, fullText.count))
-                        let cursorEnd = max(0, min(cfRange.location + cfRange.length, fullText.count))
+                        // AX API returns UTF-16 code unit offsets — convert via the UTF-16 view
+                        let utf16 = fullText.utf16
+                        let clampedStart = max(0, min(cfRange.location, utf16.count))
+                        let clampedEnd = max(0, min(cfRange.location + cfRange.length, utf16.count))
+                        let utf16Start = utf16.index(utf16.startIndex, offsetBy: clampedStart)
+                        let utf16End = utf16.index(utf16.startIndex, offsetBy: clampedEnd)
 
-                        let startIdx = fullText.index(fullText.startIndex, offsetBy: cursorStart)
-                        let endIdx = fullText.index(fullText.startIndex, offsetBy: cursorEnd)
+                        let startIdx = String.Index(utf16Start, within: fullText) ?? fullText.startIndex
+                        let endIdx = String.Index(utf16End, within: fullText) ?? fullText.endIndex
 
                         // Extract selected text
                         let selectedText: String? = cfRange.length > 0
@@ -186,18 +185,9 @@ extension ScreenContextClient: DependencyKey {
                 )
             },
             characterBeforeCursor: {
-                let systemWide = AXUIElementCreateSystemWide()
-
-                var focusedRef: CFTypeRef?
-                guard AXUIElementCopyAttributeValue(
-                    systemWide,
-                    kAXFocusedUIElementAttribute as CFString,
-                    &focusedRef
-                ) == .success, let focusedRef else {
+                guard let focused = getFocusedElement(caller: "characterBeforeCursor", bundleID: "n/a") else {
                     return nil
                 }
-
-                let focused = focusedRef as! AXUIElement
 
                 // Strategy 1: Use parameterized attribute to read char before cursor (text editors)
                 var rangeRef: CFTypeRef?
@@ -261,12 +251,16 @@ extension ScreenContextClient: DependencyKey {
         ) == .success, let rangeRef {
             var cfRange = CFRange(location: 0, length: 0)
             if AXValueGetValue(rangeRef as! AXValue, .cfRange, &cfRange) {
+                // AX API returns UTF-16 code unit offsets — convert via the UTF-16 view
+                let utf16 = fullText.utf16
                 let cursorPos = cfRange.location
                 let half = maxContextLength / 2
                 let start = max(0, cursorPos - half)
-                let end = min(fullText.count, start + maxContextLength)
-                let startIndex = fullText.index(fullText.startIndex, offsetBy: start)
-                let endIndex = fullText.index(fullText.startIndex, offsetBy: end)
+                let end = min(utf16.count, start + maxContextLength)
+                let utf16Start = utf16.index(utf16.startIndex, offsetBy: start)
+                let utf16End = utf16.index(utf16.startIndex, offsetBy: end)
+                let startIndex = String.Index(utf16Start, within: fullText) ?? fullText.startIndex
+                let endIndex = String.Index(utf16End, within: fullText) ?? fullText.endIndex
                 return String(fullText[startIndex..<endIndex])
             }
         }

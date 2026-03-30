@@ -259,15 +259,16 @@ public enum PromptLayers {
 	public static func appContextCategory(for appIdentifier: String?) -> AppContextCategory? {
 		guard let app = appIdentifier?.lowercased() else { return nil }
 
-		let codeApps = [
-			"terminal", "iterm", "warp", "alacritty", "kitty", "ghostty",
+		// Terminal identifiers: shared bundle IDs (lowercased) + short names for app name matching
+		let terminalIDs = KolCoreConstants.terminalBundleIDs.map { $0.lowercased() }
+		let terminalNames = Array(terminalShortNames)
+		let codeEditorApps = [
 			"vscode", "visual studio code", "code", "xcode", "neovim", "vim",
 			"intellij", "webstorm", "pycharm", "cursor", "zed", "sublime",
-			"com.apple.terminal", "com.googlecode.iterm2", "dev.warp.warp-stable",
-			"com.mitchellh.ghostty", "net.kovidgoyal.kitty", "org.alacritty",
 			"com.microsoft.vscode", "com.apple.dt.xcode", "com.todesktop.230313mzl4w4u92",
 			"dev.zed.zed",
 		]
+		let codeApps = terminalIDs + terminalNames + codeEditorApps
 		let messagingApps = [
 			"messages", "imessage", "slack", "whatsapp", "telegram", "discord",
 			"com.apple.mobilesms", "com.tinyspeck.slackmacgap",
@@ -286,15 +287,23 @@ public enum PromptLayers {
 		return nil
 	}
 
+	/// Short app names for terminal emulators (for matching localized app names).
+	/// The canonical bundle IDs live in `KolCoreConstants.terminalBundleIDs`.
+	private static let terminalShortNames: Set<String> = [
+		"terminal", "iterm", "warp", "alacritty", "kitty", "ghostty",
+	]
+
 	/// Whether the source app is a terminal emulator (as opposed to a code editor).
+	/// Accepts either a bundle ID or a localized app name (case-insensitive).
 	public static func isTerminal(_ appIdentifier: String?) -> Bool {
-		guard let app = appIdentifier?.lowercased() else { return false }
-		let terminals = [
-			"terminal", "iterm", "warp", "alacritty", "kitty", "ghostty",
-			"com.apple.terminal", "com.googlecode.iterm2", "dev.warp.warp-stable",
-			"com.mitchellh.ghostty", "net.kovidgoyal.kitty", "org.alacritty",
-		]
-		return terminals.contains(where: { app.contains($0) })
+		guard let app = appIdentifier else { return false }
+		// Check exact bundle ID (case-insensitive)
+		if KolCoreConstants.terminalBundleIDs.contains(where: { $0.caseInsensitiveCompare(app) == .orderedSame }) {
+			return true
+		}
+		// Check short app name (case-insensitive substring)
+		let lowered = app.lowercased()
+		return terminalShortNames.contains(where: { lowered.contains($0) })
 	}
 
 	/// Returns the default prompt text for a given category.

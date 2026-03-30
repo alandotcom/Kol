@@ -278,6 +278,7 @@ struct HotKeyProcessorTests {
 
     // MARK: - Fn + Arrow Regression
 
+    /// Guards against Fn getting "stuck" after Fn+Arrow usage (Issue #81).
     @Test
     func modifierOnly_fn_triggersAfterFnPlusKeyThenFullRelease() throws {
         runScenario(
@@ -372,6 +373,7 @@ struct HotKeyProcessorTests {
         )
     }
 
+    /// ESC while holding hotkey should not restart recording (Issue #36).
     @Test
     func escape_whileHoldingHotkey_doesNotRestart() throws {
         runScenario(

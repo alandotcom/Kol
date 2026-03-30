@@ -5,7 +5,6 @@
 //  Created by Kit Langton on 1/28/25.
 //
 import Foundation
-import SwiftUI
 
 private let hotKeyLogger = KolLog.hotKey
 

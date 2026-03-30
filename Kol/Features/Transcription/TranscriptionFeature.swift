@@ -13,6 +13,8 @@ import WhisperKit
 
 private let transcriptionFeatureLogger = KolLog.transcription
 
+private let maxVocabularyHints = 30
+
 @Reducer
 struct TranscriptionFeature {
   @ObservableState
@@ -317,7 +319,7 @@ private extension TranscriptionFeature {
       if let text = state.capturedScreenContext, !text.isEmpty {
         let vocab = VocabularyExtractor.extract(from: text)
         vocabularyCache.merge(vocab)
-        state.capturedVocabulary = vocabularyCache.topTerms(30)
+        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
       } else {
         state.capturedVocabulary = nil
       }

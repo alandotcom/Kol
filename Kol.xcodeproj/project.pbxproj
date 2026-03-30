@@ -33,11 +33,16 @@
 		3779908D2F7A4CF800FAAFD1 /* SwiftNavigation in Frameworks */ = {isa = PBXBuildFile; productRef = 47F37C5EC9694CD4D44182EC /* SwiftNavigation */; };
 		3779908E2F7A4CF800FAAFD1 /* CombineSchedulers in Frameworks */ = {isa = PBXBuildFile; productRef = C5562093AA581178D34EC294 /* CombineSchedulers */; };
 		3779908F2F7A4CF800FAAFD1 /* XCTestDynamicOverlay in Frameworks */ = {isa = PBXBuildFile; productRef = 7433F6E64A031D1C4AE440B4 /* XCTestDynamicOverlay */; };
-		377990902F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
-		377990912F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
-		377990922F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
-		377990932F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
-		377990942F7A4CF800FAAFD1 /* BuildFile in Frameworks */ = {isa = PBXBuildFile; };
+		377990902F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
+		377990912F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
+		377990922F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
+		377990932F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
+		377990942F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
+		377999182F7AD84400FAAFD1 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 9B1137862CEB38C43538B9BE /* Dependencies */; };
+		377999192F7AD84400FAAFD1 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = D0046C259393F2A4938AB19A /* DependenciesMacros */; };
+		3779991A2F7AD84400FAAFD1 /* Sauce in Frameworks */ = {isa = PBXBuildFile; productRef = F54DF918503E20282D61202F /* Sauce */; };
+		3779991B2F7AD84400FAAFD1 /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = 3F2D910B1F803177B9C3D83A /* IssueReporting */; };
+		3779991C2F7AD84400FAAFD1 /* ConcurrencyExtras in Frameworks */ = {isa = PBXBuildFile; productRef = 93CBD2F56664506274695FFE /* ConcurrencyExtras */; };
 		47512ABF2E14D8C9000E25BA /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 47512ABE2E14D8C9000E25BA /* WhisperKit */; };
 		4765045E2D45900200C7EA60 /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = 4765045D2D45900200C7EA60 /* Pow */; };
 		47C08AB62DE9F61B00564AE6 /* Inject in Frameworks */ = {isa = PBXBuildFile; productRef = 47C08AB52DE9F61B00564AE6 /* Inject */; };
@@ -123,15 +128,11 @@
 		};
 		4F0D6A032F1A000100000001 /* KolTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = KolTests;
 			sourceTree = "<group>";
 		};
 		735738841F0E32A16C6EABCE /* KolCore */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = KolCore;
 			sourceTree = "<group>";
 		};
@@ -165,11 +166,16 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				377990942F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
-				377990932F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
-				377990922F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
-				377990912F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
-				377990902F7A4CF800FAAFD1 /* BuildFile in Frameworks */,
+				3779991C2F7AD84400FAAFD1 /* ConcurrencyExtras in Frameworks */,
+				3779991B2F7AD84400FAAFD1 /* IssueReporting in Frameworks */,
+				3779991A2F7AD84400FAAFD1 /* Sauce in Frameworks */,
+				377999192F7AD84400FAAFD1 /* DependenciesMacros in Frameworks */,
+				377999182F7AD84400FAAFD1 /* Dependencies in Frameworks */,
+				377990942F7A4CF800FAAFD1 /* (null) in Frameworks */,
+				377990932F7A4CF800FAAFD1 /* (null) in Frameworks */,
+				377990922F7A4CF800FAAFD1 /* (null) in Frameworks */,
+				377990912F7A4CF800FAAFD1 /* (null) in Frameworks */,
+				377990902F7A4CF800FAAFD1 /* (null) in Frameworks */,
 				4F0D6A022F1A000100000001 /* ComposableArchitecture in Frameworks */,
 				FCDB5A11B2A3B902784F1FA1 /* KolCore.framework in Frameworks */,
 			);

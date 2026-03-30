@@ -79,4 +79,20 @@ public enum KolCoreConstants {
     /// - `KolSettings`: Default sound effects volume
     /// - Sound effect playback: Base volume before scaling
     public static let baseSoundEffectsVolume: Double = 0.2
+
+    // MARK: - Terminal Bundle IDs
+
+    /// Canonical bundle IDs for terminal emulators.
+    ///
+    /// Used by `ScreenContextClient` (tail-windowing), `PromptLayers.isTerminal()`,
+    /// and `PromptLayers.appContextCategory()` to identify terminal apps.
+    /// Uses exact bundle IDs with canonical casing.
+    public static let terminalBundleIDs: Set<String> = [
+        "com.apple.Terminal",
+        "com.googlecode.iterm2",
+        "com.mitchellh.ghostty",
+        "dev.warp.warp-stable",
+        "net.kovidgoyal.kitty",
+        "org.alacritty",
+    ]
 }
