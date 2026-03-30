@@ -889,10 +889,47 @@ High overall, but each adapter is independent and can be built incrementally. St
 - **RecordingRaceTests** — disabled, needs hosted test target. Low priority.
 - **Manual smoke test** — debug build, dictate in VS Code/Terminal/Slack/Notes, verify continuous context and IDE context in logs
 
-**Phase C — next priorities:**
-- **§5 Conversation awareness** — window title parsing for conversation ID, AX tree walk for participant names, persistent per-app name cache (LRU 50), @-mention insertion from cached names
-- **§7 Post-paste edit tracking** — AX polling after paste with element identity tracking, word-level edit vectors (M/S/D/I/C), auto-learn word remappings from repeated corrections
-- **§10 App-specific adapters** — MessagingAdapter (generic window title + name extraction across Slack/Discord/Teams/etc.), BrowserAdapter (URL-based sub-context detection)
+### Phase C — done
+
+**§5 Conversation Awareness — done**
+- `ConversationContext` model in `KolCore/ConversationContext.swift` — `conversationName`, `participants`, `bundleID` + window title parsing via `components(separatedBy: " - ")`
+- `WindowContextClient` in `Kol/Clients/WindowContextClient.swift` — three AX methods: `windowTitle(pid:)`, `browserURL(pid:)`, `messagingParticipants(pid:)`
+- `NameCacheClient` in `KolCore/NameCache.swift` — per-conversation LRU cache (max 50 names, max 20 conversations per app), NSLock-backed
+- `PromptLayers.conversationContext(participants:conversationName:)` — new prompt layer between IDE context and screen context
+- Integrated in `TranscriptionFeature.handleStartRecording()` — captures window title → conversation name → participant names for messaging/email apps, merges into NameCache
+- 9 ConversationContextTests, 7 NameCacheTests
+
+**§5 @-Mention Insertion — done**
+- `AtMentionRewriter` in `KolCore/AtMentionRewriter.swift` — detects `\bat\s+[Name]\b` → replaces with `@Name` for known participants
+- Applied after LLM post-processing + word remappings in `TranscriptionFeature`
+- Gated by `atMentionInsertionEnabled` + `conversationContextEnabled`
+- 7 AtMentionRewriterTests
+
+**§7 Post-Paste Edit Tracking (Phase 1-2) — done**
+- `EditVectorComputer` in `KolCore/EditVector.swift` — Wagner-Fischer word-level edit distance → M/S/D/I/C vector + `[WordEdit]` array, casing-only detection post-pass
+- `EditTrackingClient` in `Kol/Clients/EditTrackingClient.swift` — AX element snapshot + identity hash tracking (role + title + PID)
+- Edit tracking integrated directly in `TranscriptionFeature` — after paste, starts 500ms poll timer (max 20 polls = 10s), computes edit vector on stop, stores in `Transcript.editVector` and `Transcript.wordEdits`
+- `Transcript` model extended with optional `editVector: String?` and `wordEdits: [WordEdit]?`
+- 9 EditVectorTests
+
+**§10 App-Specific Adapters (foundation) — done**
+- `AppContextResolver` in `KolCore/AppContextResolver.swift` — resolves app category from bundleID + displayName + URL, with URL-based refinement for browsers (`mail.google.com` → email, `app.slack.com` → messaging, `docs.google.com` → document, `github.com` → code)
+- New `.email` case in `AppContextCategory` — distinct from `.document`, with email-specific prompt layer (formal tone, keep trailing periods)
+- Email app bundle IDs: `com.apple.mail`, `com.google.Gmail`, `com.microsoft.Outlook`, `com.superhuman.electron`, `com.mimestream.Mimestream`
+- `com.apple.mail` moved from document apps to email apps
+- `resolvedCategory` field on `PostProcessingContext` allows URL-based reclassification to override bundle ID detection
+- Browser URL extraction via `WindowContextClient.browserURL(pid:)` — walks AX tree for `AXTextField` with URL pattern
+- 13 AppContextResolverTests
+
+**New settings:**
+- `conversationContextEnabled` (default: false, gated by `llmPostProcessingEnabled`)
+- `atMentionInsertionEnabled` (default: false, gated by `conversationContextEnabled`)
+- `editTrackingEnabled` (default: false, independent)
+
+**Remaining work (Phase C):**
+- **Manual AX tree verification** — test WindowContextClient with Accessibility Inspector against Slack, Discord, Chrome, Safari, iMessage
+- **Auto-learn from corrections** (§7 Phase 3-4) — detect repeated substitutions, auto-suggest word remappings
+- **Conversation message extraction** (§5 Phase 2) — read recent messages from AX tree, not just participant names
 
 ---
 

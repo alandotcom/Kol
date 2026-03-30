@@ -27,6 +27,10 @@ public struct PostProcessingContext: Sendable {
 	public let screenContext: String?
 	public let structuredContext: CursorContext?
 	public let vocabularyHints: [String]?
+	public let conversationContext: ConversationContext?
+	/// Resolved app category (when URL-based reclassification was applied).
+	/// If nil, the assembler resolves from sourceApp as before.
+	public let resolvedCategory: AppContextCategory?
 	public init(
 		text: String,
 		inputLanguage: String? = nil,
@@ -36,7 +40,9 @@ public struct PostProcessingContext: Sendable {
 		ideContext: IDEContext? = nil,
 		screenContext: String? = nil,
 		structuredContext: CursorContext? = nil,
-		vocabularyHints: [String]? = nil
+		vocabularyHints: [String]? = nil,
+		conversationContext: ConversationContext? = nil,
+		resolvedCategory: AppContextCategory? = nil
 	) {
 		self.text = text
 		self.inputLanguage = inputLanguage
@@ -47,6 +53,8 @@ public struct PostProcessingContext: Sendable {
 		self.screenContext = screenContext
 		self.structuredContext = structuredContext
 		self.vocabularyHints = vocabularyHints
+		self.conversationContext = conversationContext
+		self.resolvedCategory = resolvedCategory
 	}
 }
 
@@ -102,6 +110,7 @@ public enum AppContextCategory: String, Sendable, Equatable {
 	case code
 	case messaging
 	case document
+	case email
 }
 
 /// User overrides for the built-in app context prompt layers.
@@ -111,10 +120,13 @@ public struct AppContextOverrides: Sendable {
 	public let messaging: String?
 	public let document: String?
 
-	public init(code: String? = nil, messaging: String? = nil, document: String? = nil) {
+	public let email: String?
+
+	public init(code: String? = nil, messaging: String? = nil, document: String? = nil, email: String? = nil) {
 		self.code = code
 		self.messaging = messaging
 		self.document = document
+		self.email = email
 	}
 
 	/// Returns the override for a given category, or nil if unset or empty.
@@ -123,6 +135,7 @@ public struct AppContextOverrides: Sendable {
 		case .code: code
 		case .messaging: messaging
 		case .document: document
+		case .email: email
 		}
 		guard let v = value, !v.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
 		return v
@@ -204,8 +217,14 @@ public enum PromptLayers {
 	"""
 
 	public static let appContextDocument = """
-	The text is being typed into a document or email. \
+	The text is being typed into a document. \
 	Use proper formatting. Format enumerated items as bullet points.
+	"""
+
+	public static let appContextEmail = """
+	The text is being typed into an email. \
+	Use proper formatting. Keep trailing periods. \
+	Format enumerated items as bullet points.
 	"""
 
 	/// Screen context layer: visible text near the cursor to help resolve ambiguous terms.
@@ -257,6 +276,19 @@ public enum PromptLayers {
 		"""
 	}
 
+	/// Conversation context layer: participant names and conversation identity for messaging/email apps.
+	public static func conversationContext(participants: [String], conversationName: String?) -> String {
+		var parts: [String] = []
+		if let name = conversationName, !name.isEmpty {
+			parts.append("Conversation: \(name)")
+		}
+		if !participants.isEmpty {
+			parts.append("Participants: \(participants.joined(separator: ", "))")
+		}
+		parts.append("Use these exact names when they appear in the transcription.")
+		return parts.joined(separator: "\n")
+	}
+
 	/// IDE context layer: open file names and detected language from the active code editor.
 	public static func ideContext(fileNames: [String], language: String?) -> String {
 		var parts = "Open files: " + fileNames.joined(separator: ", ")
@@ -287,14 +319,20 @@ public enum PromptLayers {
 			"net.whatsapp.whatsapp", "ru.keepcoder.telegram",
 			"com.hnc.discord",
 		]
+		let emailApps = [
+			"com.apple.mail", "com.google.gmail", "com.microsoft.outlook",
+			"com.superhuman.electron", "com.mimestream.mimestream",
+			"org.mozilla.thunderbird",
+		]
 		let documentApps = [
-			"mail", "notion", "google docs", "pages", "word", "notes", "bear",
-			"com.apple.mail", "notion.id", "com.apple.notes",
+			"notion", "google docs", "pages", "word", "notes", "bear",
+			"notion.id", "com.apple.notes",
 			"com.microsoft.word", "com.apple.iwork.pages",
 		]
 
 		if codeApps.contains(where: { app.contains($0) }) { return .code }
 		if messagingApps.contains(where: { app.contains($0) }) { return .messaging }
+		if emailApps.contains(where: { app.contains($0) }) { return .email }
 		if documentApps.contains(where: { app.contains($0) }) { return .document }
 		return nil
 	}
@@ -324,6 +362,7 @@ public enum PromptLayers {
 		case .code: return appContextCode
 		case .messaging: return appContextMessaging
 		case .document: return appContextDocument
+		case .email: return appContextEmail
 		}
 	}
 }
@@ -350,7 +389,9 @@ public enum PromptAssembler {
 		ideContext ideCtx: IDEContext? = nil,
 		screenContext: String? = nil,
 		structuredContext: CursorContext? = nil,
-		vocabularyHints: [String]? = nil
+		vocabularyHints: [String]? = nil,
+		conversationContext: ConversationContext? = nil,
+		resolvedCategory: AppContextCategory? = nil
 	) -> String {
 		var parts: [String] = [PromptLayers.core]
 
@@ -365,7 +406,10 @@ public enum PromptAssembler {
 			parts.append(PromptLayers.english)
 		}
 
-		if let category = PromptLayers.appContextCategory(for: sourceApp) {
+		// App context: use resolved category (from URL reclassification) if available,
+		// otherwise fall back to bundle ID / display name matching
+		let category = resolvedCategory ?? PromptLayers.appContextCategory(for: sourceApp)
+		if let category {
 			let text = appContextOverrides?.text(for: category) ?? PromptLayers.defaultText(for: category)
 			parts.append(text)
 		}
@@ -373,6 +417,15 @@ public enum PromptAssembler {
 		// IDE context: open file names and detected language (only for code editors)
 		if let ide = ideCtx, !ide.openFileNames.isEmpty {
 			parts.append(PromptLayers.ideContext(fileNames: ide.openFileNames, language: ide.detectedLanguage))
+		}
+
+		// Conversation context: participant names and conversation identity
+		if let convo = conversationContext,
+		   (!convo.participants.isEmpty || convo.conversationName != nil) {
+			parts.append(PromptLayers.conversationContext(
+				participants: convo.participants,
+				conversationName: convo.conversationName
+			))
 		}
 
 		// Screen context: prefer structured (before/after cursor) over flat string

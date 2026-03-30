@@ -85,7 +85,7 @@ struct PromptAssemblerTests {
 	@Test("Notes maps to document context")
 	func notesDocument() {
 		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: "com.apple.notes", customRules: nil)
-		#expect(prompt.contains("document or email"))
+		#expect(prompt.contains("typed into a document"))
 		#expect(prompt.contains("bullet points"))
 	}
 
@@ -467,6 +467,86 @@ struct PromptAssemblerTests {
 		#expect(prompt.contains("Do NOT rephrase, restructure, or reword sentences"))
 		#expect(prompt.contains("Keep the speaker's original sentence structure"))
 	}
+
+	// MARK: - Conversation Context
+
+	@Test("Conversation context included when provided")
+	func conversationContextIncluded() {
+		let convo = ConversationContext(
+			conversationName: "#engineering",
+			participants: ["Alice", "Bob"],
+			bundleID: "com.tinyspeck.slackmacgap"
+		)
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "Slack", customRules: nil,
+			conversationContext: convo
+		)
+		#expect(prompt.contains("Conversation: #engineering"))
+		#expect(prompt.contains("Participants: Alice, Bob"))
+		#expect(prompt.contains("Use these exact names"))
+	}
+
+	@Test("Conversation context excluded when nil")
+	func conversationContextNil() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "Slack", customRules: nil,
+			conversationContext: nil
+		)
+		#expect(!prompt.contains("Conversation:"))
+		#expect(!prompt.contains("Participants:"))
+	}
+
+	@Test("Conversation context excluded when empty")
+	func conversationContextEmpty() {
+		let convo = ConversationContext(conversationName: nil, participants: [])
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "Slack", customRules: nil,
+			conversationContext: convo
+		)
+		#expect(!prompt.contains("Participants:"))
+	}
+
+	@Test("Conversation context appears after app context and before screen context")
+	func conversationContextOrdering() {
+		let convo = ConversationContext(
+			conversationName: "#test",
+			participants: ["Alice"]
+		)
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "Slack", customRules: nil,
+			screenContext: "some visible text",
+			conversationContext: convo
+		)
+		let messagingIdx = prompt.range(of: "messaging app")!.lowerBound
+		let convoIdx = prompt.range(of: "Participants:")!.lowerBound
+		let screenIdx = prompt.range(of: "visible on the user's screen")!.lowerBound
+		#expect(messagingIdx < convoIdx)
+		#expect(convoIdx < screenIdx)
+	}
+
+	// MARK: - Email App Context
+
+	@Test("Email app gets email-specific prompt")
+	func emailAppContext() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "com.apple.mail", customRules: nil
+		)
+		#expect(prompt.contains("email"))
+		#expect(prompt.contains("trailing periods"))
+		#expect(!prompt.contains("messaging app"))
+	}
+
+	// MARK: - Resolved Category Override
+
+	@Test("Resolved category overrides bundle ID detection")
+	func resolvedCategoryOverride() {
+		// Chrome with a Gmail URL should get email context, not unknown
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "com.google.Chrome", customRules: nil,
+			resolvedCategory: .email
+		)
+		#expect(prompt.contains("email"))
+	}
 }
 
 @Suite("PromptLayers.appContextCategory")
@@ -478,8 +558,16 @@ struct PromptLayersAppContextTests {
 		#expect(PromptLayers.appContextCategory(for: "com.mitchellh.ghostty") == .code)
 		#expect(PromptLayers.appContextCategory(for: "com.apple.MobileSMS") == .messaging)
 		#expect(PromptLayers.appContextCategory(for: "com.apple.notes") == .document)
+		#expect(PromptLayers.appContextCategory(for: "com.apple.mail") == .email)
+		#expect(PromptLayers.appContextCategory(for: "com.google.Gmail") == .email)
 		#expect(PromptLayers.appContextCategory(for: "com.unknown.app") == nil)
 		#expect(PromptLayers.appContextCategory(for: nil) == nil)
+	}
+
+	@Test("Email apps are distinct from document apps")
+	func emailVsDocument() {
+		#expect(PromptLayers.appContextCategory(for: "com.apple.mail") == .email)
+		#expect(PromptLayers.appContextCategory(for: "com.apple.notes") == .document)
 	}
 
 	@Test("isTerminal detects terminal emulators")

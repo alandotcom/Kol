@@ -129,6 +129,9 @@ struct SettingsFeature {
     case loadLLMApiKey
     case llmApiKeyLoaded(String?)
     case setLLMScreenContextEnabled(Bool)
+    case setConversationContextEnabled(Bool)
+    case setAtMentionInsertionEnabled(Bool)
+    case setEditTrackingEnabled(Bool)
     case setLLMPromptCode(String?)
     case setLLMPromptMessaging(String?)
     case setLLMPromptDocument(String?)
@@ -665,6 +668,18 @@ struct SettingsFeature {
 
       case let .setLLMScreenContextEnabled(enabled):
         state.$kolSettings.withLock { $0.llmScreenContextEnabled = enabled }
+        return .none
+
+      case let .setConversationContextEnabled(enabled):
+        state.$kolSettings.withLock { $0.conversationContextEnabled = enabled }
+        return .none
+
+      case let .setAtMentionInsertionEnabled(enabled):
+        state.$kolSettings.withLock { $0.atMentionInsertionEnabled = enabled }
+        return .none
+
+      case let .setEditTrackingEnabled(enabled):
+        state.$kolSettings.withLock { $0.editTrackingEnabled = enabled }
         return .none
 
       case let .setLLMPromptCode(prompt):

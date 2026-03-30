@@ -62,6 +62,9 @@ public struct KolSettings: Codable, Equatable, Sendable {
 	public var llmPromptMessaging: String?
 	public var llmPromptDocument: String?
 	public var llmScreenContextEnabled: Bool
+	public var conversationContextEnabled: Bool
+	public var editTrackingEnabled: Bool
+	public var atMentionInsertionEnabled: Bool
 	public var vadSilenceDetectionEnabled: Bool
 
 	private mutating func normalizeDoubleTapSettings() {
@@ -105,6 +108,9 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		llmPromptMessaging: String? = nil,
 		llmPromptDocument: String? = nil,
 		llmScreenContextEnabled: Bool = false,
+		conversationContextEnabled: Bool = false,
+		editTrackingEnabled: Bool = false,
+		atMentionInsertionEnabled: Bool = false,
 		vadSilenceDetectionEnabled: Bool = true
 	) {
 		self.soundEffectsEnabled = soundEffectsEnabled
@@ -141,6 +147,9 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		self.llmPromptMessaging = llmPromptMessaging
 		self.llmPromptDocument = llmPromptDocument
 		self.llmScreenContextEnabled = llmScreenContextEnabled
+		self.conversationContextEnabled = conversationContextEnabled
+		self.editTrackingEnabled = editTrackingEnabled
+		self.atMentionInsertionEnabled = atMentionInsertionEnabled
 		self.vadSilenceDetectionEnabled = vadSilenceDetectionEnabled
 		normalizeDoubleTapSettings()
 	}
@@ -200,6 +209,9 @@ private enum KolSettingKey: String, CodingKey, CaseIterable {
 	case llmPromptMessaging
 	case llmPromptDocument
 	case llmScreenContextEnabled
+	case conversationContextEnabled
+	case editTrackingEnabled
+	case atMentionInsertionEnabled
 	case vadSilenceDetectionEnabled
 }
 
@@ -365,6 +377,9 @@ private enum KolSettingsSchema {
 			}
 		).eraseToAny(),
 		SettingsField(.llmScreenContextEnabled, keyPath: \.llmScreenContextEnabled, default: defaults.llmScreenContextEnabled).eraseToAny(),
+		SettingsField(.conversationContextEnabled, keyPath: \.conversationContextEnabled, default: defaults.conversationContextEnabled).eraseToAny(),
+		SettingsField(.editTrackingEnabled, keyPath: \.editTrackingEnabled, default: defaults.editTrackingEnabled).eraseToAny(),
+		SettingsField(.atMentionInsertionEnabled, keyPath: \.atMentionInsertionEnabled, default: defaults.atMentionInsertionEnabled).eraseToAny(),
 		SettingsField(.vadSilenceDetectionEnabled, keyPath: \.vadSilenceDetectionEnabled, default: defaults.vadSilenceDetectionEnabled).eraseToAny(),
 	]
 }

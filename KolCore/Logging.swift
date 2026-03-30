@@ -22,6 +22,9 @@ public enum KolLog {
     case llm = "LLM"
     case screenContext = "ScreenContext"
     case vocabulary = "Vocabulary"
+    case conversation = "Conversation"
+    case editTracking = "EditTracking"
+    case appAdapter = "AppAdapter"
   }
 
   public static func logger(_ category: Category) -> os.Logger {
@@ -45,4 +48,7 @@ public enum KolLog {
   public static let llm = logger(.llm)
   public static let screenContext = logger(.screenContext)
   public static let vocabulary = logger(.vocabulary)
+  public static let conversation = logger(.conversation)
+  public static let editTracking = logger(.editTracking)
+  public static let appAdapter = logger(.appAdapter)
 }

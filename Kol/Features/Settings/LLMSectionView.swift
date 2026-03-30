@@ -124,6 +124,43 @@ struct LLMSectionContent: View {
 					.font(.system(size: 13))
 					.foregroundColor(.secondary)
 
+				Toggle(
+					"Conversation awareness",
+					isOn: Binding(
+						get: { store.kolSettings.conversationContextEnabled },
+						set: { store.send(.setConversationContextEnabled($0)) }
+					)
+				)
+				Text("Extracts channel names and participant names in messaging and email apps.")
+					.font(.system(size: 13))
+					.foregroundColor(.secondary)
+
+				if store.kolSettings.conversationContextEnabled {
+					Toggle(
+						"Auto @-mentions",
+						isOn: Binding(
+							get: { store.kolSettings.atMentionInsertionEnabled },
+							set: { store.send(.setAtMentionInsertionEnabled($0)) }
+						)
+					)
+					.padding(.leading, 16)
+					Text("Converts \"at Name\" to \"@Name\" for known participants.")
+						.font(.system(size: 13))
+						.foregroundColor(.secondary)
+						.padding(.leading, 16)
+				}
+
+				Toggle(
+					"Learn from corrections",
+					isOn: Binding(
+						get: { store.kolSettings.editTrackingEnabled },
+						set: { store.send(.setEditTrackingEnabled($0)) }
+					)
+				)
+				Text("Tracks edits you make after paste to improve future transcriptions.")
+					.font(.system(size: 13))
+					.foregroundColor(.secondary)
+
 				Button("Customize App Context Prompts...") {
 					store.send(.showPromptCustomization)
 				}

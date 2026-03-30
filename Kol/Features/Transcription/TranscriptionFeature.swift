@@ -32,7 +32,15 @@ struct TranscriptionFeature {
     var capturedCursorContext: CursorContext?
     var capturedVocabulary: [String]?
     var capturedIDEContext: IDEContext?
+    var capturedConversationContext: ConversationContext?
+    var resolvedAppCategory: AppContextCategory?
     var contextUpdateCount: Int = 0
+    // Edit tracking state
+    var editTrackingActive: Bool = false
+    var editTrackingPastedText: String?
+    var editTrackingElementHash: Int?
+    var editTrackingTranscriptID: UUID?
+    var editTrackingPollCount: Int = 0
     @Shared(.kolSettings) var kolSettings: KolSettings
     @Shared(.isRemappingScratchpadFocused) var isRemappingScratchpadFocused: Bool = false
     @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
@@ -63,6 +71,12 @@ struct TranscriptionFeature {
     case contextRefreshTick
     case contextRefreshed(CursorContext?, String?, [String]?)
 
+    // Edit tracking
+    case editTrackingStarted(pastedText: String, elementHash: Int, transcriptID: UUID)
+    case editTrackingTick
+    case editTrackingResult(String?)
+    case editTrackingStop
+
     // Model availability
     case modelMissing
   }
@@ -72,6 +86,7 @@ struct TranscriptionFeature {
     case recordingCleanup
     case transcription
     case contextRefresh
+    case editTracking
   }
 
   @Dependency(\.transcription) var transcription
@@ -87,6 +102,9 @@ struct TranscriptionFeature {
   @Dependency(\.screenContext) var screenContext
   @Dependency(\.vocabularyCache) var vocabularyCache
   @Dependency(\.ideContext) var ideContext
+  @Dependency(\.windowContext) var windowContext
+  @Dependency(\.nameCache) var nameCache
+  @Dependency(\.editTracking) var editTrackingClient
 
   var body: some ReducerOf<Self> {
     Reduce { state, action in
@@ -140,6 +158,80 @@ struct TranscriptionFeature {
 
       case .modelMissing:
         return .none
+
+      // MARK: - Edit Tracking
+
+      case let .editTrackingStarted(pastedText, elementHash, transcriptID):
+        state.editTrackingActive = true
+        state.editTrackingPastedText = pastedText
+        state.editTrackingElementHash = elementHash
+        state.editTrackingTranscriptID = transcriptID
+        state.editTrackingPollCount = 0
+        // Start 500ms polling timer
+        return .run { send in
+          while !Task.isCancelled {
+            try await Task.sleep(for: .milliseconds(500))
+            await send(.editTrackingTick)
+          }
+        }
+        .cancellable(id: CancelID.editTracking, cancelInFlight: true)
+
+      case .editTrackingTick:
+        guard state.editTrackingActive, let hash = state.editTrackingElementHash else { return .none }
+        state.editTrackingPollCount += 1
+        // Max 20 polls (10 seconds at 500ms)
+        if state.editTrackingPollCount >= 20 {
+          return .send(.editTrackingStop)
+        }
+        return .run { [editTrackingClient] send in
+          let text = await MainActor.run {
+            editTrackingClient.readText(hash)
+          }
+          await send(.editTrackingResult(text))
+        }
+
+      case let .editTrackingResult(text):
+        guard state.editTrackingActive else { return .none }
+        if text == nil {
+          // Element changed or can't be read — stop tracking
+          return .send(.editTrackingStop)
+        }
+        return .none
+
+      case .editTrackingStop:
+        guard state.editTrackingActive,
+              let pastedText = state.editTrackingPastedText,
+              let transcriptID = state.editTrackingTranscriptID,
+              let hash = state.editTrackingElementHash
+        else {
+          state.editTrackingActive = false
+          return .cancel(id: CancelID.editTracking)
+        }
+        state.editTrackingActive = false
+        let transcriptionHistory = state.$transcriptionHistory
+        return .merge(
+          .cancel(id: CancelID.editTracking),
+          .run { [editTrackingClient] _ in
+            // Read final text
+            let finalText = await MainActor.run {
+              editTrackingClient.readText(hash)
+            }
+            guard let finalText, finalText != pastedText else { return }
+
+            let (vector, edits) = EditVectorComputer.compute(original: pastedText, edited: finalText)
+            guard !vector.isEmpty, vector.contains(where: { $0 != "M" }) else { return }
+
+            transcriptionFeatureLogger.info("Edit vector: \(vector) (\(edits.filter { $0.operation != .match }.count) change(s))")
+
+            // Update transcript in history
+            transcriptionHistory.withLock { history in
+              if let idx = history.history.firstIndex(where: { $0.id == transcriptID }) {
+                history.history[idx].editVector = vector
+                history.history[idx].wordEdits = edits
+              }
+            }
+          }
+        )
 
       // MARK: - Context Refresh During Recording
 
@@ -398,6 +490,62 @@ private extension TranscriptionFeature {
       state.capturedIDEContext = nil
     }
 
+    // Resolve app category with URL-based refinement for browsers
+    if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+      let url = windowContext.browserURL(pid)
+      let windowTitle = windowContext.windowTitle(pid)
+      state.resolvedAppCategory = AppContextResolver.resolve(
+        bundleID: state.sourceAppBundleID,
+        appName: state.sourceAppName,
+        url: url,
+        windowTitle: windowTitle
+      )
+
+      // Capture conversation context for messaging/email apps
+      let category = state.resolvedAppCategory
+      if state.kolSettings.conversationContextEnabled && state.kolSettings.llmPostProcessingEnabled,
+         category == .messaging || category == .email {
+        let conversationName = ConversationContext.conversationName(fromWindowTitle: windowTitle)
+        let participants = windowContext.messagingParticipants(pid)
+        let conversationID = conversationName ?? windowTitle ?? "unknown"
+        let bundleID = state.sourceAppBundleID ?? "unknown"
+
+        // Merge names into persistent cache
+        if !participants.isEmpty {
+          nameCache.merge(participants, bundleID, conversationID)
+        }
+
+        // Build conversation context with cached names (includes names from previous sessions)
+        let cachedNames = nameCache.allNames(bundleID, 30)
+        let allParticipants = Array(Set(participants + cachedNames))
+
+        state.capturedConversationContext = ConversationContext(
+          conversationName: conversationName,
+          participants: allParticipants,
+          bundleID: state.sourceAppBundleID
+        )
+
+        // Merge participant names into vocabulary cache for ASR biasing
+        if !allParticipants.isEmpty {
+          let nameVocab = VocabularyExtractor.Result(properNouns: allParticipants, identifiers: [], fileNames: [])
+          vocabularyCache.merge(nameVocab)
+          state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+        }
+
+        transcriptionFeatureLogger.info("Conversation context: \(conversationName ?? "nil"), \(allParticipants.count) participant(s)")
+      } else {
+        state.capturedConversationContext = nil
+      }
+    } else {
+      state.resolvedAppCategory = nil
+      state.capturedConversationContext = nil
+    }
+
+    // Stop any in-progress edit tracking from a previous recording
+    if state.editTrackingActive {
+      state.editTrackingActive = false
+    }
+
     state.contextUpdateCount = 0
     transcriptionFeatureLogger.notice("Recording started at \(startTime.ISO8601Format())")
 
@@ -628,8 +776,13 @@ private extension TranscriptionFeature {
     let capturedCursorContext = state.capturedCursorContext
     let capturedVocabulary = state.capturedVocabulary
     let capturedIDEContext = state.capturedIDEContext
+    let capturedConversationContext = state.capturedConversationContext
+    let resolvedAppCategory = state.resolvedAppCategory
+    let atMentionEnabled = state.kolSettings.atMentionInsertionEnabled
+      && state.kolSettings.conversationContextEnabled
+    let editTrackingEnabled = state.kolSettings.editTrackingEnabled
 
-    return .run { [llmPostProcessing, keychain] send in
+    return .run { [llmPostProcessing, keychain, nameCache, editTrackingClient] send in
       do {
         var finalText = modifiedResult
         var llmMetadata: LLMMetadata?
@@ -649,7 +802,9 @@ private extension TranscriptionFeature {
               ideContext: capturedIDEContext,
               screenContext: capturedScreenContext,
               structuredContext: capturedCursorContext,
-              vocabularyHints: capturedVocabulary
+              vocabularyHints: capturedVocabulary,
+              conversationContext: capturedConversationContext,
+              resolvedCategory: resolvedAppCategory
             )
             do {
               let result = try await llmPostProcessing.process(context, llmConfig, apiKey)
@@ -676,6 +831,15 @@ private extension TranscriptionFeature {
           }
         }
 
+        // @-mention rewriting: "at Alice" → "@Alice" for known participants
+        if atMentionEnabled, let convo = capturedConversationContext, !convo.participants.isEmpty {
+          let rewritten = AtMentionRewriter.rewrite(finalText, knownNames: convo.participants)
+          if rewritten != finalText {
+            transcriptionFeatureLogger.info("Applied @-mention rewriting")
+            finalText = rewritten
+          }
+        }
+
         // Mechanical join: check character before cursor via AX API.
         // Works for text editors and messaging apps. Returns nil for terminals
         // (where AX doesn't expose cursor position), so no join is attempted.
@@ -685,7 +849,7 @@ private extension TranscriptionFeature {
           }
         }
 
-        try await finalizeRecordingAndStoreTranscript(
+        let transcriptID = try await finalizeRecordingAndStoreTranscript(
           result: finalText,
           llmMetadata: llmMetadata,
           duration: duration,
@@ -694,6 +858,14 @@ private extension TranscriptionFeature {
           audioURL: audioURL,
           transcriptionHistory: transcriptionHistory
         )
+
+        // Start edit tracking after paste if enabled
+        if editTrackingEnabled, let transcriptID {
+          if let snapshot = await MainActor.run(body: { editTrackingClient.captureSnapshot() }) {
+            transcriptionFeatureLogger.info("Starting edit tracking for transcript \(transcriptID)")
+            await send(.editTrackingStarted(pastedText: finalText, elementHash: snapshot.hash, transcriptID: transcriptID))
+          }
+        }
       } catch {
         await send(.transcriptionError(error, audioURL))
       }
@@ -718,6 +890,8 @@ private extension TranscriptionFeature {
   }
 
   /// Move file to permanent location, create a transcript record, paste text, and play sound.
+  /// Returns the transcript ID (or nil if history saving is disabled).
+  @discardableResult
   func finalizeRecordingAndStoreTranscript(
     result: String,
     llmMetadata: LLMMetadata?,
@@ -725,9 +899,12 @@ private extension TranscriptionFeature {
     sourceAppBundleID: String?,
     sourceAppName: String?,
     audioURL: URL,
-    transcriptionHistory: Shared<TranscriptionHistory>
-  ) async throws {
+    transcriptionHistory: Shared<TranscriptionHistory>,
+    editTrackingEnabled: Bool = false,
+    editTrackingClient: EditTrackingClient? = nil
+  ) async throws -> UUID? {
     @Shared(.kolSettings) var kolSettings: KolSettings
+    var transcriptID: UUID?
 
     if kolSettings.saveTranscriptionHistory {
       let transcript = try await transcriptPersistence.save(
@@ -738,6 +915,7 @@ private extension TranscriptionFeature {
         sourceAppBundleID,
         sourceAppName
       )
+      transcriptID = transcript.id
 
       transcriptionHistory.withLock { history in
         history.history.insert(transcript, at: 0)
@@ -757,6 +935,7 @@ private extension TranscriptionFeature {
     }
 
     await pasteboard.paste(result)
+    return transcriptID
   }
 }
 
@@ -771,6 +950,8 @@ private extension TranscriptionFeature {
     state.capturedCursorContext = nil
     state.capturedVocabulary = nil
     state.capturedIDEContext = nil
+    state.capturedConversationContext = nil
+    state.resolvedAppCategory = nil
 
     return .merge(
       .cancel(id: CancelID.transcription),
@@ -795,6 +976,8 @@ private extension TranscriptionFeature {
     state.capturedCursorContext = nil
     state.capturedVocabulary = nil
     state.capturedIDEContext = nil
+    state.capturedConversationContext = nil
+    state.resolvedAppCategory = nil
 
     // Silently discard - no sound effect
     return .merge(
