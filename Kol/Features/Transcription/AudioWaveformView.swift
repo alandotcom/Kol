@@ -15,21 +15,14 @@ struct AudioWaveformView: View {
   var averagePower: Double
   var peakPower: Double
 
-  /// Smoothed power value — interpolated every frame for fluid amplitude changes.
-  @State private var displayPower: Double = 0
-  @State private var lastFrameTime: Double = 0
+  /// Reference-type smoother — mutated directly in the TimelineView body each frame.
+  /// Avoids @State inside TimelineView, which is unreliable on macOS 26.
+  @State private var smoother = WaveformSmoother()
 
   var body: some View {
     TimelineView(.animation) { timeline in
       let time = timeline.date.timeIntervalSinceReferenceDate
-
-      // Frame-by-frame exponential smoothing
-      let targetPower = min(1.0, (0.7 * averagePower + 0.3 * peakPower) * 1.5)
-      let dt = lastFrameTime > 0 ? min(time - lastFrameTime, 0.05) : 0.016
-      // Smoothing factor: lower base = snappier response (~60ms to settle)
-      let smoothing = pow(0.001, dt)
-      let currentPower = displayPower * smoothing + targetPower * (1 - smoothing)
-      let effectivePower = max(currentPower, 0.06)
+      let effectivePower = smoother.update(time: time, averagePower: averagePower, peakPower: peakPower)
 
       Canvas { context, size in
         let midY = size.height / 2
@@ -48,10 +41,6 @@ struct AudioWaveformView: View {
           time: time, sign: 1
         )
         context.stroke(bottomPath, with: .color(.primary.opacity(0.55)), lineWidth: 2)
-      }
-      .onChange(of: time) {
-        displayPower = currentPower
-        lastFrameTime = time
       }
     }
     .enableInjection()

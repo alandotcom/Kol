@@ -100,6 +100,7 @@ struct AppFeature {
         
       case .task:
         return .merge(
+          .send(.transcription(.task)),
           startPasteLastTranscriptMonitoring(),
           ensureSelectedModelReadiness(),
           startPermissionMonitoring()

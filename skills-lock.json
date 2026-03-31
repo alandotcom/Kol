@@ -1,20 +1,20 @@
 {
-  "version": 1,
-  "skills": {
-    "liquid-glass-design": {
-      "source": "affaan-m/everything-claude-code",
-      "sourceType": "github",
-      "computedHash": "cdd47ce273b84d1e630aa6ea8086baa9b4affd9f881b3f95a7b25334b67a1dc5"
-    },
-    "swiftui-expert-skill": {
-      "source": "avdlee/swiftui-agent-skill",
-      "sourceType": "github",
-      "computedHash": "2e48033f8c90095c5391ad0a3568ff31b3655e0273992c9d3bffd068b17dfd0f"
-    },
-    "xcodebuildmcp-cli": {
-      "source": "getsentry/xcodebuildmcp",
-      "sourceType": "github",
-      "computedHash": "4bdeb5d978bf410d4e99a7b89dda396e49ef457945633174f7f9ad0eff056cfb"
-    }
-  }
+	"version": 1,
+	"skills": {
+		"liquid-glass-design": {
+			"source": "affaan-m/everything-claude-code",
+			"sourceType": "github",
+			"computedHash": "cdd47ce273b84d1e630aa6ea8086baa9b4affd9f881b3f95a7b25334b67a1dc5"
+		},
+		"swiftui-expert-skill": {
+			"source": "avdlee/swiftui-agent-skill",
+			"sourceType": "github",
+			"computedHash": "2e48033f8c90095c5391ad0a3568ff31b3655e0273992c9d3bffd068b17dfd0f"
+		},
+		"xcodebuildmcp-cli": {
+			"source": "getsentry/xcodebuildmcp",
+			"sourceType": "github",
+			"computedHash": "4bdeb5d978bf410d4e99a7b89dda396e49ef457945633174f7f9ad0eff056cfb"
+		}
+	}
 }

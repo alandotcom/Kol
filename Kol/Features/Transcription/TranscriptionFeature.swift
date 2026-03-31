@@ -19,6 +19,7 @@ private let maxVocabularyHints = 30
 struct TranscriptionFeature {
   @ObservableState
   struct State: Equatable {
+    var didStartTask: Bool = false
     var isRecording: Bool = false
     var isTranscribing: Bool = false
     var isPrewarming: Bool = false
@@ -112,7 +113,10 @@ struct TranscriptionFeature {
       // MARK: - Lifecycle / Setup
 
       case .task:
-        // Starts two concurrent effects:
+        // Guard against double-fire (.task can arrive from both AppFeature and SwiftUI .task modifier)
+        guard !state.didStartTask else { return .none }
+        state.didStartTask = true
+        // Starts three concurrent effects:
         // 1) Observing audio meter
         // 2) Monitoring hot key events
         // 3) Priming the recorder for instant startup
@@ -304,7 +308,7 @@ private extension TranscriptionFeature {
         await send(.audioLevelUpdated(meter))
       }
     }
-    .cancellable(id: CancelID.metering, cancelInFlight: true)
+    .cancellable(id: CancelID.metering)
   }
 
   /// Effect to start monitoring hotkey events through the `keyEventMonitor`.

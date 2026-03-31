@@ -98,7 +98,7 @@ final class SuperFastCaptureController {
 
   private let logger = KolLog.recording
   private let processingQueue = DispatchQueue(label: "com.alandotcom.Kol.SuperFastCapture")
-  private let meterContinuation: AsyncStream<Meter>.Continuation
+  private let meterBroadcast: MeterBroadcast
   private let ringBuffer = FloatRingBuffer(
     capacity: Int(SuperFastCaptureConstants.sampleRate * SuperFastCaptureConstants.ringBufferDuration)
   )
@@ -117,8 +117,8 @@ final class SuperFastCaptureController {
   private var recentCallbackIntervals: [TimeInterval] = []
   private var recentBufferDurations: [TimeInterval] = []
 
-  init(meterContinuation: AsyncStream<Meter>.Continuation) {
-    self.meterContinuation = meterContinuation
+  init(meterBroadcast: MeterBroadcast) {
+    self.meterBroadcast = meterBroadcast
   }
 
   deinit {
@@ -306,9 +306,10 @@ final class SuperFastCaptureController {
       ringBuffer.append(UnsafeBufferPointer(start: samples, count: sampleCount))
     }
 
-    if activeRecording != nil {
-      meterContinuation.yield(meter(for: samples, count: sampleCount))
-    }
+    // Yield meters whenever we have audio data — not gated by activeRecording
+    // so the waveform responds as soon as the capture engine arms, before the
+    // recording file is opened (saves ~50-100ms of perceived delay)
+    meterBroadcast.yield(meter(for: samples, count: sampleCount))
 
     guard var recording = activeRecording else { return }
     if !recording.didLogFirstBuffer {

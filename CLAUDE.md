@@ -54,7 +54,7 @@ When modifying any prompt in `LLMPostProcessing.swift`:
 
 ```bash
 # Debug build for local testing (default workflow)
-killall "Kol Debug" 2>/dev/null; ./scripts/build-install.sh --debug && open ~/Library/Developer/Xcode/DerivedData/Kol-*/Build/Products/Debug/Kol\ Debug.app
+killall "Kol Debug" 2>/dev/null; ./scripts/build-install.sh --debug && open "/Applications/Kol Debug.app"
 
 # Release build + install to /Applications (only for final verification before release)
 killall Kol 2>/dev/null; ./scripts/build-install.sh
@@ -71,7 +71,7 @@ open Kol.xcodeproj
 
 ### Build rules for agents
 
-- **Use debug builds for local testing** — run `./scripts/build-install.sh --debug` and launch from DerivedData. Do NOT replace `/Applications/Kol.app` with every iteration. The release install (`./scripts/build-install.sh` without `--debug`) is only for final verification before a release.
+- **Use debug builds for local testing** — run `./scripts/build-install.sh --debug`, which installs to `/Applications/Kol Debug.app`. The release install (`./scripts/build-install.sh` without `--debug`) installs to `/Applications/Kol.app` and is only for final verification before a release.
 - **Always use `./scripts/build-install.sh`** — it handles xcodebuild, codesign, and rsync. Do NOT run `xcodebuild` manually.
 - **Xcode uses file system synchronization** (`PBXFileSystemSynchronizedRootGroup`) — new `.swift` files added to the `Kol/` directory are automatically included in the build. No need to edit the `.xcodeproj` file.
 - **Check for build failures** — the script prints "(N failures)" if there are errors. If you see failures, grep the build output for `error:` before proceeding. Do NOT sign and install a broken build.
@@ -79,7 +79,21 @@ open Kol.xcodeproj
 - **Run tests via xcodebuildmcp** — prefer the Xcode IDE path (`xcodebuildmcp xcode-ide call-tool --remote-tool RunAllTests ...`) when Xcode is open; fall back to standalone (`xcodebuildmcp macos test --scheme Kol --project-path Kol.xcodeproj`) otherwise. Do NOT use raw `xcodebuild test` directly.
 - **Never commit until tests pass** — work is not done until all tests are green. Run tests and confirm zero failures before committing. Do NOT assume failing tests are "pre-existing" or "unrelated" unless the user explicitly tells you so. If tests fail, diagnose and fix them as part of your current work.
 
-**Signing note**: Use `codesign` post-build with a stable identity so macOS permissions (accessibility, input monitoring, microphone) persist between installs. Ad-hoc signing (`-`) resets permissions every build.
+### TCC permissions and code signing — critical rules
+
+macOS TCC (Transparency, Consent, and Control) grants accessibility, input monitoring, and microphone permissions per **CDHash** — a hash of the signed binary. Any change to the code signature invalidates all TCC grants for that app, forcing the user to re-add permissions manually in System Settings. This is extremely disruptive. Follow these rules:
+
+1. **NEVER run `codesign` manually on a built app.** The build script (`build-install.sh`) already handles signing. Running `codesign --force` after the build changes the CDHash and wipes permissions. If you need to verify the signature, use `codesign -dvvv` (read-only).
+
+2. **NEVER run `tccutil reset`** — this wipes ALL TCC permissions for the bundle ID, including the production app's grants. There is no way to restore them programmatically; the user must manually re-add in System Settings.
+
+3. **Do NOT re-sign when copying to `/Applications/Kol Debug.app`** — just `cp -R` the built app. The build script's signature is already correct.
+
+4. **Both `Kol.app` and `Kol Debug.app` share bundle ID `com.alandotcom.Kol`** — TCC commands that target the bundle ID (like `tccutil reset`) affect BOTH apps. Never run destructive TCC operations.
+
+5. **If permissions break**, the only fix is for the user to manually toggle the app off/on in System Settings → Privacy & Security → Accessibility / Input Monitoring, or remove and re-add via the + button. Do NOT try to fix this programmatically.
+
+6. **Minimize rebuilds during testing** — every rebuild changes the binary, which changes the CDHash. On macOS 26 (Tahoe), TCC is aggressive about CDHash tracking and may invalidate grants on rebuild even with the same signing identity. Batch your changes and rebuild once, not iteratively.
 
 ## Architecture
 

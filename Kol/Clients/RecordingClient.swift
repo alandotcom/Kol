@@ -53,12 +53,6 @@ extension RecordingClient: DependencyKey {
   }
 }
 
-/// Simple structure representing audio metering values.
-struct Meter: Equatable {
-  let averagePower: Double
-  let peakPower: Double
-}
-
 // MARK: - RecordingClientLive Implementation
 
 actor RecordingClientLive {
@@ -98,9 +92,15 @@ actor RecordingClientLive {
     AVLinearPCMIsBigEndianKey: false,
     AVLinearPCMIsNonInterleaved: false,
   ]
-  private let (meterStream, meterContinuation) = AsyncStream<Meter>.makeStream()
+  private let meterBroadcast = MeterBroadcast()
   private var meterTask: Task<Void, Never>?
-  private lazy var captureController = SuperFastCaptureController(meterContinuation: meterContinuation)
+  private var _captureController: SuperFastCaptureController?
+  private var captureController: SuperFastCaptureController {
+    if let c = _captureController { return c }
+    let c = SuperFastCaptureController(meterBroadcast: meterBroadcast)
+    _captureController = c
+    return c
+  }
   private var captureControllerDeviceID: AudioDeviceID?
   private var notificationObservers: [NSObjectProtocol] = []
   private var audioHardwareObservers: [AudioHardwareObserver] = []
@@ -946,7 +946,7 @@ actor RecordingClientLive {
         let averageNormalized = pow(10, averagePower / 20.0)
         let peakPower = r.peakPower(forChannel: 0)
         let peakNormalized = pow(10, peakPower / 20.0)
-        meterContinuation.yield(Meter(averagePower: Double(averageNormalized), peakPower: Double(peakNormalized)))
+        meterBroadcast.yield(Meter(averagePower: Double(averageNormalized), peakPower: Double(peakNormalized)))
         try? await Task.sleep(for: .milliseconds(100))
       }
     }
@@ -958,7 +958,7 @@ actor RecordingClientLive {
   }
 
   func observeAudioLevel() -> AsyncStream<Meter> {
-    meterStream
+    meterBroadcast.subscribe()
   }
 
   func warmUpRecorder() async {
