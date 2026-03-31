@@ -47,7 +47,7 @@ When modifying any prompt in `LLMPostProcessing.swift`:
 
 1. **Update the eval prompt files** — `evals/prompts/*.txt` are static copies of the assembled system prompts. They must be kept in sync manually. If you change `appContextCode`, update `evals/prompts/english-code.txt` and `evals/prompts/english-code-screen.txt`.
 2. **Run evals before building** — see Eval Workflow below.
-3. **Run unit tests** — `xcodebuild test -scheme Kol -destination 'platform=macOS'`
+3. **Run unit tests** — see "Run tests" commands below
 4. **Then build** — `./scripts/build-install.sh --debug`
 
 ## Build & Development Commands
@@ -59,8 +59,11 @@ killall "Kol Debug" 2>/dev/null; ./scripts/build-install.sh --debug && open ~/Li
 # Release build + install to /Applications (only for final verification before release)
 killall Kol 2>/dev/null; ./scripts/build-install.sh
 
-# Run tests
-xcodebuild test -scheme Kol -destination 'platform=macOS' 2>&1 | tail -5
+# Run tests (preferred — uses running Xcode instance, fastest)
+xcodebuildmcp xcode-ide call-tool --remote-tool RunAllTests --json '{"arguments":{"tabIdentifier":"windowtab1"}}'
+
+# Run tests (fallback — standalone, no Xcode required)
+xcodebuildmcp macos test --scheme Kol --project-path Kol.xcodeproj
 
 # Open in Xcode (recommended for development)
 open Kol.xcodeproj
@@ -72,6 +75,9 @@ open Kol.xcodeproj
 - **Always use `./scripts/build-install.sh`** — it handles xcodebuild, codesign, and rsync. Do NOT run `xcodebuild` manually.
 - **Xcode uses file system synchronization** (`PBXFileSystemSynchronizedRootGroup`) — new `.swift` files added to the `Kol/` directory are automatically included in the build. No need to edit the `.xcodeproj` file.
 - **Check for build failures** — the script prints "(N failures)" if there are errors. If you see failures, grep the build output for `error:` before proceeding. Do NOT sign and install a broken build.
+- **Pipe build/test output to a file, then grep the file** — builds are slow. Do NOT pipe output through grep inline and then re-run the command to see different parts. Instead, run once with output redirected to a temp file (e.g., `./scripts/build-install.sh --debug > /tmp/build.log 2>&1`), then grep `/tmp/build.log` as many times as needed.
+- **Run tests via xcodebuildmcp** — prefer the Xcode IDE path (`xcodebuildmcp xcode-ide call-tool --remote-tool RunAllTests ...`) when Xcode is open; fall back to standalone (`xcodebuildmcp macos test --scheme Kol --project-path Kol.xcodeproj`) otherwise. Do NOT use raw `xcodebuild test` directly.
+- **Never commit until tests pass** — work is not done until all tests are green. Run tests and confirm zero failures before committing. Do NOT assume failing tests are "pre-existing" or "unrelated" unless the user explicitly tells you so. If tests fail, diagnose and fix them as part of your current work.
 
 **Signing note**: Use `codesign` post-build with a stable identity so macOS permissions (accessibility, input monitoring, microphone) persist between installs. Ad-hoc signing (`-`) resets permissions every build.
 

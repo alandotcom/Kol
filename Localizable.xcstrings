@@ -4,36 +4,32 @@
     "" : {
       "shouldTranslate" : false
     },
+    "  ·  " : {
+
+    },
     "·" : {
 
     },
     "(%@)" : {
 
     },
-    "(customized)" : {
+    "%lld → %lld tokens" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld → %2$lld tokens"
+          }
+        }
+      }
+    },
+    "%lld active" : {
 
     },
-    "%@ %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ %2$@"
-          }
-        }
-      }
-    },
-    "%lld active of %lld" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld active of %2$lld"
-          }
-        }
-      }
-    },
     "%lld words" : {
+
+    },
+    "%lldms" : {
 
     },
     "50" : {
@@ -78,7 +74,10 @@
     "Accuracy" : {
 
     },
-    "Add" : {
+    "Add Transform" : {
+
+    },
+    "AI post-processing details" : {
 
     },
     "API Key" : {
@@ -104,7 +103,13 @@
     "Audio Behavior while Recording" : {
 
     },
+    "Auto @-mentions" : {
+
+    },
     "Base URL" : {
+
+    },
+    "Based on Hex by Kit Langton" : {
 
     },
     "Cancel" : {
@@ -184,6 +189,12 @@
         }
       }
     },
+    "Conversation awareness" : {
+
+    },
+    "Converts \"at Name\" to \"@Name\" for known participants." : {
+
+    },
     "Copied" : {
       "comment" : "Transcription from history copied.",
       "localizations" : {
@@ -216,6 +227,9 @@
 
     },
     "Customize the instructions sent to the LLM for each type of app. These tell the AI how to format and clean up your transcription." : {
+
+    },
+    "customized" : {
 
     },
     "Delete" : {
@@ -331,9 +345,6 @@
     "Enable Word Removals" : {
 
     },
-    "English Model" : {
-
-    },
     "Ensure Kol can access your microphone and system accessibility features." : {
       "comment" : "Footer for permissions section in settings",
       "extractionState" : "stale",
@@ -357,7 +368,13 @@
         }
       }
     },
+    "Extracts channel names and participant names in messaging and email apps." : {
+
+    },
     "Fast but may not restore all clipboard content. Turn off to use simulated keypresses." : {
+
+    },
+    "Features" : {
 
     },
     "General" : {
@@ -386,9 +403,6 @@
           }
         }
       }
-    },
-    "Hebrew Model" : {
-
     },
     "History" : {
       "comment" : "History View Title",
@@ -430,9 +444,6 @@
     "Include visible text as context" : {
 
     },
-    "Input" : {
-
-    },
     "Input Device" : {
 
     },
@@ -440,6 +451,9 @@
 
     },
     "Keep the microphone warm for near-instant capture. macOS will keep showing the microphone indicator." : {
+
+    },
+    "Keyboard Shortcuts" : {
 
     },
     "Kol" : {
@@ -457,10 +471,10 @@
         }
       }
     },
-    "Kol switches automatically based on your keyboard layout" : {
+    "Kol switches automatically based on your keyboard layout." : {
 
     },
-    "Kol switches automatically based on your keyboard layout." : {
+    "Learn from corrections" : {
 
     },
     "Match" : {
@@ -519,6 +533,9 @@
     "Not set" : {
 
     },
+    "of %lld transforms" : {
+
+    },
     "Oldest entries will be automatically deleted when limit is reached" : {
 
     },
@@ -536,7 +553,7 @@
         }
       }
     },
-    "Original Project" : {
+    "Original:" : {
 
     },
     "Output Language" : {
@@ -594,6 +611,9 @@
         }
       }
     },
+    "Post-processing rules applied to transcriptions" : {
+
+    },
     "Prevent System Sleep while Recording" : {
       "comment" : "Label for general setting whether to prevent system sleep while recording.",
       "localizations" : {
@@ -606,6 +626,9 @@
       }
     },
     "Preview" : {
+
+    },
+    "Pro Tip" : {
 
     },
     "Provider" : {
@@ -635,7 +658,10 @@
         }
       }
     },
-    "Reset to Default" : {
+    "Reset" : {
+
+    },
+    "Resources" : {
 
     },
     "Save Transcription History" : {
@@ -645,6 +671,9 @@
 
     },
     "Say something…" : {
+
+    },
+    "Select a model" : {
 
     },
     "Selected device not connected. System default will be used." : {
@@ -765,6 +794,12 @@
     "Super Fast Mode" : {
 
     },
+    "Test Input" : {
+
+    },
+    "Tracks edits you make after paste to improve future transcriptions." : {
+
+    },
     "Transcription history is currently disabled." : {
 
     },
@@ -780,10 +815,19 @@
         }
       }
     },
+    "Transforms" : {
+
+    },
+    "Transforms are applied in sequence. Word removals run first, then remappings." : {
+
+    },
     "Unavailable Device" : {
 
     },
     "Unlimited" : {
+
+    },
+    "Up to date" : {
 
     },
     "Use at least one modifier plus a key." : {

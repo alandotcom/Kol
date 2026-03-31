@@ -135,6 +135,7 @@ struct SettingsFeature {
     case setLLMPromptCode(String?)
     case setLLMPromptMessaging(String?)
     case setLLMPromptDocument(String?)
+    case setLLMPromptEmail(String?)
     case showPromptCustomization
     case dismissPromptCustomization
   }
@@ -692,6 +693,10 @@ struct SettingsFeature {
 
       case let .setLLMPromptDocument(prompt):
         state.$kolSettings.withLock { $0.llmPromptDocument = prompt }
+        return .none
+
+      case let .setLLMPromptEmail(prompt):
+        state.$kolSettings.withLock { $0.llmPromptEmail = prompt }
         return .none
 
       case .showPromptCustomization:

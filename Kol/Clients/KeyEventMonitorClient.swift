@@ -8,6 +8,7 @@ import DependenciesMacros
 import Foundation
 import IOKit
 import IOKit.hidsystem
+import os
 import Sauce
 
 private let logger = KolLog.keyEvent
@@ -29,13 +30,20 @@ struct KeyEventMonitorToken: Sendable {
 public extension KeyEvent {
   init(cgEvent: CGEvent, type: CGEventType, isFnPressed: Bool) {
     let keyCode = Int(cgEvent.getIntegerValueField(.keyboardEventKeycode))
-    // Accessing keyboard layout / input source via Sauce must be on main thread.
+    // Sauce.shared.key(for:) must be called on the main thread.
+    // The CGEvent tap source runs on the main run loop, so the callback should
+    // always be on the main thread. NEVER use DispatchQueue.main.sync here —
+    // if the main thread is blocked (e.g. by an AX call), that deadlocks the
+    // active event tap and freezes ALL system input.
     let key: Key?
     if cgEvent.type == .keyDown {
       if Thread.isMainThread {
         key = Sauce.shared.key(for: keyCode)
       } else {
-        key = DispatchQueue.main.sync { Sauce.shared.key(for: keyCode) }
+        // Should not happen — tap source is on main run loop.
+        // Fall back to nil rather than risking deadlock.
+        logger.error("Event tap callback unexpectedly off main thread; skipping Sauce key lookup for keyCode \(keyCode)")
+        key = nil
       }
     } else {
       key = nil
@@ -91,14 +99,23 @@ extension DependencyValues {
 class KeyEventMonitorClientLive {
   private var eventTapPort: CFMachPort?
   private var runLoopSource: CFRunLoopSource?
+
+  // All mutable state below is protected by `stateLock`.
+  // OSAllocatedUnfairLock is Apple's recommended replacement for os_unfair_lock
+  // in Swift — an order of magnitude faster than GCD dispatch for short critical
+  // sections, and safe (unlike os_unfair_lock which has value-type address issues).
+  private let stateLock = OSAllocatedUnfairLock()
   private var continuations: [UUID: @Sendable (KeyEvent) -> Bool] = [:]
   private var inputContinuations: [UUID: @Sendable (InputEvent) -> Bool] = [:]
-  private let queue = DispatchQueue(label: "com.alandotcom.Kol.KeyEventMonitor", attributes: .concurrent)
-  private var isMonitoring = false
   private var wantsMonitoring = false
   private var accessibilityTrusted = false
   private var inputMonitoringTrusted = false
   private var trustMonitorTask: Task<Void, Never>?
+
+  // Only accessed from the event tap callback (main thread) — no lock needed.
+  private var consecutiveTimeouts = 0
+
+  private var isMonitoring = false
   private var isFnPressed = false
   private var hasPromptedForAccessibilityTrust = false
   @Shared(.hotkeyPermissionState) private var hotkeyPermissionState: HotkeyPermissionState
@@ -114,21 +131,19 @@ class KeyEventMonitorClientLive {
   }
 
   private var hasRequiredPermissions: Bool {
-    queue.sync { accessibilityTrusted && inputMonitoringTrusted }
+    stateLock.withLock { accessibilityTrusted && inputMonitoringTrusted }
   }
 
   private var hasHandlers: Bool {
-    queue.sync { !(continuations.isEmpty && inputContinuations.isEmpty) }
+    stateLock.withLock { !(continuations.isEmpty && inputContinuations.isEmpty) }
   }
 
   private func setMonitoringIntent(_ value: Bool) {
-    queue.async(flags: .barrier) { [weak self] in
-      self?.wantsMonitoring = value
-    }
+    stateLock.withLock { wantsMonitoring = value }
   }
 
   private func desiredMonitoringState() -> Bool {
-    queue.sync {
+    stateLock.withLock {
       wantsMonitoring
         && accessibilityTrusted
         && inputMonitoringTrusted
@@ -141,18 +156,16 @@ class KeyEventMonitorClientLive {
     AsyncThrowingStream { continuation in
       let uuid = UUID()
 
-      queue.async(flags: .barrier) { [weak self] in
-        guard let self = self else { return }
-        self.continuations[uuid] = { event in
+      let shouldStart: Bool = stateLock.withLock {
+        continuations[uuid] = { event in
           continuation.yield(event)
           return false
         }
-        let shouldStart = self.continuations.count == 1 && self.inputContinuations.isEmpty
+        return continuations.count == 1 && inputContinuations.isEmpty
+      }
 
-        // Start monitoring if this is the first subscription
-        if shouldStart {
-          self.startMonitoring()
-        }
+      if shouldStart {
+        startMonitoring()
       }
 
       // Cleanup on cancellation
@@ -163,22 +176,22 @@ class KeyEventMonitorClientLive {
   }
 
   private func removeHandlerContinuation(uuid: UUID) {
-    queue.async(flags: .barrier) { [weak self] in
-      guard let self = self else { return }
-      self.continuations[uuid] = nil
-      if self.continuations.isEmpty && self.inputContinuations.isEmpty {
-        self.stopMonitoring()
-      }
+    let shouldStop: Bool = stateLock.withLock {
+      continuations[uuid] = nil
+      return continuations.isEmpty && inputContinuations.isEmpty
+    }
+    if shouldStop {
+      stopMonitoring()
     }
   }
 
   private func removeInputContinuation(uuid: UUID) {
-    queue.async(flags: .barrier) { [weak self] in
-      guard let self = self else { return }
-      self.inputContinuations[uuid] = nil
-      if self.continuations.isEmpty && self.inputContinuations.isEmpty {
-        self.stopMonitoring()
-      }
+    let shouldStop: Bool = stateLock.withLock {
+      inputContinuations[uuid] = nil
+      return continuations.isEmpty && inputContinuations.isEmpty
+    }
+    if shouldStop {
+      stopMonitoring()
     }
   }
 
@@ -194,14 +207,13 @@ class KeyEventMonitorClientLive {
   func handleKeyEvent(_ handler: @Sendable @escaping (KeyEvent) -> Bool) -> KeyEventMonitorToken {
     let uuid = UUID()
 
-    queue.async(flags: .barrier) { [weak self] in
-      guard let self = self else { return }
-      self.continuations[uuid] = handler
-      let shouldStart = self.continuations.count == 1 && self.inputContinuations.isEmpty
+    let shouldStart: Bool = stateLock.withLock {
+      continuations[uuid] = handler
+      return continuations.count == 1 && inputContinuations.isEmpty
+    }
 
-      if shouldStart {
-        self.startMonitoring()
-      }
+    if shouldStart {
+      startMonitoring()
     }
 
     return KeyEventMonitorToken { [weak self] in
@@ -212,14 +224,13 @@ class KeyEventMonitorClientLive {
   func handleInputEvent(_ handler: @Sendable @escaping (InputEvent) -> Bool) -> KeyEventMonitorToken {
     let uuid = UUID()
 
-    queue.async(flags: .barrier) { [weak self] in
-      guard let self = self else { return }
-      self.inputContinuations[uuid] = handler
-      let shouldStart = self.inputContinuations.count == 1 && self.continuations.isEmpty
+    let shouldStart: Bool = stateLock.withLock {
+      inputContinuations[uuid] = handler
+      return inputContinuations.count == 1 && continuations.isEmpty
+    }
 
-      if shouldStart {
-        self.startMonitoring()
-      }
+    if shouldStart {
+      startMonitoring()
     }
 
     return KeyEventMonitorToken { [weak self] in
@@ -236,25 +247,27 @@ class KeyEventMonitorClientLive {
   }
 
   private func startTrustMonitorIfNeeded() {
-    queue.async(flags: .barrier) { [weak self] in
-      guard let self else { return }
-      guard self.trustMonitorTask == nil else { return }
-      self.trustMonitorTask = Task { [weak self] in
-        await self?.watchPermissions()
-      }
+    stateLock.lock()
+    guard trustMonitorTask == nil else {
+      stateLock.unlock()
+      return
     }
+    trustMonitorTask = Task { [weak self] in
+      await self?.watchPermissions()
+    }
+    stateLock.unlock()
   }
 
   private func cancelTrustMonitorIfNeeded() {
-    queue.async(flags: .barrier) { [weak self] in
-      guard let self else { return }
-      guard !self.wantsMonitoring else { return }
-      self.trustMonitorTask?.cancel()
-      self.trustMonitorTask = nil
+    stateLock.lock()
+    guard !wantsMonitoring else {
+      stateLock.unlock()
+      return
     }
+    trustMonitorTask?.cancel()
+    trustMonitorTask = nil
+    stateLock.unlock()
   }
-
-  // no separate helper; handled inline above
 
   private func watchPermissions() async {
     var last = (
@@ -320,9 +333,9 @@ class KeyEventMonitorClientLive {
   }
 
   private func setPermissionFlags(accessibility: Bool, input: Bool) {
-    queue.async(flags: .barrier) { [weak self] in
-      self?.accessibilityTrusted = accessibility
-      self?.inputMonitoringTrusted = input
+    stateLock.withLock {
+      accessibilityTrusted = accessibility
+      inputMonitoringTrusted = input
     }
     recordSharedPermissionState(accessibility: accessibility, input: input)
   }
@@ -392,6 +405,9 @@ class KeyEventMonitorClientLive {
             return Unmanaged.passUnretained(cgEvent)
           }
 
+          // Tap is processing events normally — reset timeout counter.
+          hotKeyClientLive.consecutiveTimeouts = 0
+
           guard hotKeyClientLive.hasRequiredPermissions else {
             return Unmanaged.passUnretained(cgEvent)
           }
@@ -446,30 +462,43 @@ class KeyEventMonitorClientLive {
   }
 
   private func handleTapDisabledEvent(_ type: CGEventType) {
-    let reason = type == .tapDisabledByTimeout ? "timeout" : "userInput"
-    logger.error("Event tap disabled by \(reason); scheduling restart.")
-    Task { [weak self] in
-      guard let self else { return }
-      await self.refreshMonitoringState(reason: "tap_disabled_\(reason)")
+    if type == .tapDisabledByTimeout {
+      consecutiveTimeouts += 1
+      if consecutiveTimeouts >= 3 {
+        logger.error("Event tap timed out \(self.consecutiveTimeouts) times consecutively; leaving disabled to protect system input.")
+        return
+      }
+    } else {
+      consecutiveTimeouts = 0
     }
-  }
-
-  private func processEvent<T>(
-    _ event: T,
-    handlers: [UUID: @Sendable (T) -> Bool]
-  ) -> Bool {
-    let handlerList = queue.sync { Array(handlers.values) }
-    return handlerList.reduce(false) { handled, handler in
-      handler(event) || handled
+    let reason = type == .tapDisabledByTimeout ? "timeout" : "userInput"
+    logger.error("Event tap disabled by \(reason); re-enabling.")
+    // The tap was disabled by macOS but the mach port is still valid.
+    // Just re-enable it directly — don't go through activateTapIfNeeded,
+    // which guards on !isMonitoring and would be a no-op.
+    if let port = eventTapPort {
+      CGEvent.tapEnable(tap: port, enable: true)
     }
   }
 
   private func processKeyEvent(_ keyEvent: KeyEvent) -> Bool {
-    processEvent(keyEvent, handlers: continuations)
+    let handlerList: [@Sendable (KeyEvent) -> Bool]
+    stateLock.lock()
+    handlerList = Array(continuations.values)
+    stateLock.unlock()
+    return handlerList.reduce(false) { handled, handler in
+      handler(keyEvent) || handled
+    }
   }
 
   private func processInputEvent(_ inputEvent: InputEvent) -> Bool {
-    processEvent(inputEvent, handlers: inputContinuations)
+    let handlerList: [@Sendable (InputEvent) -> Bool]
+    stateLock.lock()
+    handlerList = Array(inputContinuations.values)
+    stateLock.unlock()
+    return handlerList.reduce(false) { handled, handler in
+      handler(inputEvent) || handled
+    }
   }
 }
 

@@ -14,7 +14,8 @@ public enum AtMentionRewriter {
 			// Use word boundaries to avoid matching inside other words
 			let escapedName = NSRegularExpression.escapedPattern(for: name)
 			guard let regex = try? NSRegularExpression(
-				pattern: #"\b[Aa]t\s+"# + escapedName + #"\b"#
+				pattern: #"\b[Aa]t\s+"# + escapedName + #"\b"#,
+				options: .caseInsensitive
 			) else { continue }
 
 			let range = NSRange(result.startIndex..., in: result)

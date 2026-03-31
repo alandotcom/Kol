@@ -61,6 +61,7 @@ public struct KolSettings: Codable, Equatable, Sendable {
 	public var llmPromptCode: String?
 	public var llmPromptMessaging: String?
 	public var llmPromptDocument: String?
+	public var llmPromptEmail: String?
 	public var llmScreenContextEnabled: Bool
 	public var conversationContextEnabled: Bool
 	public var editTrackingEnabled: Bool
@@ -107,6 +108,7 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		llmPromptCode: String? = nil,
 		llmPromptMessaging: String? = nil,
 		llmPromptDocument: String? = nil,
+		llmPromptEmail: String? = nil,
 		llmScreenContextEnabled: Bool = false,
 		conversationContextEnabled: Bool = false,
 		editTrackingEnabled: Bool = false,
@@ -146,6 +148,7 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		self.llmPromptCode = llmPromptCode
 		self.llmPromptMessaging = llmPromptMessaging
 		self.llmPromptDocument = llmPromptDocument
+		self.llmPromptEmail = llmPromptEmail
 		self.llmScreenContextEnabled = llmScreenContextEnabled
 		self.conversationContextEnabled = conversationContextEnabled
 		self.editTrackingEnabled = editTrackingEnabled
@@ -208,6 +211,7 @@ private enum KolSettingKey: String, CodingKey, CaseIterable {
 	case llmPromptCode
 	case llmPromptMessaging
 	case llmPromptDocument
+	case llmPromptEmail
 	case llmScreenContextEnabled
 	case conversationContextEnabled
 	case editTrackingEnabled
@@ -372,6 +376,14 @@ private enum KolSettingsSchema {
 			.llmPromptDocument,
 			keyPath: \.llmPromptDocument,
 			default: defaults.llmPromptDocument,
+			encode: { container, key, value in
+				try container.encodeIfPresent(value, forKey: key)
+			}
+		).eraseToAny(),
+		SettingsField(
+			.llmPromptEmail,
+			keyPath: \.llmPromptEmail,
+			default: defaults.llmPromptEmail,
 			encode: { container, key, value in
 				try container.encodeIfPresent(value, forKey: key)
 			}

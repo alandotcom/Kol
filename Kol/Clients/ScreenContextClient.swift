@@ -225,15 +225,6 @@ extension ScreenContextClient: DependencyKey {
 
     // MARK: - AX Helpers
 
-    /// Read a string attribute from an AX element, returning nil on failure.
-    private static func axStringAttribute(_ element: AXUIElement, _ attribute: String) -> String? {
-        var ref: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &ref) == .success,
-              let str = ref as? String
-        else { return nil }
-        return str
-    }
-
     /// Extract `kAXValueAttribute` text from an element, applying windowing.
     private static func extractValue(from element: AXUIElement, sourceAppBundleID: String?) -> String? {
         guard let fullText = axStringAttribute(element, kAXValueAttribute),

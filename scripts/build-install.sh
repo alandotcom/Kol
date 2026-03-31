@@ -14,6 +14,13 @@ if [[ "$1" == "--debug" ]]; then
   CONFIG=Debug
 fi
 
+# Kill running Kol before building.
+# Kol registers an active CGEvent tap (kernel-level, synchronous) for hotkeys.
+# If the app is running during a heavy build, the main thread gets CPU-starved
+# and the tap callback can't fire — macOS blocks ALL system input waiting for it,
+# freezing mouse + keyboard until the process is killed or the tap times out.
+killall Kol 2>/dev/null && sleep 0.5 || true
+
 JOBS=$(sysctl -n hw.ncpu)
 echo "Building $CONFIG (${JOBS} parallel jobs)..."
 xcodebuild build \

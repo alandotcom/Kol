@@ -36,12 +36,21 @@ struct PromptCustomizationView: View {
 					)
 
 					promptEditor(
-						title: "Documents / Email",
-						caption: "Mail, Notes, Notion, Word, Pages, Bear...",
+						title: "Documents",
+						caption: "Notes, Notion, Word, Pages, Bear, Google Docs...",
 						value: store.kolSettings.llmPromptDocument,
 						defaultText: PromptLayers.appContextDocument,
 						onSet: { store.send(.setLLMPromptDocument($0)) },
 						onReset: { store.send(.setLLMPromptDocument(nil)) }
+					)
+
+					promptEditor(
+						title: "Email",
+						caption: "Mail, Gmail, Outlook, Superhuman, Mimestream...",
+						value: store.kolSettings.llmPromptEmail,
+						defaultText: PromptLayers.appContextEmail,
+						onSet: { store.send(.setLLMPromptEmail($0)) },
+						onReset: { store.send(.setLLMPromptEmail(nil)) }
 					)
 				}
 			}
@@ -57,7 +66,7 @@ struct PromptCustomizationView: View {
 			}
 		}
 		.padding(28)
-		.frame(width: 560, height: 580)
+		.frame(width: 560, height: 720)
 	}
 
 	@ViewBuilder

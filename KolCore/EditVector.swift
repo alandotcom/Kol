@@ -35,6 +35,16 @@ public enum EditVectorComputer {
 			return ("", [])
 		}
 
+		// Handle edge cases where one side is empty (avoids 1...0 range crash)
+		if origWords.isEmpty {
+			let edits = editWords.map { WordEdit(original: "", corrected: $0, operation: .insert) }
+			return (String(repeating: "I", count: editWords.count), edits)
+		}
+		if editWords.isEmpty {
+			let edits = origWords.map { WordEdit(original: $0, corrected: "", operation: .delete) }
+			return (String(repeating: "D", count: origWords.count), edits)
+		}
+
 		let m = origWords.count
 		let n = editWords.count
 

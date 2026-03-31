@@ -444,107 +444,7 @@ private extension TranscriptionFeature {
       state.sourceAppName = activeApp.localizedName
     }
 
-    // Capture screen context for LLM post-processing (synchronous AX call)
-    if state.kolSettings.llmPostProcessingEnabled && state.kolSettings.llmScreenContextEnabled {
-      // Prefer structured cursor context; fall back to flat capture
-      if let cursor = screenContext.captureCursorContext(state.sourceAppBundleID) {
-        state.capturedCursorContext = cursor
-        state.capturedScreenContext = cursor.flatText
-      } else {
-        state.capturedCursorContext = nil
-        state.capturedScreenContext = screenContext.captureVisibleText(state.sourceAppBundleID)
-      }
-
-      // Extract vocabulary from screen text and merge into persistent cache
-      if let text = state.capturedScreenContext, !text.isEmpty {
-        let vocab = VocabularyExtractor.extract(from: text)
-        vocabularyCache.merge(vocab)
-        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
-      } else {
-        state.capturedVocabulary = nil
-      }
-    } else {
-      state.capturedScreenContext = nil
-      state.capturedCursorContext = nil
-      state.capturedVocabulary = nil
-    }
-
-    // Capture IDE context (open file names) for code editors
-    // Only when LLM post-processing and screen context are enabled (same gate as screen context above)
-    if state.kolSettings.llmPostProcessingEnabled && state.kolSettings.llmScreenContextEnabled,
-       PromptLayers.appContextCategory(for: state.sourceAppBundleID) == .code,
-       let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
-      let tabTitles = ideContext.extractTabTitles(pid)
-      if !tabTitles.isEmpty {
-        let ide = IDEContext(openFileNames: tabTitles)
-        state.capturedIDEContext = ide
-        // Merge file names into vocabulary cache
-        let fileVocab = VocabularyExtractor.Result(properNouns: [], identifiers: [], fileNames: tabTitles)
-        vocabularyCache.merge(fileVocab)
-        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
-        transcriptionFeatureLogger.info("IDE context: \(tabTitles.count) tab(s), language: \(ide.detectedLanguage ?? "unknown")")
-      } else {
-        state.capturedIDEContext = nil
-      }
-    } else {
-      state.capturedIDEContext = nil
-    }
-
-    // Resolve app category with URL-based refinement for browsers
-    if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
-      let url = windowContext.browserURL(pid)
-      let windowTitle = windowContext.windowTitle(pid)
-      state.resolvedAppCategory = AppContextResolver.resolve(
-        bundleID: state.sourceAppBundleID,
-        appName: state.sourceAppName,
-        url: url,
-        windowTitle: windowTitle
-      )
-
-      // Capture conversation context for messaging/email apps
-      let category = state.resolvedAppCategory
-      if state.kolSettings.conversationContextEnabled && state.kolSettings.llmPostProcessingEnabled,
-         category == .messaging || category == .email {
-        let conversationName = ConversationContext.conversationName(fromWindowTitle: windowTitle)
-        let participants = windowContext.messagingParticipants(pid)
-        let conversationID = conversationName ?? windowTitle ?? "unknown"
-        let bundleID = state.sourceAppBundleID ?? "unknown"
-
-        // Merge names into persistent cache
-        if !participants.isEmpty {
-          nameCache.merge(participants, bundleID, conversationID)
-        }
-
-        // Build conversation context with cached names (includes names from previous sessions)
-        let cachedNames = nameCache.allNames(bundleID, 30)
-        let allParticipants = Array(Set(participants + cachedNames))
-
-        state.capturedConversationContext = ConversationContext(
-          conversationName: conversationName,
-          participants: allParticipants,
-          bundleID: state.sourceAppBundleID
-        )
-
-        // Merge participant names into vocabulary cache for ASR biasing
-        if !allParticipants.isEmpty {
-          let nameVocab = VocabularyExtractor.Result(properNouns: allParticipants, identifiers: [], fileNames: [])
-          vocabularyCache.merge(nameVocab)
-          state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
-        }
-
-        transcriptionFeatureLogger.info("Conversation context: \(conversationName ?? "nil"), \(allParticipants.count) participant(s)")
-      } else {
-        state.capturedConversationContext = nil
-      }
-    } else {
-      state.resolvedAppCategory = nil
-      state.capturedConversationContext = nil
-    }
-
-    // Stop any in-progress edit tracking from a previous recording
-    if state.editTrackingActive {
-      state.editTrackingActive = false
-    }
+    captureRecordingContext(&state)
 
     state.contextUpdateCount = 0
     transcriptionFeatureLogger.notice("Recording started at \(startTime.ISO8601Format())")
@@ -579,6 +479,116 @@ private extension TranscriptionFeature {
     .cancellable(id: CancelID.contextRefresh, cancelInFlight: true)
 
     return .merge(startRecordingEffect, contextRefreshEffect)
+  }
+
+  /// Capture all context signals at recording start: app category, screen text,
+  /// IDE tabs, conversation participants, and vocabulary hints.
+  func captureRecordingContext(_ state: inout State) {
+    // Resolve app category early so downstream blocks can use it.
+    // URL-based refinement only runs for unknown apps (avoids AX tree walk for known editors/terminals).
+    if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+      let windowTitle = windowContext.windowTitle(pid)
+      let knownCategory = PromptLayers.appContextCategory(for: state.sourceAppBundleID)
+      let url: String? = knownCategory == nil ? windowContext.browserURL(pid) : nil
+      state.resolvedAppCategory = AppContextResolver.resolve(
+        bundleID: state.sourceAppBundleID,
+        appName: state.sourceAppName,
+        url: url,
+        windowTitle: windowTitle
+      )
+    } else {
+      state.resolvedAppCategory = nil
+    }
+
+    // Capture screen context for LLM post-processing (synchronous AX call)
+    if state.kolSettings.llmPostProcessingEnabled && state.kolSettings.llmScreenContextEnabled {
+      // Prefer structured cursor context; fall back to flat capture
+      if let cursor = screenContext.captureCursorContext(state.sourceAppBundleID) {
+        state.capturedCursorContext = cursor
+        state.capturedScreenContext = cursor.flatText
+      } else {
+        state.capturedCursorContext = nil
+        state.capturedScreenContext = screenContext.captureVisibleText(state.sourceAppBundleID)
+      }
+
+      // Extract vocabulary from screen text and merge into persistent cache
+      if let text = state.capturedScreenContext, !text.isEmpty {
+        let vocab = VocabularyExtractor.extract(from: text)
+        vocabularyCache.merge(vocab)
+        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+      } else {
+        state.capturedVocabulary = nil
+      }
+    } else {
+      state.capturedScreenContext = nil
+      state.capturedCursorContext = nil
+      state.capturedVocabulary = nil
+    }
+
+    // Capture IDE context (open file names) for code editors.
+    // Uses raw bundle ID (not resolvedAppCategory) — IDE tabs only make sense
+    // for actual editors, not browsers on code hosting sites like github.com.
+    if state.kolSettings.llmPostProcessingEnabled && state.kolSettings.llmScreenContextEnabled,
+       PromptLayers.appContextCategory(for: state.sourceAppBundleID) == .code,
+       let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+      let tabTitles = ideContext.extractTabTitles(pid)
+      if !tabTitles.isEmpty {
+        let ide = IDEContext(openFileNames: tabTitles)
+        state.capturedIDEContext = ide
+        // Merge file names into vocabulary cache
+        let fileVocab = VocabularyExtractor.Result(properNouns: [], identifiers: [], fileNames: tabTitles)
+        vocabularyCache.merge(fileVocab)
+        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+        transcriptionFeatureLogger.info("IDE context: \(tabTitles.count) tab(s), language: \(ide.detectedLanguage ?? "unknown")")
+      } else {
+        state.capturedIDEContext = nil
+      }
+    } else {
+      state.capturedIDEContext = nil
+    }
+
+    // Capture conversation context for messaging/email apps
+    if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+       state.kolSettings.conversationContextEnabled && state.kolSettings.llmPostProcessingEnabled,
+       let category = state.resolvedAppCategory,
+       category == .messaging || category == .email {
+      let windowTitle = windowContext.windowTitle(pid)
+      let conversationName = ConversationContext.conversationName(fromWindowTitle: windowTitle)
+      let participants = windowContext.messagingParticipants(pid)
+      let conversationID = conversationName ?? windowTitle ?? "unknown"
+      let bundleID = state.sourceAppBundleID ?? "unknown"
+
+      // Merge names into persistent cache
+      if !participants.isEmpty {
+        nameCache.merge(participants, bundleID, conversationID)
+      }
+
+      // Build conversation context with cached names (includes names from previous sessions)
+      let cachedNames = nameCache.allNames(bundleID, 30)
+      let allParticipants = Array(Set(participants + cachedNames))
+
+      state.capturedConversationContext = ConversationContext(
+        conversationName: conversationName,
+        participants: allParticipants,
+        bundleID: state.sourceAppBundleID
+      )
+
+      // Merge participant names into vocabulary cache for ASR biasing
+      if !allParticipants.isEmpty {
+        let nameVocab = VocabularyExtractor.Result(properNouns: allParticipants, identifiers: [], fileNames: [])
+        vocabularyCache.merge(nameVocab)
+        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+      }
+
+      transcriptionFeatureLogger.info("Conversation context: \(conversationName ?? "nil"), \(allParticipants.count) participant(s)")
+    } else {
+      state.capturedConversationContext = nil
+    }
+
+    // Stop any in-progress edit tracking from a previous recording
+    if state.editTrackingActive {
+      state.editTrackingActive = false
+    }
   }
 
   func handleStopRecording(_ state: inout State) -> Effect<Action> {
@@ -769,7 +779,8 @@ private extension TranscriptionFeature {
     let llmAppContextOverrides = AppContextOverrides(
       code: state.kolSettings.llmPromptCode,
       messaging: state.kolSettings.llmPromptMessaging,
-      document: state.kolSettings.llmPromptDocument
+      document: state.kolSettings.llmPromptDocument,
+      email: state.kolSettings.llmPromptEmail
     )
     let resolvedLanguage = state.resolvedLanguage
     let capturedScreenContext = state.capturedScreenContext
@@ -899,9 +910,7 @@ private extension TranscriptionFeature {
     sourceAppBundleID: String?,
     sourceAppName: String?,
     audioURL: URL,
-    transcriptionHistory: Shared<TranscriptionHistory>,
-    editTrackingEnabled: Bool = false,
-    editTrackingClient: EditTrackingClient? = nil
+    transcriptionHistory: Shared<TranscriptionHistory>
   ) async throws -> UUID? {
     @Shared(.kolSettings) var kolSettings: KolSettings
     var transcriptID: UUID?
