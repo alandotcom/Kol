@@ -1,5 +1,6 @@
 import ApplicationServices
 
+// TODO: Remove when EditTrackingClient and IDEContextClient are migrated to AXorcist Element API.
 /// Read a string attribute from an AXUIElement, returning nil on failure.
 func axStringAttribute(_ element: AXUIElement, _ attribute: String) -> String? {
 	var ref: CFTypeRef?

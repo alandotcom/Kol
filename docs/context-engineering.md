@@ -671,38 +671,120 @@ Medium. Timer management and main-thread coordination are the main challenges.
 ## 9. OCR as Parallel Context Path
 
 ### Problem
-AX APIs can't see text rendered as images, canvas-drawn text, PDF content in some viewers, or text in apps with poor accessibility support. These are common in design tools, PDF readers, and some web apps.
+Chromium-based apps (Slack, Discord, Teams, browsers) hide page content from the macOS AX tree entirely. Direct AX probing (2026-03-30) confirmed:
 
-### Design
-Capture a screenshot and run OCR to extract text that AX can't reach.
+| App | AX Nodes | Content via AX | What AX exposes |
+|-----|----------|----------------|-----------------|
+| **iMessage** (native) | 70, rich | ✅ Full messages as AXTextArea values | Sidebar previews, contact names, timestamps |
+| **Slack** (Electron) | 155, sparse | ❌ Zero message content | Window title, member names in button desc, channel topic |
+| **Gmail in Brave** (Chromium) | 110, sparse | ❌ Zero email content | URL bar, window title, UI chrome only |
+
+Slack's `AXWebArea` at depth 7 reports `AXNumberOfCharacters = 0`. Gmail same. The content is GPU-composited and invisible to AX. This isn't a bug — it's how Chromium works. All Electron apps (Slack, Discord, Teams, Notion Desktop, Telegram Desktop) will have the same limitation.
+
+**OCR is the only universal path to screen content for these apps.**
+
+### Design: Two-Tier Context Extraction
+
+```
+captureRecordingContext()
+│
+├─ Tier 1: AX Extraction (always, no extra permissions)
+│   ├─ Screen text (cursor context, visible text via AXorcist)
+│   ├─ Window title → conversation name
+│   ├─ App-specific metadata (member names, topics from AX descriptions)
+│   └─ Vocabulary extraction → LLM hints + ASR biasing
+│
+├─ Quality gate: is captured text < 50 chars?
+│   • Native apps (iMessage): 500+ chars from AX → OCR skipped
+│   • Electron apps (Slack): ~15 chars from AX → OCR triggered
+│
+└─ Tier 2: OCR Fallback (opt-in, requires Screen Recording permission)
+    ├─ ScreenCaptureKit → window screenshot
+    ├─ VNRecognizeTextRequest (.fast, on-device Neural Engine)
+    ├─ Dedup with AX-extracted vocabulary
+    └─ Replaces sparse AX text in capturedScreenContext
+```
 
 ### Implementation
 
-**Phase 1: On-device OCR via Vision framework**
-- Use `VNRecognizeTextRequest` (available macOS 10.15+) for on-device text recognition
-- Capture screenshot of the focused window via `CGWindowListCreateImage`
-- Run OCR asynchronously at recording start, alongside AX capture
-- Merge OCR results with AX results, deduplicating overlapping text
+**Phase 1: ScreenCaptureKit + Vision OCR**
+
+`CGWindowListCreateImage` is deprecated and removed in macOS 15+. Use ScreenCaptureKit instead:
+
+```swift
+// 1. Get the focused window
+let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+let window = content.windows.first { $0.owningApplication?.processID == pid }
+
+// 2. Capture screenshot
+let filter = SCContentFilter(desktopIndependentWindow: window)
+let config = SCStreamConfiguration()
+config.width = Int(window.frame.width) * 2  // retina
+config.height = Int(window.frame.height) * 2
+let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+
+// 3. Run OCR
+let request = VNRecognizeTextRequest()
+request.recognitionLevel = .fast
+let handler = VNImageRequestHandler(cgImage: image)
+try handler.perform([request])
+let texts = request.results?.compactMap { $0.topCandidates(1).first?.string } ?? []
+```
+
+**Proof of concept** (2026-03-30): Captured Gmail inbox in Brave — **68 lines, 2,407 chars in 146ms**. Every email sender, subject line, timestamp, and preview text extracted. Vision framework `.fast` mode on Apple Silicon is well within the 200ms performance budget.
 
 **Phase 2: Targeted OCR**
-- Instead of full-screen OCR, capture only the area around the cursor
-- Use AX position data to determine the region of interest
-- Reduces OCR time and noise from irrelevant screen regions
+- Capture only the area around the cursor using AX position data
+- Reduces OCR noise from irrelevant screen regions (sidebar, toolbar)
+- Use `SCContentFilter` with crop rect
+
+**Phase 3: Continuous OCR during recording**
+- Re-capture on context refresh ticks (1Hz) if the user scrolls or switches context
+- Diff OCR results against previous capture to avoid redundant vocabulary merges
+
+### Permission Model
+- ScreenCaptureKit requires **Screen Recording** permission (System Settings → Privacy & Security → Screen Recording)
+- Permission check via `SCShareableContent.excludingDesktopWindows()` — throws if not granted
+- Other voice-to-text apps (Wispr, Superwhisper) already require this permission
+- Extend `PermissionClient` with `screenRecordingStatus()` check
+- Show permission status in Settings alongside accessibility/microphone
+
+### Trigger Logic
+OCR fires **only when AX text is too sparse** (< 50 chars). This avoids wasting time for native apps that expose rich AX trees:
+- iMessage gives 500+ chars via AX → OCR never fires
+- Slack gives ~15 chars via AX → OCR fires, captures message content
+- VS Code gives full file content via AX → OCR never fires
 
 ### Prompt Integration
-OCR-extracted vocabulary is added to the same vocabulary hints section as AX-extracted vocabulary. No separate prompt layer needed.
+OCR text **replaces** sparse AX text in `capturedScreenContext` — no new prompt layer needed. Vocabulary extracted from OCR text merges into the existing vocabulary cache and feeds into `PromptLayers.vocabularyHints()` and ASR biasing.
 
 ### Performance
-- `VNRecognizeTextRequest` with `.fast` recognition level: ~50-100ms for a window screenshot
-- `.accurate` level: ~200-500ms (probably too slow for recording start)
-- Run async and race with recording — if OCR finishes before transcription, include results
+- `VNRecognizeTextRequest` `.fast` level: **146ms** measured on Gmail (3024×1898 retina screenshot, 68 text observations)
+- ScreenCaptureKit capture: ~20ms
+- Total OCR pipeline: ~170ms — within 200ms budget
+- Runs async, does not block recording start
 
 ### Dependencies
-- None — parallel to AX pipeline
-- Proper noun extraction (section 2) can process OCR text as additional input
+- ScreenCaptureKit (macOS 12.3+)
+- Vision framework (macOS 10.15+)
+- Screen Recording permission
+- Proper noun extraction (section 2) processes OCR text as additional input
 
 ### Complexity
-Medium. Vision framework API is well-documented. Main challenge is performance tuning and dedup with AX text.
+Medium. ScreenCaptureKit and Vision APIs are well-documented. Main challenges: permission UX flow, dedup with AX text, performance tuning for continuous capture.
+
+### New Client
+
+```swift
+@DependencyClient
+struct OCRClient: Sendable {
+    var captureWindowText: @Sendable (_ pid: pid_t) async -> String? = { _ in nil }
+}
+```
+
+### Settings
+- `ocrContextEnabled` (default: off, gated by `llmPostProcessingEnabled`)
+- Automatically triggered when AX text < 50 chars (no user decision per-dictation)
 
 ---
 
@@ -884,10 +966,9 @@ High overall, but each adapter is independent and can be built incrementally. St
 ### Remaining work
 
 **Deferred from Phase A/B:**
-- **AXorcist migration** — ScreenContextClient and IDEContextClient both use raw `AXUIElement` C API. AXorcist is an SPM dependency but not yet imported. Migration deferred to when observation APIs (§8 real-time AX notifications) are needed.
+- **AXorcist migration** — ScreenContextClient and WindowContextClient migrated to AXorcist `Element` API (2026-03-30). IDEContextClient and EditTrackingClient still use raw `AXUIElement` C API (deferred — simple, working).
 - **IDE tab AX tree tuning** — IDEContextClient's tab extraction heuristic needs verification per editor (VS Code, Cursor, Xcode, Zed) via Accessibility Inspector
 - **RecordingRaceTests** — disabled, needs hosted test target. Low priority.
-- **Manual smoke test** — debug build, dictate in VS Code/Terminal/Slack/Notes, verify continuous context and IDE context in logs
 
 ### Phase C — done
 
@@ -927,9 +1008,15 @@ High overall, but each adapter is independent and can be built incrementally. St
 - `editTrackingEnabled` (default: false, independent)
 
 **Remaining work (Phase C):**
-- **Manual AX tree verification** — test WindowContextClient with Accessibility Inspector against Slack, Discord, Chrome, Safari, iMessage
 - **Auto-learn from corrections** (§7 Phase 3-4) — detect repeated substitutions, auto-suggest word remappings
-- **Conversation message extraction** (§5 Phase 2) — read recent messages from AX tree, not just participant names
+- **Enhanced metadata extraction** — parse member names from Slack button descriptions ("Includes Member A and Member B"), iMessage sidebar contact names. Extend `WindowContextClient.extractMetadata(pid:, category:)`.
+- **Conversation message extraction** (§5 Phase 2) — only possible for native apps (iMessage exposes messages as AXTextArea values). Electron apps (Slack, Discord) hide message content from AX tree entirely — OCR (§9) is the only path.
+
+**AX tree verification results (2026-03-30):**
+- ✅ **iMessage**: Rich AX tree (70 nodes). Full message content accessible as AXTextArea values. Sidebar shows contact names + preview text in descriptions.
+- ❌ **Slack** (Electron): Sparse (155 nodes). AXWebArea at depth 7 reports `AXNumberOfCharacters = 0`. No message content. Available: window title, member names in button desc ("View all 3 members. Includes Member A and Member B."), channel topic.
+- ❌ **Gmail in Brave** (Chromium): Sparse (110 nodes). Zero email content. Available: URL bar (`mail.google.com/mail/u/0/#inbox`), window title only.
+- **Conclusion**: Chromium-based apps (Slack, Discord, Teams, browsers) require OCR for content. Native apps (iMessage, Notes, TextEdit) have rich AX trees — OCR unnecessary.
 
 ---
 
@@ -947,14 +1034,18 @@ High overall, but each adapter is independent and can be built incrementally. St
 
 ### Phase C — Advanced (high complexity, medium impact)
 7. **Post-paste edit tracking** (section 7, Phases 1-2)
-8. **On-device OCR** (section 9, Phase 1)
-9. **Conversation awareness** (section 5, Phase 1 — names only)
+8. **Conversation awareness** (section 5, Phase 1 — names only)
+9. **App-specific adapters** (section 10) — foundation: AppContextResolver + URL reclassification
 
-### Phase D — Polish & Integration
-10. **App-specific adapters** (section 10) — build per-app as needed
-11. **Auto-learn from corrections** (section 7, Phases 3-4)
-12. **LLM-assisted extraction** (section 2, Option B)
-13. **Conversation message extraction** (section 5, Phase 2)
+### Phase D — Two-Tier Context (high impact for Electron apps)
+10. **Enhanced AX metadata extraction** — parse member names from button descriptions (Slack), sidebar contacts (iMessage), extend `WindowContextClient.extractMetadata()`
+11. **On-device OCR** (section 9) — ScreenCaptureKit + Vision framework, quality-gated (fires only when AX text < 50 chars). Proof of concept: 68 lines, 2,407 chars from Gmail in 146ms.
+12. **Auto-learn from corrections** (section 7, Phases 3-4)
+
+### Phase E — Polish
+13. **LLM-assisted extraction** (section 2, Option B)
+14. **Conversation message extraction** (section 5, Phase 2) — native apps only (iMessage); Electron apps use OCR
+15. **Targeted OCR** (section 9, Phase 2) — crop to cursor region, continuous OCR during recording
 
 ---
 
@@ -975,6 +1066,8 @@ All new context features should follow this pattern:
 | OCR context | `ocrContextEnabled` | off | `llmPostProcessingEnabled` |
 
 Privacy invariant: **No context data leaves the device unless `llmPostProcessingEnabled` is on.** ASR biasing, vocabulary caching, and edit tracking are purely local.
+
+**OCR permission note:** `ocrContextEnabled` additionally requires macOS Screen Recording permission (System Settings → Privacy & Security → Screen Recording). OCR capture runs entirely on-device via Vision framework Neural Engine — no network calls. The screenshot is never persisted to disk; it's processed in-memory and discarded immediately after text extraction.
 
 ---
 

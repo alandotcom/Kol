@@ -1,4 +1,4 @@
-import ApplicationServices
+import AXorcist
 import Dependencies
 import DependenciesMacros
 import Foundation
@@ -24,32 +24,27 @@ extension WindowContextClient: DependencyKey {
 	static var liveValue: Self {
 		Self(
 			windowTitle: { pid in
-				readWindowTitle(pid: pid)
+				MainActor.assumeIsolated { readWindowTitle(pid: pid) }
 			},
 			browserURL: { pid in
-				extractBrowserURL(pid: pid)
+				MainActor.assumeIsolated { extractBrowserURL(pid: pid) }
 			},
 			messagingParticipants: { pid in
-				extractParticipantNames(pid: pid)
+				MainActor.assumeIsolated { extractParticipantNames(pid: pid) }
 			}
 		)
 	}
 
 	// MARK: - Window Title
 
+	@MainActor
 	private static func readWindowTitle(pid: pid_t) -> String? {
-		let app = AXUIElementCreateApplication(pid)
-		var windowRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
-			  let windowRef
-		else { return nil }
-		let window = windowRef as! AXUIElement
-
-		var titleRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleRef) == .success,
-			  let title = titleRef as? String, !title.isEmpty
+		guard let app = Element.application(for: pid),
+			  let window = app.focusedWindow(),
+			  let title = window.title(), !title.isEmpty
 		else { return nil }
 
+		logger.debug("WindowContext: windowTitle(\(pid)) = \"\(title, privacy: .private)\"")
 		return title
 	}
 
@@ -57,51 +52,51 @@ extension WindowContextClient: DependencyKey {
 
 	/// Walk the AX tree looking for a text field containing a URL.
 	/// Browsers expose the address bar as an AXTextField or AXComboBox with a URL value.
+	@MainActor
 	private static func extractBrowserURL(pid: pid_t) -> String? {
-		let app = AXUIElementCreateApplication(pid)
-		var windowRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
-			  let windowRef
+		guard let app = Element.application(for: pid),
+			  let window = app.focusedWindow()
 		else { return nil }
-		let window = windowRef as! AXUIElement
 
-		var result: String?
-		searchForURL(element: window, depth: 0, maxDepth: 4, nodeCount: 0, maxNodes: 100, result: &result)
+		var nodeCount = 0
+		let result = searchForURL(element: window, depth: 0, maxDepth: 4, nodeCount: &nodeCount, maxNodes: 100)
+		if let result {
+			logger.debug("WindowContext: browserURL(\(pid)) = \"\(result, privacy: .private)\"")
+		} else {
+			logger.debug("WindowContext: browserURL(\(pid)) = nil (no URL found at depth ≤4, ≤100 nodes)")
+		}
 		return result
 	}
 
+	@MainActor
 	private static func searchForURL(
-		element: AXUIElement,
+		element: Element,
 		depth: Int,
 		maxDepth: Int,
-		nodeCount: Int,
-		maxNodes: Int,
-		result: inout String?
-	) {
-		guard depth < maxDepth, nodeCount < maxNodes, result == nil else { return }
+		nodeCount: inout Int,
+		maxNodes: Int
+	) -> String? {
+		guard depth < maxDepth, nodeCount < maxNodes else { return nil }
 
-		let role = axStringAttribute(element, kAXRoleAttribute)
+		let role = element.role()
 
 		// URL bars are typically AXTextField, AXComboBox, or AXStaticText
 		if role == "AXTextField" || role == "AXComboBox" {
-			if let value = axStringAttribute(element, kAXValueAttribute), looksLikeURL(value) {
-				result = value
-				return
+			if let value = element.stringValue(), looksLikeURL(value) {
+				return value
 			}
 		}
 
 		// Recurse into children
-		var childrenRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-			  let children = childrenRef as? [AXUIElement]
-		else { return }
+		guard let children = element.children() else { return nil }
 
-		var count = nodeCount + 1
+		nodeCount += 1
 		for child in children {
-			searchForURL(element: child, depth: depth + 1, maxDepth: maxDepth, nodeCount: count, maxNodes: maxNodes, result: &result)
-			count += 1
-			if result != nil { return }
+			if let url = searchForURL(element: child, depth: depth + 1, maxDepth: maxDepth, nodeCount: &nodeCount, maxNodes: maxNodes) {
+				return url
+			}
 		}
+		return nil
 	}
 
 	private static func looksLikeURL(_ value: String) -> Bool {
@@ -113,27 +108,28 @@ extension WindowContextClient: DependencyKey {
 	// MARK: - Messaging Participants
 
 	/// Walk the AX tree looking for sender-like text elements in messaging apps.
-	/// Heuristic: AXStaticText elements that look like person names (capitalized, 2-30 chars).
+	/// Heuristic: AXStaticText elements that look like person names.
+	@MainActor
 	private static func extractParticipantNames(pid: pid_t) -> [String] {
-		let app = AXUIElementCreateApplication(pid)
-		var windowRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
-			  let windowRef
+		guard let app = Element.application(for: pid),
+			  let window = app.focusedWindow()
 		else { return [] }
-		let window = windowRef as! AXUIElement
 
 		var names: [String] = []
 		var seen = Set<String>()
 		collectParticipantNames(element: window, depth: 0, maxDepth: 5, nodeCount: 0, maxNodes: 500, names: &names, seen: &seen)
 
 		if !names.isEmpty {
-			logger.debug("WindowContext: found \(names.count) participant name(s) for pid \(pid)")
+			logger.debug("WindowContext: found \(names.count) participant name(s) for pid \(pid): \(names.joined(separator: ", "), privacy: .private)")
+		} else {
+			logger.debug("WindowContext: no participant names found for pid \(pid)")
 		}
 		return Array(names.prefix(20))
 	}
 
+	@MainActor
 	private static func collectParticipantNames(
-		element: AXUIElement,
+		element: Element,
 		depth: Int,
 		maxDepth: Int,
 		nodeCount: Int,
@@ -143,21 +139,23 @@ extension WindowContextClient: DependencyKey {
 	) {
 		guard depth < maxDepth, nodeCount < maxNodes else { return }
 
-		let role = axStringAttribute(element, kAXRoleAttribute)
+		let role = element.role()
 
 		// Look for static text that could be a sender name
 		if role == "AXStaticText" || role == "AXHeading" {
-			if let value = axStringAttribute(element, kAXValueAttribute) ?? axStringAttribute(element, kAXTitleAttribute),
-			   looksLikePersonName(value), seen.insert(value).inserted {
-				names.append(value)
+			if let value = element.stringValue() ?? element.title() {
+				if looksLikePersonName(value) {
+					if seen.insert(value).inserted {
+						names.append(value)
+					}
+				} else if value.count >= 2, value.count <= 40, !value.contains("\n") {
+					logger.debug("WindowContext: rejected name candidate: \"\(value, privacy: .private)\" (role=\(role ?? "?"))")
+				}
 			}
 		}
 
 		// Recurse into children
-		var childrenRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-			  let children = childrenRef as? [AXUIElement]
-		else { return }
+		guard let children = element.children() else { return }
 
 		var count = nodeCount + 1
 		for child in children {
@@ -170,9 +168,10 @@ extension WindowContextClient: DependencyKey {
 	}
 
 	/// Heuristic: does this text look like a person's name?
-	/// Must start with uppercase, be 2-30 chars, contain only letters/spaces/hyphens/apostrophes.
+	/// Accepts single-word names (Alice), multi-word (Alan Cohen), hyphenated (Mary-Jane),
+	/// and Unicode letters for non-Western names.
 	private static let namePattern: NSRegularExpression = {
-		try! NSRegularExpression(pattern: #"^[A-Z][a-z]+(?:[\s'-][A-Z]?[a-z]+)*$"#)
+		try! NSRegularExpression(pattern: #"^\p{Lu}\p{L}+(?:[\s'\-]\p{L}+)*$"#)
 	}()
 
 	private static func looksLikePersonName(_ text: String) -> Bool {

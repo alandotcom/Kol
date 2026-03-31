@@ -117,11 +117,12 @@ struct TranscriptionFeature {
         // Guard against double-fire (.task can arrive from both AppFeature and SwiftUI .task modifier)
         guard !state.didStartTask else { return .none }
         state.didStartTask = true
-        // Starts two concurrent effects:
-        // 1) Monitoring hot key events
-        // 2) Priming the recorder for instant startup
-        // Note: audio metering starts/stops with recording (CancelID.metering)
+        // Starts three concurrent effects:
+        // 1) Observing audio meter (long-lived, runs for app lifetime)
+        // 2) Monitoring hot key events
+        // 3) Priming the recorder for instant startup
         return .merge(
+          startMeteringEffect(),
           startHotKeyMonitoringEffect(),
           warmUpRecorderEffect()
         )
@@ -308,7 +309,11 @@ private extension TranscriptionFeature {
         await send(.audioLevelUpdated(meter))
       }
     }
-    .cancellable(id: CancelID.metering, cancelInFlight: true)
+    // DO NOT add cancelInFlight — it kills the metering stream and breaks the waveform.
+    // DO NOT cancel this effect in stop/cancel/discard — it's a long-lived subscription
+    // started once in .task that runs for the app's lifetime. The capture controller yields
+    // meters only when the audio engine is running, so idle cost is zero.
+    .cancellable(id: CancelID.metering)
   }
 
   /// Effect to start monitoring hotkey events through the `keyEventMonitor`.
@@ -456,7 +461,6 @@ private extension TranscriptionFeature {
     // Prevent system sleep during recording
     let startRecordingEffect: Effect<Action> = .merge(
       .cancel(id: CancelID.recordingCleanup),
-      startMeteringEffect(),
       .run { [sleepManagement, preventSleep = state.kolSettings.preventSystemSleep] _ in
         // Play sound immediately for instant feedback
         soundEffect.play(.startRecording)
@@ -500,6 +504,9 @@ private extension TranscriptionFeature {
         url: url,
         windowTitle: windowTitle
       )
+      let catStr = state.resolvedAppCategory?.rawValue ?? "nil"
+      let bidStr = state.sourceAppBundleID ?? "nil"
+      transcriptionFeatureLogger.debug("App context: category=\(catStr), bundleID=\(bidStr, privacy: .private), url=\(url ?? "nil", privacy: .private)")
     } else {
       state.resolvedAppCategory = nil
     }
@@ -628,7 +635,6 @@ private extension TranscriptionFeature {
       // discard the audio to avoid accidental triggers.
       transcriptionFeatureLogger.notice("Discarding short recording per decision \(String(describing: decision))")
       return .merge(
-        .cancel(id: CancelID.metering),
         .cancel(id: CancelID.contextRefresh),
         .run { _ in
           let url = await recording.stopRecording()
@@ -656,7 +662,6 @@ private extension TranscriptionFeature {
     let capturedVocabulary = state.capturedVocabulary
 
     return .merge(
-      .cancel(id: CancelID.metering),
       .cancel(id: CancelID.contextRefresh),
       .run { [sleepManagement] send in
         // Allow system to sleep again
@@ -971,7 +976,6 @@ private extension TranscriptionFeature {
     state.resolvedAppCategory = nil
 
     return .merge(
-      .cancel(id: CancelID.metering),
       .cancel(id: CancelID.transcription),
       .cancel(id: CancelID.contextRefresh),
       .run { [sleepManagement] _ in
@@ -999,7 +1003,6 @@ private extension TranscriptionFeature {
 
     // Silently discard - no sound effect
     return .merge(
-      .cancel(id: CancelID.metering),
       .cancel(id: CancelID.contextRefresh),
       .run { [sleepManagement] _ in
         // Allow system to sleep again
