@@ -304,15 +304,17 @@ struct TranscriptionFeature {
 private extension TranscriptionFeature {
   /// Effect to begin observing the audio meter.
   func startMeteringEffect() -> Effect<Action> {
-    .run { [recording] send in
+    // DO NOT capture [recording] — TCA propagates dependencies through the task context.
+    // Explicit capture resolves the dependency at effect creation time, which gets the
+    // default (non-live) value whose observeAudioLevel returns an empty stream.
+    // DO NOT add cancelInFlight — it kills the metering stream and breaks the waveform.
+    // DO NOT cancel this effect in stop/cancel/discard — it's a long-lived subscription
+    // started once in .task that runs for the app's lifetime.
+    .run { send in
       for await meter in await recording.observeAudioLevel() {
         await send(.audioLevelUpdated(meter))
       }
     }
-    // DO NOT add cancelInFlight — it kills the metering stream and breaks the waveform.
-    // DO NOT cancel this effect in stop/cancel/discard — it's a long-lived subscription
-    // started once in .task that runs for the app's lifetime. The capture controller yields
-    // meters only when the audio engine is running, so idle cost is zero.
     .cancellable(id: CancelID.metering)
   }
 

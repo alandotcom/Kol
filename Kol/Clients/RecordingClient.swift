@@ -37,7 +37,7 @@ struct RecordingClient {
 extension RecordingClient: DependencyKey {
   static var liveValue: Self {
     let live = RecordingClientLive()
-    Task { [live] in
+    Task {
       await live.startObservingSystemChanges()
     }
     return Self(
@@ -173,8 +173,7 @@ actor RecordingClientLive {
         forName: NSWorkspace.didWakeNotification,
         object: nil,
         queue: .main
-      ) { [weak self] _ in
-        guard let self else { return }
+      ) { _ in
         Task { await self.enqueueCaptureEnvironmentChange(reason: "system-wake", forceRestart: true) }
       }
     )
@@ -183,8 +182,7 @@ actor RecordingClientLive {
         forName: NSWorkspace.screensDidWakeNotification,
         object: nil,
         queue: .main
-      ) { [weak self] _ in
-        guard let self else { return }
+      ) { _ in
         Task { await self.enqueueCaptureEnvironmentChange(reason: "display-wake", forceRestart: true) }
       }
     )
@@ -195,8 +193,7 @@ actor RecordingClientLive {
         forName: NSNotification.Name(rawValue: "AVCaptureDeviceWasConnected"),
         object: nil,
         queue: .main
-      ) { [weak self] _ in
-        guard let self else { return }
+      ) { _ in
         Task { await self.enqueueCaptureEnvironmentChange(reason: "capture-device-connected", forceRestart: true) }
       }
     )
@@ -205,8 +202,7 @@ actor RecordingClientLive {
         forName: NSNotification.Name(rawValue: "AVCaptureDeviceWasDisconnected"),
         object: nil,
         queue: .main
-      ) { [weak self] _ in
-        guard let self else { return }
+      ) { _ in
         Task { await self.enqueueCaptureEnvironmentChange(reason: "capture-device-disconnected", forceRestart: true) }
       }
     )
@@ -231,8 +227,7 @@ actor RecordingClientLive {
     selector: AudioObjectPropertySelector,
     reason: String
   ) {
-    let listener: CoreAudioPropertyListenerBlock = { [weak self] _, _ in
-      guard let self else { return }
+    let listener: CoreAudioPropertyListenerBlock = { _, _ in
       Task { await self.enqueueCaptureEnvironmentChange(reason: reason, forceRestart: true) }
     }
 

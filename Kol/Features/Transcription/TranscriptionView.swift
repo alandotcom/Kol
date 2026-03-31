@@ -7,6 +7,7 @@ struct TranscriptionView: View {
   @ObserveInjection var inject
 
   @State private var showCompleted = false
+  @State private var completedTask: Task<Void, Never>?
 
   private var storeStatus: TranscriptionIndicatorView.Status {
     if store.isTranscribing {
@@ -32,15 +33,19 @@ struct TranscriptionView: View {
     )
     .onChange(of: storeStatus) { oldStatus, newStatus in
       if (oldStatus == .transcribing || oldStatus == .prewarming) && newStatus == .hidden {
+        completedTask?.cancel()
         showCompleted = true
+        completedTask = Task {
+          try? await Task.sleep(for: .milliseconds(600))
+          guard !Task.isCancelled else { return }
+          await MainActor.run {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+              showCompleted = false
+            }
+          }
+        }
       } else if newStatus == .recording {
-        showCompleted = false
-      }
-    }
-    .task(id: showCompleted) {
-      guard showCompleted else { return }
-      try? await Task.sleep(for: .milliseconds(600))
-      withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+        completedTask?.cancel()
         showCompleted = false
       }
     }

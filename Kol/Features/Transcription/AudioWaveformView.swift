@@ -19,11 +19,8 @@ struct AudioWaveformView: View {
   /// Avoids @State inside TimelineView, which is unreliable on macOS 26.
   @State private var smoother = WaveformSmoother()
 
-  /// Drive at display refresh rate only while audio is flowing; drop to idle otherwise.
-  private var isActive: Bool { averagePower > 0 || peakPower > 0 }
-
   var body: some View {
-    TimelineView(isActive ? .animation : .animation(paused: true)) { timeline in
+    TimelineView(.animation) { timeline in
       let time = timeline.date.timeIntervalSinceReferenceDate
       let effectivePower = smoother.update(time: time, averagePower: averagePower, peakPower: peakPower)
 
