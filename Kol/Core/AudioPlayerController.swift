@@ -22,7 +22,6 @@ class AudioPlayerController: NSObject, AVAudioPlayerDelegate {
 		callback?()
 	}
 
-	// AVAudioPlayerDelegate method
 	func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
 		self.player = nil
 		let callback = onPlaybackFinished

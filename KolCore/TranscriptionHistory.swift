@@ -34,6 +34,8 @@ public struct Transcript: Codable, Equatable, Identifiable, Sendable {
     public var editVector: String?
     public var wordEdits: [WordEdit]?
 
+    public var wordCount: Int { text.split(separator: " ").count }
+
     public init(
         id: UUID = UUID(),
         timestamp: Date,

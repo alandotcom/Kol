@@ -40,8 +40,7 @@ struct TranscriptView: View {
 				Spacer()
 
 				// Word count badge
-				let wordCount = transcript.text.split(separator: " ").count
-				Text("\(wordCount) words")
+				Text("\(transcript.wordCount) words")
 					.font(.system(size: 12))
 					.padding(.horizontal, 8)
 					.padding(.vertical, 3)
@@ -170,28 +169,19 @@ struct TranscriptView: View {
 		)
 		.shadow(color: .black.opacity(0.08), radius: 4, y: 2)
 		.shadow(color: .black.opacity(0.08), radius: 12, y: 8)
-		.onDisappear {
-			copyTask?.cancel()
+		.task(id: showCopied) {
+			guard showCopied else { return }
+			try? await Task.sleep(for: .seconds(1.5))
+			withAnimation { showCopied = false }
 		}
 	}
 
 	@State private var showDetails = false
 	@State private var showCopied = false
-	@State private var copyTask: Task<Void, Error>?
 
 	private func showCopyAnimation() {
-		copyTask?.cancel()
-
-		copyTask = Task {
-			withAnimation {
-				showCopied = true
-			}
-
-			try await Task.sleep(for: .seconds(1.5))
-
-			withAnimation {
-				showCopied = false
-			}
+		withAnimation {
+			showCopied = true
 		}
 	}
 }
@@ -210,7 +200,7 @@ struct HistoryStatsView: View {
 	}
 
 	private var totalWords: Int {
-		history.reduce(0) { $0 + $1.text.split(separator: " ").count }
+		history.reduce(0) { $0 + $1.wordCount }
 	}
 
 	private var formattedDuration: String {

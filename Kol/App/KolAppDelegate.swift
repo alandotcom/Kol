@@ -4,6 +4,7 @@ import SwiftUI
 private let appLogger = KolLog.app
 private let cacheLogger = KolLog.caches
 
+@MainActor
 class KolAppDelegate: NSObject, NSApplicationDelegate {
 	var invisibleWindow: InvisibleWindow?
 	var settingsWindow: NSWindow?
@@ -142,8 +143,8 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	@objc private func handleAppModeUpdate() {
-		Task {
-			await updateAppMode()
+		Task { [weak self] in
+			self?.updateAppMode()
 		}
 	}
 
@@ -163,8 +164,12 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	func applicationWillTerminate(_: Notification) {
+		NotificationCenter.default.removeObserver(self)
+		let sema = DispatchSemaphore(value: 0)
 		Task {
 			await recording.cleanup()
+			sema.signal()
 		}
+		_ = sema.wait(timeout: .now() + 2.0)
 	}
 }

@@ -9,14 +9,15 @@ struct MenuBarCopyLastTranscriptButton: View {
   @Shared(.kolSettings) var kolSettings: KolSettings
   @Dependency(\.pasteboard) var pasteboard
 
-  var body: some View {
-    let lastText = transcriptionHistory.history.first?.text
-    let preview: String = {
-      guard let text = lastText?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return "" }
-      let snippet = text.prefix(40)
-      return "\(snippet)\(text.count > 40 ? "…" : "")"
-    }()
+  private var lastText: String? { transcriptionHistory.history.first?.text }
 
+  private var previewText: String {
+    guard let text = lastText?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !text.isEmpty else { return "" }
+    return text.count > 40 ? "\(text.prefix(40))…" : text
+  }
+
+  var body: some View {
     let button = Button(action: {
       if let text = lastText {
         Task { await pasteboard.paste(text) }
@@ -24,8 +25,8 @@ struct MenuBarCopyLastTranscriptButton: View {
     }) {
       HStack(spacing: 6) {
         Text("Paste Last Transcript")
-        if !preview.isEmpty {
-          Text("(\(preview))")
+        if !previewText.isEmpty {
+          Text("(\(previewText))")
             .foregroundStyle(.secondary)
         }
       }

@@ -14,6 +14,15 @@ struct LLMPostProcessingClient: Sendable {
 }
 
 extension LLMPostProcessingClient: DependencyKey {
+	private static let llmSession: URLSession = {
+		let config = URLSessionConfiguration.default
+		config.waitsForConnectivity = true
+		config.allowsExpensiveNetworkAccess = false
+		config.timeoutIntervalForRequest = 5
+		config.timeoutIntervalForResource = 30
+		return URLSession(configuration: config)
+	}()
+
 	static var liveValue: Self {
 		Self(
 			process: { context, config, apiKey in
@@ -54,7 +63,7 @@ extension LLMPostProcessingClient: DependencyKey {
 				request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
 				let startTime = Date()
-				let (data, response) = try await URLSession.shared.data(for: request)
+				let (data, response) = try await Self.llmSession.data(for: request)
 				let elapsed = Date().timeIntervalSince(startTime)
 
 				guard let httpResponse = response as? HTTPURLResponse else {

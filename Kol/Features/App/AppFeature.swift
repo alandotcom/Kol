@@ -171,20 +171,13 @@ struct AppFeature {
       case .requestAccessibility:
         return .run { send in
           await permissions.requestAccessibility()
-          // Poll for status change (macOS doesn't provide callback)
-          for _ in 0..<10 {
-            try? await Task.sleep(for: .seconds(1))
-            await send(.checkPermissions)
-          }
+          await send(.checkPermissions)
         }
 
       case .requestInputMonitoring:
         return .run { send in
           _ = await permissions.requestInputMonitoring()
-          for _ in 0..<10 {
-            try? await Task.sleep(for: .seconds(1))
-            await send(.checkPermissions)
-          }
+          await send(.checkPermissions)
         }
 
       case .modelStatusEvaluated:

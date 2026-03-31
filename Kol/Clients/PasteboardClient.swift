@@ -250,7 +250,7 @@ struct PasteboardClientLive {
     private func waitForPasteboardCommit(
         targetChangeCount: Int,
         timeout: Duration = .milliseconds(150),
-        pollInterval: Duration = .milliseconds(5)
+        pollInterval: Duration = .milliseconds(20)
     ) async -> Bool {
         guard targetChangeCount > NSPasteboard.general.changeCount else { return true }
 

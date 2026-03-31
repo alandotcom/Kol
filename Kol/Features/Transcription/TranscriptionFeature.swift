@@ -106,6 +106,7 @@ struct TranscriptionFeature {
   @Dependency(\.windowContext) var windowContext
   @Dependency(\.nameCache) var nameCache
   @Dependency(\.editTracking) var editTrackingClient
+  @Dependency(\.continuousClock) var clock
 
   var body: some ReducerOf<Self> {
     Reduce { state, action in
@@ -116,12 +117,11 @@ struct TranscriptionFeature {
         // Guard against double-fire (.task can arrive from both AppFeature and SwiftUI .task modifier)
         guard !state.didStartTask else { return .none }
         state.didStartTask = true
-        // Starts three concurrent effects:
-        // 1) Observing audio meter
-        // 2) Monitoring hot key events
-        // 3) Priming the recorder for instant startup
+        // Starts two concurrent effects:
+        // 1) Monitoring hot key events
+        // 2) Priming the recorder for instant startup
+        // Note: audio metering starts/stops with recording (CancelID.metering)
         return .merge(
-          startMeteringEffect(),
           startHotKeyMonitoringEffect(),
           warmUpRecorderEffect()
         )
@@ -303,12 +303,12 @@ struct TranscriptionFeature {
 private extension TranscriptionFeature {
   /// Effect to begin observing the audio meter.
   func startMeteringEffect() -> Effect<Action> {
-    .run { send in
+    .run { [recording] send in
       for await meter in await recording.observeAudioLevel() {
         await send(.audioLevelUpdated(meter))
       }
     }
-    .cancellable(id: CancelID.metering)
+    .cancellable(id: CancelID.metering, cancelInFlight: true)
   }
 
   /// Effect to start monitoring hotkey events through the `keyEventMonitor`.
@@ -456,6 +456,7 @@ private extension TranscriptionFeature {
     // Prevent system sleep during recording
     let startRecordingEffect: Effect<Action> = .merge(
       .cancel(id: CancelID.recordingCleanup),
+      startMeteringEffect(),
       .run { [sleepManagement, preventSleep = state.kolSettings.preventSystemSleep] _ in
         // Play sound immediately for instant feedback
         soundEffect.play(.startRecording)
@@ -474,9 +475,8 @@ private extension TranscriptionFeature {
       return startRecordingEffect
     }
 
-    let contextRefreshEffect: Effect<Action> = .run { send in
-      while !Task.isCancelled {
-        try await Task.sleep(for: .seconds(1))
+    let contextRefreshEffect: Effect<Action> = .run { [clock] send in
+      for await _ in clock.timer(interval: .seconds(1)) {
         await send(.contextRefreshTick)
       }
     }
@@ -628,6 +628,7 @@ private extension TranscriptionFeature {
       // discard the audio to avoid accidental triggers.
       transcriptionFeatureLogger.notice("Discarding short recording per decision \(String(describing: decision))")
       return .merge(
+        .cancel(id: CancelID.metering),
         .cancel(id: CancelID.contextRefresh),
         .run { _ in
           let url = await recording.stopRecording()
@@ -655,6 +656,7 @@ private extension TranscriptionFeature {
     let capturedVocabulary = state.capturedVocabulary
 
     return .merge(
+      .cancel(id: CancelID.metering),
       .cancel(id: CancelID.contextRefresh),
       .run { [sleepManagement] send in
         // Allow system to sleep again
@@ -930,18 +932,20 @@ private extension TranscriptionFeature {
       )
       transcriptID = transcript.id
 
+      var removedTranscripts: [Transcript] = []
       transcriptionHistory.withLock { history in
         history.history.insert(transcript, at: 0)
 
         if let maxEntries = kolSettings.maxHistoryEntries, maxEntries > 0 {
           while history.history.count > maxEntries {
             if let removedTranscript = history.history.popLast() {
-              Task {
-                 try? await transcriptPersistence.deleteAudio(removedTranscript)
-              }
+              removedTranscripts.append(removedTranscript)
             }
           }
         }
+      }
+      for transcript in removedTranscripts {
+        try? await transcriptPersistence.deleteAudio(transcript)
       }
     } else {
       try? FileManager.default.removeItem(at: audioURL)
@@ -967,6 +971,7 @@ private extension TranscriptionFeature {
     state.resolvedAppCategory = nil
 
     return .merge(
+      .cancel(id: CancelID.metering),
       .cancel(id: CancelID.transcription),
       .cancel(id: CancelID.contextRefresh),
       .run { [sleepManagement] _ in
@@ -994,6 +999,7 @@ private extension TranscriptionFeature {
 
     // Silently discard - no sound effect
     return .merge(
+      .cancel(id: CancelID.metering),
       .cancel(id: CancelID.contextRefresh),
       .run { [sleepManagement] _ in
         // Allow system to sleep again

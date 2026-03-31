@@ -93,11 +93,9 @@ struct HistoryFeature {
 						await withCheckedContinuation { continuation in
 							controller.onPlaybackFinished = {
 								continuation.resume()
-								Task { @MainActor in
-									send(.playbackFinished)
-								}
 							}
 						}
+						await send(.playbackFinished)
 					}
 				} catch {
 					historyLogger.error("Failed to play audio: \(error.localizedDescription)")

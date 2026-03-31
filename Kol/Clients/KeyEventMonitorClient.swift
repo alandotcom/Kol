@@ -96,33 +96,39 @@ extension DependencyValues {
   }
 }
 
+@MainActor
 class KeyEventMonitorClientLive {
-  private var eventTapPort: CFMachPort?
+  nonisolated(unsafe) private var eventTapPort: CFMachPort?
   private var runLoopSource: CFRunLoopSource?
 
   // All mutable state below is protected by `stateLock`.
   // OSAllocatedUnfairLock is Apple's recommended replacement for os_unfair_lock
   // in Swift — an order of magnitude faster than GCD dispatch for short critical
   // sections, and safe (unlike os_unfair_lock which has value-type address issues).
+  // nonisolated(unsafe) because thread safety is managed by the lock, not actor
+  // isolation — these are accessed from both @MainActor and nonisolated contexts.
   private let stateLock = OSAllocatedUnfairLock()
-  private var continuations: [UUID: @Sendable (KeyEvent) -> Bool] = [:]
-  private var inputContinuations: [UUID: @Sendable (InputEvent) -> Bool] = [:]
-  private var wantsMonitoring = false
-  private var accessibilityTrusted = false
-  private var inputMonitoringTrusted = false
-  private var trustMonitorTask: Task<Void, Never>?
+  nonisolated(unsafe) private var continuations: [UUID: @Sendable (KeyEvent) -> Bool] = [:]
+  nonisolated(unsafe) private var inputContinuations: [UUID: @Sendable (InputEvent) -> Bool] = [:]
+  nonisolated(unsafe) private var wantsMonitoring = false
+  nonisolated(unsafe) private var accessibilityTrusted = false
+  nonisolated(unsafe) private var inputMonitoringTrusted = false
+  nonisolated(unsafe) private var trustMonitorTask: Task<Void, Never>?
 
   // Only accessed from the event tap callback (main thread) — no lock needed.
-  private var consecutiveTimeouts = 0
+  // nonisolated(unsafe) because the C callback accesses these via Unmanaged pointer,
+  // bypassing Swift's actor isolation checks. Safe because the CGEvent tap runs on
+  // the main run loop, matching this class's @MainActor isolation.
+  nonisolated(unsafe) private var consecutiveTimeouts = 0
 
   private var isMonitoring = false
-  private var isFnPressed = false
-  private var hasPromptedForAccessibilityTrust = false
+  nonisolated(unsafe) private var isFnPressed = false
+  nonisolated(unsafe) private var hasPromptedForAccessibilityTrust = false
   @Shared(.hotkeyPermissionState) private var hotkeyPermissionState: HotkeyPermissionState
 
-  private let trustCheckIntervalNanoseconds: UInt64 = 100_000_000 // 100ms
+  private let trustCheckIntervalNanoseconds: UInt64 = 2_000_000_000 // 2s
 
-  init() {
+  nonisolated init() {
     logger.info("Initializing HotKeyClient with CGEvent tap.")
   }
 
@@ -130,19 +136,19 @@ class KeyEventMonitorClientLive {
     self.stopMonitoring()
   }
 
-  private var hasRequiredPermissions: Bool {
+  nonisolated private var hasRequiredPermissions: Bool {
     stateLock.withLock { accessibilityTrusted && inputMonitoringTrusted }
   }
 
-  private var hasHandlers: Bool {
+  nonisolated private var hasHandlers: Bool {
     stateLock.withLock { !(continuations.isEmpty && inputContinuations.isEmpty) }
   }
 
-  private func setMonitoringIntent(_ value: Bool) {
+  nonisolated private func setMonitoringIntent(_ value: Bool) {
     stateLock.withLock { wantsMonitoring = value }
   }
 
-  private func desiredMonitoringState() -> Bool {
+  nonisolated private func desiredMonitoringState() -> Bool {
     stateLock.withLock {
       wantsMonitoring
         && accessibilityTrusted
@@ -152,7 +158,7 @@ class KeyEventMonitorClientLive {
   }
 
   /// Provide a stream of key events.
-  func listenForKeyPress() -> AsyncThrowingStream<KeyEvent, Error> {
+  nonisolated func listenForKeyPress() -> AsyncThrowingStream<KeyEvent, Error> {
     AsyncThrowingStream { continuation in
       let uuid = UUID()
 
@@ -175,7 +181,7 @@ class KeyEventMonitorClientLive {
     }
   }
 
-  private func removeHandlerContinuation(uuid: UUID) {
+  nonisolated private func removeHandlerContinuation(uuid: UUID) {
     let shouldStop: Bool = stateLock.withLock {
       continuations[uuid] = nil
       return continuations.isEmpty && inputContinuations.isEmpty
@@ -185,7 +191,7 @@ class KeyEventMonitorClientLive {
     }
   }
 
-  private func removeInputContinuation(uuid: UUID) {
+  nonisolated private func removeInputContinuation(uuid: UUID) {
     let shouldStop: Bool = stateLock.withLock {
       inputContinuations[uuid] = nil
       return continuations.isEmpty && inputContinuations.isEmpty
@@ -195,7 +201,7 @@ class KeyEventMonitorClientLive {
     }
   }
 
-  func startMonitoring() {
+  nonisolated func startMonitoring() {
     setMonitoringIntent(true)
     startTrustMonitorIfNeeded()
     refreshTrustedFlag(promptIfUntrusted: true)
@@ -204,7 +210,7 @@ class KeyEventMonitorClientLive {
     }
   }
   // TODO: Handle removing the handler from the continuations on deinit/cancellation
-  func handleKeyEvent(_ handler: @Sendable @escaping (KeyEvent) -> Bool) -> KeyEventMonitorToken {
+  nonisolated func handleKeyEvent(_ handler: @Sendable @escaping (KeyEvent) -> Bool) -> KeyEventMonitorToken {
     let uuid = UUID()
 
     let shouldStart: Bool = stateLock.withLock {
@@ -221,7 +227,7 @@ class KeyEventMonitorClientLive {
     }
   }
 
-  func handleInputEvent(_ handler: @Sendable @escaping (InputEvent) -> Bool) -> KeyEventMonitorToken {
+  nonisolated func handleInputEvent(_ handler: @Sendable @escaping (InputEvent) -> Bool) -> KeyEventMonitorToken {
     let uuid = UUID()
 
     let shouldStart: Bool = stateLock.withLock {
@@ -238,7 +244,7 @@ class KeyEventMonitorClientLive {
     }
   }
 
-  func stopMonitoring() {
+  nonisolated func stopMonitoring() {
     setMonitoringIntent(false)
     Task { [weak self] in
       await self?.refreshMonitoringState(reason: "stopMonitoring")
@@ -246,7 +252,7 @@ class KeyEventMonitorClientLive {
     cancelTrustMonitorIfNeeded()
   }
 
-  private func startTrustMonitorIfNeeded() {
+  nonisolated private func startTrustMonitorIfNeeded() {
     stateLock.lock()
     guard trustMonitorTask == nil else {
       stateLock.unlock()
@@ -258,7 +264,7 @@ class KeyEventMonitorClientLive {
     stateLock.unlock()
   }
 
-  private func cancelTrustMonitorIfNeeded() {
+  nonisolated private func cancelTrustMonitorIfNeeded() {
     stateLock.lock()
     guard !wantsMonitoring else {
       stateLock.unlock()
@@ -332,7 +338,7 @@ class KeyEventMonitorClientLive {
     }
   }
 
-  private func setPermissionFlags(accessibility: Bool, input: Bool) {
+  nonisolated private func setPermissionFlags(accessibility: Bool, input: Bool) {
     stateLock.withLock {
       accessibilityTrusted = accessibility
       inputMonitoringTrusted = input
@@ -340,8 +346,10 @@ class KeyEventMonitorClientLive {
     recordSharedPermissionState(accessibility: accessibility, input: input)
   }
 
-  private func recordSharedPermissionState(accessibility: Bool, input: Bool) {
-    $hotkeyPermissionState.withLock {
+  nonisolated private func recordSharedPermissionState(accessibility: Bool, input: Bool) {
+    // Use a local @Shared reference to avoid accessing self's MainActor-isolated property
+    @Shared(.hotkeyPermissionState) var state
+    $state.withLock {
       $0.accessibility = accessibility ? .granted : .denied
       $0.inputMonitoring = input ? .granted : .denied
       $0.lastUpdated = Date()
@@ -461,7 +469,7 @@ class KeyEventMonitorClientLive {
     logger.info("Suspended key event monitoring (reason: \(reason)).")
   }
 
-  private func handleTapDisabledEvent(_ type: CGEventType) {
+  nonisolated private func handleTapDisabledEvent(_ type: CGEventType) {
     if type == .tapDisabledByTimeout {
       consecutiveTimeouts += 1
       if consecutiveTimeouts >= 3 {
@@ -481,7 +489,7 @@ class KeyEventMonitorClientLive {
     }
   }
 
-  private func processKeyEvent(_ keyEvent: KeyEvent) -> Bool {
+  nonisolated private func processKeyEvent(_ keyEvent: KeyEvent) -> Bool {
     let handlerList: [@Sendable (KeyEvent) -> Bool]
     stateLock.lock()
     handlerList = Array(continuations.values)
@@ -491,7 +499,7 @@ class KeyEventMonitorClientLive {
     }
   }
 
-  private func processInputEvent(_ inputEvent: InputEvent) -> Bool {
+  nonisolated private func processInputEvent(_ inputEvent: InputEvent) -> Bool {
     let handlerList: [@Sendable (InputEvent) -> Bool]
     stateLock.lock()
     handlerList = Array(inputContinuations.values)
@@ -503,14 +511,14 @@ class KeyEventMonitorClientLive {
 }
 
 extension KeyEventMonitorClientLive {
-  private func updateFnStateIfNeeded(type: CGEventType, cgEvent: CGEvent) {
+  nonisolated private func updateFnStateIfNeeded(type: CGEventType, cgEvent: CGEvent) {
     guard type == .flagsChanged else { return }
     let keyCode = Int(cgEvent.getIntegerValueField(.keyboardEventKeycode))
     guard keyCode == kVK_Function else { return }
     isFnPressed = cgEvent.flags.contains(.maskSecondaryFn)
   }
 
-  private func refreshTrustedFlag(promptIfUntrusted: Bool) {
+  nonisolated private func refreshTrustedFlag(promptIfUntrusted: Bool) {
     var accessibilityTrusted = currentAccessibilityTrust()
     if !accessibilityTrusted && promptIfUntrusted && !hasPromptedForAccessibilityTrust {
       accessibilityTrusted = requestAccessibilityTrustPrompt()
@@ -522,17 +530,17 @@ extension KeyEventMonitorClientLive {
     setPermissionFlags(accessibility: accessibilityTrusted, input: inputMonitoringTrusted)
   }
 
-  private func currentAccessibilityTrust() -> Bool {
+  nonisolated private func currentAccessibilityTrust() -> Bool {
     let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
     return AXIsProcessTrustedWithOptions([promptKey: false] as CFDictionary)
   }
 
-  private func requestAccessibilityTrustPrompt() -> Bool {
+  nonisolated private func requestAccessibilityTrustPrompt() -> Bool {
     let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
     return AXIsProcessTrustedWithOptions([promptKey: true] as CFDictionary)
   }
 
-  private func currentInputMonitoringTrust() -> Bool {
+  nonisolated private func currentInputMonitoringTrust() -> Bool {
     IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
   }
 
