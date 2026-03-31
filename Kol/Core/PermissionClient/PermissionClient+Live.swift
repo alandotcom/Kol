@@ -5,6 +5,7 @@ import Dependencies
 import Foundation
 import IOKit
 import IOKit.hidsystem
+import ScreenCaptureKit
 
 private let logger = KolLog.permissions
 
@@ -15,12 +16,14 @@ extension PermissionClient: DependencyKey {
       microphoneStatus: { await live.microphoneStatus() },
       accessibilityStatus: { live.accessibilityStatus() },
       inputMonitoringStatus: { live.inputMonitoringStatus() },
+      screenRecordingStatus: { await live.screenRecordingStatus() },
       requestMicrophone: { await live.requestMicrophone() },
       requestAccessibility: { await live.requestAccessibility() },
       requestInputMonitoring: { await live.requestInputMonitoring() },
       openMicrophoneSettings: { await live.openMicrophoneSettings() },
       openAccessibilitySettings: { await live.openAccessibilitySettings() },
       openInputMonitoringSettings: { await live.openInputMonitoringSettings() },
+      openScreenRecordingSettings: { await live.openScreenRecordingSettings() },
       observeAppActivation: { live.observeAppActivation() }
     )
   }
@@ -168,6 +171,28 @@ actor PermissionClientLive {
     await MainActor.run {
       _ = NSWorkspace.shared.open(
         URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
+      )
+    }
+  }
+
+  // MARK: - Screen Recording Permissions
+
+  func screenRecordingStatus() async -> PermissionStatus {
+    do {
+      _ = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
+      logger.info("Screen recording status: granted")
+      return .granted
+    } catch {
+      logger.info("Screen recording status: denied (\(error.localizedDescription))")
+      return .denied
+    }
+  }
+
+  func openScreenRecordingSettings() async {
+    logger.info("Opening screen recording settings in System Preferences...")
+    await MainActor.run {
+      _ = NSWorkspace.shared.open(
+        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
       )
     }
   }

@@ -5,6 +5,7 @@ import SwiftUI
 struct LLMSectionContent: View {
 	@ObserveInjection var inject
 	@Bindable var store: StoreOf<SettingsFeature>
+	let screenRecordingPermission: PermissionStatus
 
 	var body: some View {
 		Toggle(
@@ -133,10 +134,36 @@ struct LLMSectionContent: View {
 						)
 					)
 					.padding(.leading, 16)
-					Text("Reads screen content via OCR when accessibility text is sparse (Slack, Discord, browser apps). Requires Screen Recording permission.")
+					Text("Reads screen content via OCR when accessibility text is sparse (Slack, Discord, browser apps).")
 						.font(.system(size: 13))
 						.foregroundColor(.secondary)
 						.padding(.leading, 16)
+
+					if store.kolSettings.ocrContextEnabled {
+						HStack(spacing: 6) {
+							if screenRecordingPermission == .granted {
+								Image(systemName: "checkmark.circle.fill")
+									.foregroundStyle(.green)
+									.font(.system(size: 13))
+								Text("Screen Recording permission granted")
+									.font(.system(size: 13))
+									.foregroundColor(.secondary)
+							} else {
+								Image(systemName: "exclamationmark.triangle.fill")
+									.foregroundStyle(.yellow)
+									.font(.system(size: 13))
+								Text("Screen Recording permission required")
+									.font(.system(size: 13))
+									.foregroundColor(.secondary)
+								Button("Grant") {
+									store.send(.openScreenRecordingSettings)
+								}
+								.buttonStyle(.bordered)
+								.controlSize(.mini)
+							}
+						}
+						.padding(.leading, 16)
+					}
 				}
 
 				Toggle(

@@ -133,6 +133,7 @@ struct SettingsFeature {
     case setAtMentionInsertionEnabled(Bool)
     case setEditTrackingEnabled(Bool)
     case setOCRContextEnabled(Bool)
+    case openScreenRecordingSettings
     case setLLMPromptCode(String?)
     case setLLMPromptMessaging(String?)
     case setLLMPromptDocument(String?)
@@ -687,6 +688,11 @@ struct SettingsFeature {
       case let .setOCRContextEnabled(enabled):
         state.$kolSettings.withLock { $0.ocrContextEnabled = enabled }
         return .none
+
+      case .openScreenRecordingSettings:
+        return .run { _ in
+          await permissions.openScreenRecordingSettings()
+        }
 
       case let .setLLMPromptCode(prompt):
         state.$kolSettings.withLock { $0.llmPromptCode = prompt }

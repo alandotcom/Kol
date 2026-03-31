@@ -43,6 +43,12 @@ public struct PermissionClient: Sendable {
   /// Uses `IOHIDCheckAccess` to determine whether we can listen for global keyboard events.
   public var inputMonitoringStatus: @Sendable () -> PermissionStatus = { .notDetermined }
 
+  /// Check the current screen recording permission status.
+  ///
+  /// Attempts a minimal ScreenCaptureKit call — if it succeeds, permission is granted;
+  /// if it throws, permission is denied. There is no `notDetermined` state for Screen Recording.
+  public var screenRecordingStatus: @Sendable () async -> PermissionStatus = { .notDetermined }
+
   /// Request microphone permission from the user.
   ///
   /// If permission is `.notDetermined`, this will show the system permission dialog.
@@ -74,6 +80,9 @@ public struct PermissionClient: Sendable {
 
   /// Open System Settings to the Input Monitoring privacy panel.
   public var openInputMonitoringSettings: @Sendable () async -> Void = {}
+
+  /// Open System Settings to the Screen Recording privacy panel.
+  public var openScreenRecordingSettings: @Sendable () async -> Void = {}
 
   /// Observe app activation events.
   ///

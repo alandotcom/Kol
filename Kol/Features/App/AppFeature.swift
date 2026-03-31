@@ -52,6 +52,7 @@ struct AppFeature {
     var microphonePermission: PermissionStatus = .notDetermined
     var accessibilityPermission: PermissionStatus = .notDetermined
     var inputMonitoringPermission: PermissionStatus = .notDetermined
+    var screenRecordingPermission: PermissionStatus = .notDetermined
   }
 
   enum Action: BindableAction {
@@ -65,7 +66,7 @@ struct AppFeature {
 
     // Permission actions
     case checkPermissions
-    case permissionsUpdated(mic: PermissionStatus, acc: PermissionStatus, input: PermissionStatus)
+    case permissionsUpdated(mic: PermissionStatus, acc: PermissionStatus, input: PermissionStatus, screenRec: PermissionStatus)
     case appActivated
     case requestMicrophone
     case requestAccessibility
@@ -131,6 +132,10 @@ struct AppFeature {
       case .transcription:
         return .none
 
+      case .settings(.setOCRContextEnabled):
+        // Re-check permissions so screen recording status updates immediately
+        return .send(.checkPermissions)
+
       case .settings:
         return .none
 
@@ -145,17 +150,24 @@ struct AppFeature {
 
       // Permission handling
       case .checkPermissions:
+        let ocrEnabled = state.kolSettings.ocrContextEnabled
         return .run { send in
           async let mic = permissions.microphoneStatus()
           async let acc = permissions.accessibilityStatus()
           async let input = permissions.inputMonitoringStatus()
-          await send(.permissionsUpdated(mic: mic, acc: acc, input: input))
+          // SCShareableContent does a WindowServer IPC round-trip (~5-30ms).
+          // Only pay that cost when OCR is enabled and the result is actually displayed.
+          let screenRec: PermissionStatus = ocrEnabled
+            ? await permissions.screenRecordingStatus()
+            : .notDetermined
+          await send(.permissionsUpdated(mic: mic, acc: acc, input: input, screenRec: screenRec))
         }
 
-      case let .permissionsUpdated(mic, acc, input):
+      case let .permissionsUpdated(mic, acc, input, screenRec):
         state.microphonePermission = mic
         state.accessibilityPermission = acc
         state.inputMonitoringPermission = input
+        state.screenRecordingPermission = screenRec
         return .none
 
       case .appActivated:

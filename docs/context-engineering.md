@@ -1046,10 +1046,15 @@ High overall, but each adapter is independent and can be built incrementally. St
 **Settings UI:**
 - OCR toggle in LLMSectionView: "OCR for Electron apps" — conditionally shown when `llmScreenContextEnabled`, indented under "Include visible text as context"
 
+**Screen Recording permission UI — done**
+- `PermissionClient` extended with `screenRecordingStatus()` (probes `SCShareableContent`) and `openScreenRecordingSettings()`
+- `AppFeature` plumbs `screenRecordingPermission` through state; check gated by `ocrContextEnabled` to avoid WindowServer IPC (~5-30ms) when OCR is off
+- `LLMSectionView` shows inline permission indicator below OCR toggle: green checkmark when granted, yellow warning + "Grant" button when not
+- Toggling OCR on triggers immediate permission re-check via `AppFeature` intercepting `.settings(.setOCRContextEnabled)`
+
 **Remaining work (Phase D):**
 - **Auto-learn from corrections** (§7 Phase 3-4) — detect repeated substitutions, auto-suggest word remappings
 - **iMessage sidebar contact extraction** — parse contact names from AXStaticText descriptions in sidebar area (currently only AXButton descriptions are parsed)
-- **Screen Recording permission UI** — add permission status card to PermissionsSectionView when OCR is enabled
 
 ---
 

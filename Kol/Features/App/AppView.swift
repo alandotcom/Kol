@@ -61,7 +61,8 @@ struct AppView: View {
     case .advanced:
       AdvancedSettingsView(
         store: store.scope(state: \.settings, action: \.settings),
-        microphonePermission: store.microphonePermission
+        microphonePermission: store.microphonePermission,
+        screenRecordingPermission: store.screenRecordingPermission
       )
     case .about:
       AboutView(store: store.scope(state: \.settings, action: \.settings))

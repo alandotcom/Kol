@@ -6,6 +6,7 @@ struct AdvancedSettingsView: View {
     @ObserveInjection var inject
     @Bindable var store: StoreOf<SettingsFeature>
     let microphonePermission: PermissionStatus
+    let screenRecordingPermission: PermissionStatus
 
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
@@ -13,7 +14,7 @@ struct AdvancedSettingsView: View {
 
             VStack(alignment: .leading, spacing: 16) {
                 SectionHeader(title: "AI Post-Processing", style: .section)
-                LLMSectionContent(store: store)
+                LLMSectionContent(store: store, screenRecordingPermission: screenRecordingPermission)
             }
 
             Divider()
