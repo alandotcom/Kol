@@ -112,4 +112,49 @@ struct VocabularyExtractorTests {
 		#expect(all.contains("Alan Cohen"))
 		#expect(all.contains("AppFeature.swift"))
 	}
+
+	// MARK: - OCR Garbage Filter
+
+	@Test("Rejects OCR garbage with low vowel ratio")
+	func rejectsLowVowels() {
+		#expect(VocabularyExtractor.looksLikeGarbage("dlscLntrWt"))
+		#expect(VocabularyExtractor.looksLikeGarbage("bLrtxm"))
+	}
+
+	@Test("Rejects OCR garbage with long consonant runs")
+	func rejectsConsonantRuns() {
+		#expect(VocabularyExtractor.looksLikeGarbage("IrnplerrwtstiDn"))
+		#expect(VocabularyExtractor.looksLikeGarbage("sSedxmblrt"))
+	}
+
+	@Test("Accepts valid names")
+	func acceptsValidNames() {
+		#expect(!VocabularyExtractor.looksLikeGarbage("Jane Smith"))
+		#expect(!VocabularyExtractor.looksLikeGarbage("Michael Chen"))
+		#expect(!VocabularyExtractor.looksLikeGarbage("Maria Rodriguez"))
+		#expect(!VocabularyExtractor.looksLikeGarbage("David Kim"))
+	}
+
+	@Test("Accepts valid identifiers")
+	func acceptsValidIdentifiers() {
+		#expect(!VocabularyExtractor.looksLikeGarbage("handleStart"))
+		#expect(!VocabularyExtractor.looksLikeGarbage("SearchEngine"))
+		#expect(!VocabularyExtractor.looksLikeGarbage("viewModel"))
+	}
+
+	@Test("Accepts short terms without filtering")
+	func acceptsShortTerms() {
+		#expect(!VocabularyExtractor.looksLikeGarbage("Liz"))
+		#expect(!VocabularyExtractor.looksLikeGarbage("Bio"))
+		#expect(!VocabularyExtractor.looksLikeGarbage("App"))
+	}
+
+	@Test("Filters garbage from extract results")
+	func extractFiltersGarbage() {
+		let text = "IrnplerrwtstiDn dlscLntrWt Jane Smith handleStart"
+		let result = VocabularyExtractor.extract(from: text)
+		#expect(!result.allTerms.contains("IrnplerrwtstiDn"))
+		#expect(!result.allTerms.contains("dlscLntrWt"))
+		#expect(result.allTerms.contains("Jane Smith"))
+	}
 }

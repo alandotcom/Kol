@@ -124,6 +124,21 @@ struct LLMSectionContent: View {
 					.font(.system(size: 13))
 					.foregroundColor(.secondary)
 
+				if store.kolSettings.llmScreenContextEnabled {
+					Toggle(
+						"OCR for Electron apps",
+						isOn: Binding(
+							get: { store.kolSettings.ocrContextEnabled },
+							set: { store.send(.setOCRContextEnabled($0)) }
+						)
+					)
+					.padding(.leading, 16)
+					Text("Reads screen content via OCR when accessibility text is sparse (Slack, Discord, browser apps). Requires Screen Recording permission.")
+						.font(.system(size: 13))
+						.foregroundColor(.secondary)
+						.padding(.leading, 16)
+				}
+
 				Toggle(
 					"Conversation awareness",
 					isOn: Binding(

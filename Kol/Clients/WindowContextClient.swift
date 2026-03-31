@@ -144,12 +144,25 @@ extension WindowContextClient: DependencyKey {
 		// Look for static text that could be a sender name
 		if role == "AXStaticText" || role == "AXHeading" {
 			if let value = element.stringValue() ?? element.title() {
-				if looksLikePersonName(value) {
+				if NameParser.looksLikePersonName(value) {
 					if seen.insert(value).inserted {
 						names.append(value)
 					}
 				} else if value.count >= 2, value.count <= 40, !value.contains("\n") {
 					logger.debug("WindowContext: rejected name candidate: \"\(value, privacy: .private)\" (role=\(role ?? "?"))")
+				}
+			}
+		}
+
+		// Check button descriptions for "Includes X and Y" patterns (Slack member lists)
+		if role == "AXButton" {
+			if let desc = element.descriptionText(), desc.contains("Includes") {
+				let parsed = NameParser.parseNamesFromDescription(desc)
+				for name in parsed {
+					if seen.insert(name).inserted {
+						names.append(name)
+						logger.debug("WindowContext: found name in button description: \"\(name, privacy: .private)\"")
+					}
 				}
 			}
 		}
@@ -165,20 +178,6 @@ extension WindowContextClient: DependencyKey {
 			)
 			count += 1
 		}
-	}
-
-	/// Heuristic: does this text look like a person's name?
-	/// Accepts single-word names (Alice), multi-word (Alan Cohen), hyphenated (Mary-Jane),
-	/// and Unicode letters for non-Western names.
-	private static let namePattern: NSRegularExpression = {
-		try! NSRegularExpression(pattern: #"^\p{Lu}\p{L}+(?:[\s'\-]\p{L}+)*$"#)
-	}()
-
-	private static func looksLikePersonName(_ text: String) -> Bool {
-		let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-		guard trimmed.count >= 2, trimmed.count <= 30 else { return false }
-		let range = NSRange(trimmed.startIndex..., in: trimmed)
-		return namePattern.firstMatch(in: trimmed, range: range) != nil
 	}
 
 }

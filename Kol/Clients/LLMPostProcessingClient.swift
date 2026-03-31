@@ -42,6 +42,8 @@ extension LLMPostProcessingClient: DependencyKey {
 
 				logger.notice("LLM sourceApp: \(context.sourceApp ?? "nil", privacy: .public)")
 				logger.notice("LLM screenContext length: \(context.screenContext?.count ?? 0)")
+				let vocabPreview = context.vocabularyHints?.joined(separator: ", ") ?? "(none)"
+				logger.notice("LLM vocabulary hints: \(vocabPreview, privacy: .public)")
 				logger.notice("LLM system prompt preview: \(String(systemPrompt.suffix(200)), privacy: .public)")
 
 				let url = URL(string: "\(config.baseURL)/chat/completions")!

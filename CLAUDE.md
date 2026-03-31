@@ -206,6 +206,7 @@ FluidAudio models reside under `Application Support/FluidAudio/Models`.
 - Repeated mic prompts during debug: ensure Debug signing uses "Apple Development" so TCC sticks
 - Sandbox network errors (‑1003): add `com.apple.security.network.client = true` (already set)
 - Parakeet not detected: ensure it resides under the container path above; downloading from Kol places it correctly.
+- Documented solutions to past build/test issues: `docs/solutions/` (YAML frontmatter searchable by module, tags, problem_type)
 
 ## Eval Workflow
 

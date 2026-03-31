@@ -1007,16 +1007,49 @@ High overall, but each adapter is independent and can be built incrementally. St
 - `atMentionInsertionEnabled` (default: false, gated by `conversationContextEnabled`)
 - `editTrackingEnabled` (default: false, independent)
 
-**Remaining work (Phase C):**
-- **Auto-learn from corrections** (§7 Phase 3-4) — detect repeated substitutions, auto-suggest word remappings
-- **Enhanced metadata extraction** — parse member names from Slack button descriptions ("Includes Member A and Member B"), iMessage sidebar contact names. Extend `WindowContextClient.extractMetadata(pid:, category:)`.
-- **Conversation message extraction** (§5 Phase 2) — only possible for native apps (iMessage exposes messages as AXTextArea values). Electron apps (Slack, Discord) hide message content from AX tree entirely — OCR (§9) is the only path.
+**Remaining work (Phase C) — moved to Phase D/E:**
+- **Auto-learn from corrections** (§7 Phase 3-4) — detect repeated substitutions, auto-suggest word remappings → Phase D
+- **Conversation message extraction** (§5 Phase 2) — only possible for native apps (iMessage exposes messages as AXTextArea values). Electron apps (Slack, Discord) hide message content from AX tree entirely — OCR (§9) is the only path → Phase E
 
 **AX tree verification results (2026-03-30):**
 - ✅ **iMessage**: Rich AX tree (70 nodes). Full message content accessible as AXTextArea values. Sidebar shows contact names + preview text in descriptions.
 - ❌ **Slack** (Electron): Sparse (155 nodes). AXWebArea at depth 7 reports `AXNumberOfCharacters = 0`. No message content. Available: window title, member names in button desc ("View all 3 members. Includes Member A and Member B."), channel topic.
 - ❌ **Gmail in Brave** (Chromium): Sparse (110 nodes). Zero email content. Available: URL bar (`mail.google.com/mail/u/0/#inbox`), window title only.
 - **Conclusion**: Chromium-based apps (Slack, Discord, Teams, browsers) require OCR for content. Native apps (iMessage, Notes, TextEdit) have rich AX trees — OCR unnecessary.
+
+### Phase D — done
+
+**Enhanced AX metadata extraction — done**
+- `WindowContextClient.parseNamesFromDescription()` — pure function that extracts names from Slack-style button descriptions ("Includes X and Y", "Includes X, Y, and Z")
+- `collectParticipantNames()` extended to check `element.descriptionText()` on `AXButton` elements for "Includes" patterns
+- Names parsed from descriptions are merged into existing participant name flow (NameCache → VocabularyCache → ASR biasing)
+- `looksLikePersonName()` promoted to `static` visibility for testability
+- 12 WindowContextMetadataTests (two names, Oxford comma, no-Oxford, simple pattern, no match, empty, trailing period, non-name filtering, unicode, hyphenated, valid/invalid name detection)
+
+**§9 On-device OCR — done**
+- `OCRClient` in `Kol/Clients/OCRClient.swift` — TCA `@DependencyClient` with `captureWindowText(pid:)`
+- Implementation: `SCShareableContent` → `SCContentFilter` → `SCScreenshotManager.captureImage` → `VNRecognizeTextRequest` (`.fast` recognition level)
+- 1x resolution capture (`scaleFactor = 1.0`), results capped at 3000 chars
+- Quality gate: fires only when AX-captured text < 50 chars (Electron apps get ~15 chars; native apps get 500+)
+- `TranscriptionFeature.State.ocrTriggered` tracks whether OCR was triggered for the current recording
+- OCR runs async at recording start (does not block recording), sends `.ocrCaptured` action
+- `contextRefreshTick` re-runs OCR every ~3s (3-tick cooldown) when `ocrTriggered` and AX text still sparse
+- OCR text replaces sparse AX text in `capturedScreenContext` — no new prompt layer needed
+- Vocabulary extracted from OCR text merges into existing VocabularyCache pipeline
+- `ocrTriggered` cleared in `handleCancel`, `handleDiscard`
+- Screen Recording permission added to `PermissionClient` (`screenRecordingStatus`, `openScreenRecordingSettings`)
+- No new entitlement needed (ScreenCaptureKit works in sandbox)
+
+**New settings:**
+- `ocrContextEnabled` (default: false, gated by `llmPostProcessingEnabled` + `llmScreenContextEnabled`)
+
+**Settings UI:**
+- OCR toggle in LLMSectionView: "OCR for Electron apps" — conditionally shown when `llmScreenContextEnabled`, indented under "Include visible text as context"
+
+**Remaining work (Phase D):**
+- **Auto-learn from corrections** (§7 Phase 3-4) — detect repeated substitutions, auto-suggest word remappings
+- **iMessage sidebar contact extraction** — parse contact names from AXStaticText descriptions in sidebar area (currently only AXButton descriptions are parsed)
+- **Screen Recording permission UI** — add permission status card to PermissionsSectionView when OCR is enabled
 
 ---
 

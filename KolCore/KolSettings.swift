@@ -67,6 +67,7 @@ public struct KolSettings: Codable, Equatable, Sendable {
 	public var editTrackingEnabled: Bool
 	public var atMentionInsertionEnabled: Bool
 	public var vadSilenceDetectionEnabled: Bool
+	public var ocrContextEnabled: Bool
 
 	private mutating func normalizeDoubleTapSettings() {
 		if !doubleTapLockEnabled {
@@ -113,7 +114,8 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		conversationContextEnabled: Bool = false,
 		editTrackingEnabled: Bool = false,
 		atMentionInsertionEnabled: Bool = false,
-		vadSilenceDetectionEnabled: Bool = true
+		vadSilenceDetectionEnabled: Bool = true,
+		ocrContextEnabled: Bool = false
 	) {
 		self.soundEffectsEnabled = soundEffectsEnabled
 		self.soundEffectsVolume = soundEffectsVolume
@@ -154,6 +156,7 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		self.editTrackingEnabled = editTrackingEnabled
 		self.atMentionInsertionEnabled = atMentionInsertionEnabled
 		self.vadSilenceDetectionEnabled = vadSilenceDetectionEnabled
+		self.ocrContextEnabled = ocrContextEnabled
 		normalizeDoubleTapSettings()
 	}
 
@@ -217,6 +220,7 @@ private enum KolSettingKey: String, CodingKey, CaseIterable {
 	case editTrackingEnabled
 	case atMentionInsertionEnabled
 	case vadSilenceDetectionEnabled
+	case ocrContextEnabled
 }
 
 private struct SettingsField<Value: Codable & Sendable> {
@@ -393,5 +397,6 @@ private enum KolSettingsSchema {
 		SettingsField(.editTrackingEnabled, keyPath: \.editTrackingEnabled, default: defaults.editTrackingEnabled).eraseToAny(),
 		SettingsField(.atMentionInsertionEnabled, keyPath: \.atMentionInsertionEnabled, default: defaults.atMentionInsertionEnabled).eraseToAny(),
 		SettingsField(.vadSilenceDetectionEnabled, keyPath: \.vadSilenceDetectionEnabled, default: defaults.vadSilenceDetectionEnabled).eraseToAny(),
+		SettingsField(.ocrContextEnabled, keyPath: \.ocrContextEnabled, default: defaults.ocrContextEnabled).eraseToAny(),
 	]
 }

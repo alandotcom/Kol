@@ -66,6 +66,7 @@ public enum VocabularyExtractor {
 		pattern: #"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b"#
 	)
 
+
 	/// File names with known extensions
 	/// e.g., "AppFeature.swift", "package.json", "README.md"
 	private static let fileNameRegex = try! NSRegularExpression(
@@ -77,8 +78,8 @@ public enum VocabularyExtractor {
 			return Result(properNouns: [], identifiers: [], fileNames: [])
 		}
 
-		let identifiers = extractIdentifiers(from: text)
-		let properNouns = extractProperNouns(from: text)
+		let identifiers = extractIdentifiers(from: text).filter { !looksLikeGarbage($0) }
+		let properNouns = extractProperNouns(from: text).filter { !looksLikeGarbage($0) }
 		let fileNames = extractFileNames(from: text)
 
 		let result = Result(
@@ -86,7 +87,8 @@ public enum VocabularyExtractor {
 			identifiers: identifiers,
 			fileNames: fileNames
 		)
-		logger.debug("Extracted \(result.allTerms.count) terms: \(identifiers.count) identifiers, \(properNouns.count) nouns, \(fileNames.count) files")
+		let termsPreview = result.allTerms.joined(separator: ", ")
+		logger.info("Extracted \(result.allTerms.count, privacy: .public) terms [\(termsPreview, privacy: .public)]: \(identifiers.count, privacy: .public) identifiers, \(properNouns.count, privacy: .public) nouns, \(fileNames.count, privacy: .public) files")
 		return result
 	}
 
@@ -171,5 +173,47 @@ public enum VocabularyExtractor {
 		}
 
 		return results
+	}
+
+	// MARK: - OCR Garbage Filter
+
+	private static let vowels: Set<Character> = ["a", "e", "i", "o", "u", "A", "E", "I", "O", "U"]
+
+	/// Rejects terms that look like OCR misreads rather than real words.
+	/// OCR garbage characteristics: low vowel ratio, long consonant runs, digit-letter mixing.
+	static func looksLikeGarbage(_ term: String) -> Bool {
+		// Split multi-word terms and check each word
+		let words = term.split(separator: " ")
+		for word in words {
+			if wordLooksLikeGarbage(String(word)) { return true }
+		}
+		return false
+	}
+
+	private static func wordLooksLikeGarbage(_ word: String) -> Bool {
+		guard word.count >= 5 else { return false }
+
+		let letters = word.filter(\.isLetter)
+		guard letters.count >= 5 else { return false }
+
+		// 1. Vowel ratio: reject if < 15% vowels (most languages need ~25%+)
+		let vowelCount = letters.filter { vowels.contains($0) }.count
+		let vowelRatio = Double(vowelCount) / Double(letters.count)
+		if vowelRatio < 0.15 { return true }
+
+		// 2. Consecutive consonants: 5+ non-vowel lowercase letters in a row
+		//    Reset on uppercase (PascalCase boundaries) to avoid false positives
+		//    like "SearchFountain" where "rchF" spans a word boundary.
+		var consonantRun = 0
+		for char in word where char.isLetter {
+			if vowels.contains(char) || char.isUppercase {
+				consonantRun = 0
+			} else {
+				consonantRun += 1
+				if consonantRun >= 5 { return true }
+			}
+		}
+
+		return false
 	}
 }

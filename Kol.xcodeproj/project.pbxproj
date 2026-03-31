@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		16847F9110C1C667D621AC45 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E23613B199896A5DD0FC2BB /* Cocoa.framework */; };
+		2DE422E495504204A8B4D890 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 3B9944FCDBF0437F952241BC /* FluidAudio */; };
 		37798B7E2F7A4B2000FAAFD1 /* AXorcist in Frameworks */ = {isa = PBXBuildFile; productRef = 026BEE407424C5C195DE8F03 /* AXorcist */; };
 		37798B7F2F7A4B2000FAAFD1 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = 15C0465AEB781CAC239453CD /* CasePaths */; };
 		37798B802F7A4B2000FAAFD1 /* IdentifiedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = 1A49FDC9D3A96580756DD5ED /* IdentifiedCollections */; };
@@ -52,6 +53,7 @@
 		47E05E0C2D44525B00D26DA6 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E0B2D44525B00D26DA6 /* DependenciesMacros */; };
 		47E16A622EC6C9D300885CF7 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 47E16A612EC6C9D300885CF7 /* FluidAudio */; };
 		4F0D6A022F1A000100000001 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E012D444EE900D26DA6 /* ComposableArchitecture */; };
+		68E96F0176EC4A6C9979E3D6 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = F2A621BA7C114F699E1DE995 /* WhisperKit */; };
 		B5045C972D78DED500D0A119 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = B5045C962D78DED500D0A119 /* MarkdownUI */; };
 		B53356002D7B8D4900E5F542 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B53355FF2D7B8D4900E5F542 /* Localizable.xcstrings */; };
 		C84995FA9130723B621B5575 /* KolCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7F7962AB52729F8E987112D /* KolCore.framework */; };
@@ -166,6 +168,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2DE422E495504204A8B4D890 /* FluidAudio in Frameworks */,
+				68E96F0176EC4A6C9979E3D6 /* WhisperKit in Frameworks */,
 				3779991C2F7AD84400FAAFD1 /* ConcurrencyExtras in Frameworks */,
 				3779991B2F7AD84400FAAFD1 /* IssueReporting in Frameworks */,
 				3779991A2F7AD84400FAAFD1 /* Sauce in Frameworks */,
@@ -289,6 +293,8 @@
 				F54DF918503E20282D61202F /* Sauce */,
 				3F2D910B1F803177B9C3D83A /* IssueReporting */,
 				93CBD2F56664506274695FFE /* ConcurrencyExtras */,
+				3B9944FCDBF0437F952241BC /* FluidAudio */,
+				F2A621BA7C114F699E1DE995 /* WhisperKit */,
 			);
 			productName = KolTests;
 			productReference = 478637A52D48725900319BFA /* KolTests.xctest */;
@@ -499,7 +505,7 @@
 		328E1D880B5A4F84E389F480 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -798,7 +804,7 @@
 		D227F9F531C9A21710F783E7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_IDENTITY = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -974,6 +980,11 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = Sharing;
 		};
+		3B9944FCDBF0437F952241BC /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47E16A602EC6C9D300885CF7 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
 		3F2D910B1F803177B9C3D83A /* IssueReporting */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = IssueReporting;
@@ -1106,6 +1117,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 47E05E002D444EE900D26DA6 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
 			productName = ComposableArchitecture;
+		};
+		F2A621BA7C114F699E1DE995 /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 47512ABD2E14D8C9000E25BA /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
 		};
 		F54DF918503E20282D61202F /* Sauce */ = {
 			isa = XCSwiftPackageProductDependency;

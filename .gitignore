@@ -21,3 +21,4 @@ node_modules/
 # Claude
 .env
 .claude/settings.local.json
+default.profraw

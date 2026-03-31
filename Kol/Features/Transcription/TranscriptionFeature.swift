@@ -14,6 +14,7 @@ import WhisperKit
 private let transcriptionFeatureLogger = KolLog.transcription
 
 private let maxVocabularyHints = 30
+private let ocrQualityThreshold = 50
 
 @Reducer
 struct TranscriptionFeature {
@@ -28,6 +29,7 @@ struct TranscriptionFeature {
     var meter: Meter = .init(averagePower: 0, peakPower: 0)
     var sourceAppBundleID: String?
     var sourceAppName: String?
+    var sourceAppPID: pid_t?
     var resolvedLanguage: String?
     var capturedScreenContext: String?
     var capturedCursorContext: CursorContext?
@@ -42,6 +44,8 @@ struct TranscriptionFeature {
     var editTrackingElementHash: Int?
     var editTrackingTranscriptID: UUID?
     var editTrackingPollCount: Int = 0
+    var ocrTriggered: Bool = false
+    var lastOCRTickNumber: Int = 0  // contextUpdateCount at last OCR run
     @Shared(.kolSettings) var kolSettings: KolSettings
     @Shared(.isRemappingScratchpadFocused) var isRemappingScratchpadFocused: Bool = false
     @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
@@ -72,6 +76,9 @@ struct TranscriptionFeature {
     case contextRefreshTick
     case contextRefreshed(CursorContext?, String?, [String]?)
 
+    // OCR fallback for Electron/Chromium apps
+    case ocrCaptured(String, [String]?)
+
     // Edit tracking
     case editTrackingStarted(pastedText: String, elementHash: Int, transcriptID: UUID)
     case editTrackingTick
@@ -87,6 +94,7 @@ struct TranscriptionFeature {
     case recordingCleanup
     case transcription
     case contextRefresh
+    case ocrCapture
     case editTracking
   }
 
@@ -106,6 +114,7 @@ struct TranscriptionFeature {
   @Dependency(\.windowContext) var windowContext
   @Dependency(\.nameCache) var nameCache
   @Dependency(\.editTracking) var editTrackingClient
+  @Dependency(\.ocrClient) var ocrClient
   @Dependency(\.continuousClock) var clock
 
   var body: some ReducerOf<Self> {
@@ -243,7 +252,16 @@ struct TranscriptionFeature {
       case .contextRefreshTick:
         guard state.isRecording else { return .none }
         let bundleID = state.sourceAppBundleID
-        return .run { [screenContext, vocabularyCache] send in
+        let sourceAppPID = state.sourceAppPID
+
+        // OCR cooldown: skip OCR on ticks that are too close to the last OCR run.
+        // The context refresh timer fires every 1s; a cooldown of 3 ticks means OCR
+        // runs at most every ~3s, saving ~170ms of CPU + memory per skipped tick.
+        let ocrCooldownTicks = 3
+        let ticksSinceLastOCR = state.contextUpdateCount - state.lastOCRTickNumber
+        let shouldOCR = state.ocrTriggered && ticksSinceLastOCR >= ocrCooldownTicks
+
+        return .run { [screenContext, vocabularyCache, ocrClient] send in
           let cursor = await MainActor.run {
             screenContext.captureCursorContext(bundleID)
           }
@@ -255,6 +273,18 @@ struct TranscriptionFeature {
               screenContext.captureVisibleText(bundleID)
             }
           }
+
+          // If OCR was triggered and AX text is still sparse, re-run OCR
+          if shouldOCR, (flatText?.count ?? 0) < ocrQualityThreshold, let pid = sourceAppPID {
+            if let ocrText = await ocrClient.captureWindowText(pid) {
+              let vocab = VocabularyExtractor.extract(from: ocrText)
+              vocabularyCache.merge(vocab)
+              let terms = vocabularyCache.topTerms(maxVocabularyHints)
+              await send(.ocrCaptured(ocrText, terms))
+              return
+            }
+          }
+
           var vocabulary: [String]?
           if let text = flatText, !text.isEmpty {
             let vocab = VocabularyExtractor.extract(from: text)
@@ -276,6 +306,17 @@ struct TranscriptionFeature {
         if let vocabulary {
           state.capturedVocabulary = vocabulary
         }
+        state.contextUpdateCount += 1
+        return .none
+
+      case let .ocrCaptured(_, vocabulary):
+        // OCR text feeds vocabulary extraction only — proper nouns and identifiers
+        // are cached in VocabularyCacheClient and persist across recordings.
+        // Raw OCR text is not used for LLM screen context.
+        if let vocabulary {
+          state.capturedVocabulary = vocabulary
+        }
+        state.lastOCRTickNumber = state.contextUpdateCount
         state.contextUpdateCount += 1
         return .none
 
@@ -449,13 +490,25 @@ private extension TranscriptionFeature {
     let startTime = now
     state.recordingStartTime = startTime
     
-    // Capture the active application
+    // Capture the active application (PID stored for OCR/AX effects during recording)
     if let activeApp = NSWorkspace.shared.frontmostApplication {
       state.sourceAppBundleID = activeApp.bundleIdentifier
       state.sourceAppName = activeApp.localizedName
+      state.sourceAppPID = activeApp.processIdentifier
     }
 
     captureRecordingContext(&state)
+
+    // OCR quality gate: if AX text is too sparse, trigger OCR fallback
+    let axTextCount = state.capturedScreenContext?.count ?? 0
+    if state.kolSettings.ocrContextEnabled,
+       state.kolSettings.llmPostProcessingEnabled,
+       state.kolSettings.llmScreenContextEnabled,
+       axTextCount < ocrQualityThreshold,
+       state.sourceAppPID != nil {
+      state.ocrTriggered = true
+      transcriptionFeatureLogger.info("OCR triggered: AX text \(axTextCount) chars < \(ocrQualityThreshold) threshold")
+    }
 
     state.contextUpdateCount = 0
     transcriptionFeatureLogger.notice("Recording started at \(startTime.ISO8601Format())")
@@ -474,11 +527,27 @@ private extension TranscriptionFeature {
       }
     )
 
+    // Fire initial OCR capture asynchronously (does not block recording start)
+    let ocrEffect: Effect<Action>
+    if state.ocrTriggered, let pid = state.sourceAppPID {
+      ocrEffect = .run { [ocrClient, vocabularyCache] send in
+        if let ocrText = await ocrClient.captureWindowText(pid) {
+          let vocab = VocabularyExtractor.extract(from: ocrText)
+          vocabularyCache.merge(vocab)
+          let terms = vocabularyCache.topTerms(maxVocabularyHints)
+          await send(.ocrCaptured(ocrText, terms))
+        }
+      }
+      .cancellable(id: CancelID.ocrCapture, cancelInFlight: true)
+    } else {
+      ocrEffect = .none
+    }
+
     // Start periodic context refresh during recording (1s interval)
     let shouldRefreshContext = state.kolSettings.llmPostProcessingEnabled
       && state.kolSettings.llmScreenContextEnabled
     guard shouldRefreshContext else {
-      return startRecordingEffect
+      return .merge(startRecordingEffect, ocrEffect)
     }
 
     let contextRefreshEffect: Effect<Action> = .run { [clock] send in
@@ -488,7 +557,7 @@ private extension TranscriptionFeature {
     }
     .cancellable(id: CancelID.contextRefresh, cancelInFlight: true)
 
-    return .merge(startRecordingEffect, contextRefreshEffect)
+    return .merge(startRecordingEffect, contextRefreshEffect, ocrEffect)
   }
 
   /// Capture all context signals at recording start: app category, screen text,
@@ -638,6 +707,7 @@ private extension TranscriptionFeature {
       transcriptionFeatureLogger.notice("Discarding short recording per decision \(String(describing: decision))")
       return .merge(
         .cancel(id: CancelID.contextRefresh),
+        .cancel(id: CancelID.ocrCapture),
         .run { _ in
           let url = await recording.stopRecording()
           guard !Task.isCancelled else { return }
@@ -661,10 +731,12 @@ private extension TranscriptionFeature {
 
     state.isPrewarming = true
     let vadEnabled = state.kolSettings.vadSilenceDetectionEnabled
+    // Use vocabulary from cache — includes OCR-extracted terms from this and previous recordings
     let capturedVocabulary = state.capturedVocabulary
 
     return .merge(
       .cancel(id: CancelID.contextRefresh),
+      .cancel(id: CancelID.ocrCapture),
       .run { [sleepManagement] send in
         // Allow system to sleep again
         await sleepManagement.allowSleep()
@@ -798,7 +870,8 @@ private extension TranscriptionFeature {
     let resolvedLanguage = state.resolvedLanguage
     let capturedScreenContext = state.capturedScreenContext
     let capturedCursorContext = state.capturedCursorContext
-    let capturedVocabulary = state.capturedVocabulary
+    // Read vocabulary fresh from the cache — OCR terms may have been merged since recording started
+    let capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
     let capturedIDEContext = state.capturedIDEContext
     let capturedConversationContext = state.capturedConversationContext
     let resolvedAppCategory = state.resolvedAppCategory
@@ -976,10 +1049,13 @@ private extension TranscriptionFeature {
     state.capturedIDEContext = nil
     state.capturedConversationContext = nil
     state.resolvedAppCategory = nil
+    state.ocrTriggered = false
+    state.lastOCRTickNumber = 0
 
     return .merge(
       .cancel(id: CancelID.transcription),
       .cancel(id: CancelID.contextRefresh),
+      .cancel(id: CancelID.ocrCapture),
       .run { [sleepManagement] _ in
         // Allow system to sleep again
         await sleepManagement.allowSleep()
@@ -1002,10 +1078,13 @@ private extension TranscriptionFeature {
     state.capturedIDEContext = nil
     state.capturedConversationContext = nil
     state.resolvedAppCategory = nil
+    state.ocrTriggered = false
+    state.lastOCRTickNumber = 0
 
     // Silently discard - no sound effect
     return .merge(
       .cancel(id: CancelID.contextRefresh),
+      .cancel(id: CancelID.ocrCapture),
       .run { [sleepManagement] _ in
         // Allow system to sleep again
         await sleepManagement.allowSleep()

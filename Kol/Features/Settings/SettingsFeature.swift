@@ -132,6 +132,7 @@ struct SettingsFeature {
     case setConversationContextEnabled(Bool)
     case setAtMentionInsertionEnabled(Bool)
     case setEditTrackingEnabled(Bool)
+    case setOCRContextEnabled(Bool)
     case setLLMPromptCode(String?)
     case setLLMPromptMessaging(String?)
     case setLLMPromptDocument(String?)
@@ -681,6 +682,10 @@ struct SettingsFeature {
 
       case let .setEditTrackingEnabled(enabled):
         state.$kolSettings.withLock { $0.editTrackingEnabled = enabled }
+        return .none
+
+      case let .setOCRContextEnabled(enabled):
+        state.$kolSettings.withLock { $0.ocrContextEnabled = enabled }
         return .none
 
       case let .setLLMPromptCode(prompt):

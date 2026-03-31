@@ -533,6 +533,9 @@
     "Not set" : {
 
     },
+    "OCR for Electron apps" : {
+
+    },
     "of %lld transforms" : {
 
     },
@@ -635,6 +638,9 @@
 
     },
     "Quit" : {
+
+    },
+    "Reads screen content via OCR when accessibility text is sparse (Slack, Discord, browser apps). Requires Screen Recording permission." : {
 
     },
     "Refresh available input devices" : {
