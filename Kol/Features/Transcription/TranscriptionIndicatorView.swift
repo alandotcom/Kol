@@ -31,8 +31,8 @@ struct TranscriptionIndicatorView: View {
   @State private var transcribeEffect = 0
 
   var body: some View {
-    let averagePower = min(1, meter.averagePower * 3)
-    let peakPower = min(1, meter.peakPower * 3)
+    let averagePower = min(1, max(0, meter.averagePower - 0.003) * 50)
+    let peakPower = min(1, max(0, meter.peakPower - 0.003) * 50)
 
     ZStack {
       // Frosted glass panel

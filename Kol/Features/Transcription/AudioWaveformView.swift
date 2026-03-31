@@ -26,7 +26,7 @@ struct AudioWaveformView: View {
 
       Canvas { context, size in
         let midY = size.height / 2
-        let amplitude = midY * 0.85 * effectivePower
+        let amplitude = midY * 1.2 * effectivePower
 
         // Top wave (above center)
         let topPath = waveformPath(
