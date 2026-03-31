@@ -67,7 +67,23 @@ xcodebuildmcp macos test --scheme Kol --project-path Kol.xcodeproj
 
 # Open in Xcode (recommended for development)
 open Kol.xcodeproj
+
+# Trigger a transcription and capture logs (no Xcode needed)
+./scripts/test-transcribe.sh              # 3s silence, current focused app
+./scripts/test-transcribe.sh 5            # 5s silence
+./scripts/test-transcribe.sh 3 Slack      # focus Slack first
+./scripts/test-transcribe.sh 3 Messages   # focus Messages first
+./scripts/test-transcribe.sh 3 Cursor     # focus Cursor first
 ```
+
+### Runtime log capture (test-transcribe)
+
+`scripts/test-transcribe.sh` launches Kol Debug, simulates the Right Option hotkey via CGEvent, and streams unified logs to `/tmp/kol-transcribe-test.log`. Use this to exercise the full transcription pipeline (recording → VAD → transcription → LLM post-processing) without manual interaction.
+
+- **How it works**: CGEvent posts Right Option key down/up events that Kol's global `CGEventTap` monitor picks up. Records silence from the mic (VAD will skip transcription, but all logging fires).
+- **Focus an app**: Pass a second argument (e.g., `Messages`, `Slack`, `Cursor`) to activate that app before recording, so Kol captures its screen context, vocabulary, and conversation metadata.
+- **Logs**: All `com.alandotcom.Kol` subsystem logs at debug level, written to `/tmp/kol-transcribe-test.log`. Note: `<private>` redaction is normal for unified logging outside the Xcode debugger — the log structure and categories are still visible.
+- **When to use**: After changing screen context, vocabulary extraction, recording, or LLM prompt code — faster than manual testing.
 
 ### Build rules for agents
 
