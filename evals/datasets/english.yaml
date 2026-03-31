@@ -452,3 +452,89 @@
       value: "retro"
     - type: llm-rubric
       value: "The output must use some list structure — numbered list, bullet points, or line-break-separated items."
+
+# =============================================================================
+# Name resolution from screen context
+# =============================================================================
+
+- description: "Screen context: capitalize person name visible on screen"
+  vars:
+    input: "can you ping gal about the deploy"
+    screenContext: "Gal Mor\n2:41 PM\nthe build passed, looks good to merge"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging-screen.txt
+  assert:
+    - type: contains
+      value: "Gal"
+    - type: not-contains
+      value: "gal about"
+
+- description: "Screen context: uncommon name capitalized from screen"
+  vars:
+    input: "tell rivka we're on schedule"
+    screenContext: "Rivka Shamir\n3:12 PM\nany updates on the release?"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging-screen.txt
+  assert:
+    - type: contains
+      value: "Rivka"
+    - type: not-contains
+      value: "rivka"
+
+- description: "Screen context: company name from screen"
+  vars:
+    input: "reach out to the fountain bio team"
+    screenContext: "Fountain Bio\nSubject: Partnership inquiry\nHi,"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging-screen.txt
+  assert:
+    - type: contains
+      value: "Fountain Bio"
+    - type: not-contains
+      value: "fountain bio"
+
+- description: "Screen context: spelling mismatch resolved from screen"
+  vars:
+    input: "tell jon we need the API keys"
+    screenContext: "Jon Peretz\n4:05 PM\nI'll send the staging creds after lunch"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging-screen.txt
+  assert:
+    - type: contains
+      value: "Jon"
+    - type: not-contains
+      value: "John"
+
+- description: "Screen context: mixed identifiers and names resolved together"
+  vars:
+    input: "ask rivka to check the validate item function"
+    screenContext: "Rivka Shamir\n3:12 PM\nthe validateItem function is throwing on nil input"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging-screen.txt
+  assert:
+    - type: contains
+      value: "Rivka"
+    - type: not-contains
+      value: "rivka"
+    - type: contains
+      value: "validateItem"
+
+- description: "Screen context: no hallucinated names when not on screen"
+  vars:
+    input: "can you check the logs"
+    screenContext: "ERROR: connection timeout\nretrying in 5s\n[2026-03-31 14:22:01]"
+  options:
+    prompt:
+      raw: file://prompts/english-messaging-screen.txt
+  assert:
+    - type: contains
+      value: "logs"
+    - type: not-icontains
+      value: "Alice"
+    - type: not-icontains
+      value: "Bob"

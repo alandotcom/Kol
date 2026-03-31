@@ -234,8 +234,8 @@ public enum PromptLayers {
 			: "The following text is currently visible on the user's screen near the cursor."
 		return """
 		\(preamble) \
-		Use it ONLY to resolve ambiguous words, technical terms, function names, or variable names \
-		that appear in the transcription. Do NOT add, summarize, or reference this text in your output.
+		Use it ONLY to resolve ambiguous words, technical terms, function names, variable names, \
+		or names of people and places that appear in the transcription. Do NOT add, summarize, or reference this text in your output.
 		---
 		\(visibleText)
 		---
@@ -250,8 +250,8 @@ public enum PromptLayers {
 			: "The following is the text surrounding the user's cursor."
 		var parts = """
 		\(preamble) \
-		Use it ONLY to resolve ambiguous words, technical terms, function names, or variable names \
-		that appear in the transcription. Do NOT add, summarize, or reference this text in your output.
+		Use it ONLY to resolve ambiguous words, technical terms, function names, variable names, \
+		or names of people and places that appear in the transcription. Do NOT add, summarize, or reference this text in your output.
 		"""
 
 		if !context.beforeCursor.isEmpty {

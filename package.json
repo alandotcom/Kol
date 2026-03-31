@@ -16,6 +16,7 @@
     "eval": "cd evals && npx promptfoo@latest eval",
     "eval:code": "cd evals && npx promptfoo@latest eval --prompts prompts/english-code.txt --tests datasets/code-dictation.yaml --filter-pattern 'Keyword|Operator|Full type|Variable|Interface|Switch|No capitalize|TS:|Python:|PascalCase|camelCase|Keywords stay'",
     "eval:screen": "cd evals && npx promptfoo@latest eval --prompts prompts/english-code-screen.txt --tests datasets/code-dictation.yaml --filter-pattern 'Screen context'",
+    "eval:names": "cd evals && npx promptfoo@latest eval --tests datasets/english.yaml --filter-pattern 'Screen context.*name|Screen context.*person|Screen context.*company|Screen context.*capitalize|Screen context.*spelling|Screen context.*mixed|Screen context.*hallucinate'",
     "eval:view": "cd evals && npx promptfoo@latest view"
   },
   "devDependencies": {
