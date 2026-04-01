@@ -23,6 +23,9 @@ killall Kol 2>/dev/null && sleep 0.5 || true
 
 JOBS=$(sysctl -n hw.ncpu)
 echo "Building $CONFIG (${JOBS} parallel jobs)..."
+# pipefail ensures xcodebuild failures propagate through the pipe to tail.
+# Without it, set -e only sees tail's exit code (always 0).
+set -o pipefail
 xcodebuild build \
   -scheme Kol \
   -configuration "$CONFIG" \

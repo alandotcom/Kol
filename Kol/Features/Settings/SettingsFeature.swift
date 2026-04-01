@@ -62,6 +62,9 @@ struct SettingsFeature {
     var llmApiKey: String = ""
     var isLLMApiKeyLoaded: Bool = false
     var showingPromptCustomization: Bool = false
+
+    // Suggested remappings from edit tracking
+    var suggestedRemappings: [SuggestedRemapping] = []
   }
 
   enum Action: BindableAction {
@@ -118,6 +121,11 @@ struct SettingsFeature {
     case updateWordRemapping(WordRemapping)
     case removeWordRemapping(UUID)
     case setRemappingScratchpadFocused(Bool)
+
+    // Suggested remappings
+    case computeSuggestions
+    case acceptSuggestion(SuggestedRemapping)
+    case dismissSuggestion(SuggestedRemapping)
 
     // LLM Post-Processing
     case setLLMEnabled(Bool)
@@ -430,6 +438,30 @@ struct SettingsFeature {
         state.$isRemappingScratchpadFocused.withLock { $0 = isFocused }
         return .none
 
+      case .computeSuggestions:
+        state.suggestedRemappings = SuggestionExtractor.extract(
+          from: state.transcriptionHistory,
+          existingRemappings: state.kolSettings.wordRemappings,
+          dismissedKeys: state.kolSettings.dismissedSuggestionKeys
+        )
+        return .none
+
+      case let .acceptSuggestion(suggestion):
+        state.$kolSettings.withLock {
+          $0.wordRemappings.append(
+            WordRemapping(match: suggestion.original, replacement: suggestion.corrected)
+          )
+        }
+        state.suggestedRemappings.removeAll { $0.key == suggestion.key }
+        return .none
+
+      case let .dismissSuggestion(suggestion):
+        state.$kolSettings.withLock {
+          $0.dismissedSuggestionKeys.append(suggestion.key)
+        }
+        state.suggestedRemappings.removeAll { $0.key == suggestion.key }
+        return .none
+
       case .startSettingPasteLastTranscriptHotkey:
         beginCapture(.pasteLastTranscript, state: &state)
         return .none
@@ -592,6 +624,22 @@ struct SettingsFeature {
 
       case let .setMaxHistoryEntries(maxHistoryEntries):
         state.$kolSettings.withLock { $0.maxHistoryEntries = maxHistoryEntries }
+        // Trim existing history if the new limit is smaller
+        if let maxEntries = maxHistoryEntries, maxEntries > 0 {
+          var removed: [Transcript] = []
+          state.$transcriptionHistory.withLock { history in
+            while history.history.count > maxEntries {
+              if let t = history.history.popLast() { removed.append(t) }
+            }
+          }
+          if !removed.isEmpty {
+            return .run { [transcriptPersistence] _ in
+              for transcript in removed {
+                try? await transcriptPersistence.deleteAudio(transcript)
+              }
+            }
+          }
+        }
         return .none
 
       case let .setModifierSide(kind, side):

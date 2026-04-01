@@ -17,6 +17,7 @@ struct TranscriptionIndicatorView: View {
     case optionKeyPressed
     case recording
     case transcribing
+    case postProcessing
     case prewarming
     case completed
   }
@@ -24,57 +25,91 @@ struct TranscriptionIndicatorView: View {
   var status: Status
   var meter: Meter
 
-  private let panelWidth: CGFloat = 380
-  private let panelHeight: CGFloat = 130
-  private let panelCornerRadius: CGFloat = 20
-
-  @State private var transcribeEffect = 0
+  private let panelWidth: CGFloat = 190
+  private let panelHeight: CGFloat = 35
+  private let panelCornerRadius: CGFloat = 10
 
   var body: some View {
-    let averagePower = min(1, max(0, meter.averagePower - 0.003) * 50)
-    let peakPower = min(1, max(0, meter.peakPower - 0.003) * 50)
+    // During recording, pass real meter values. During processing,
+    // the waveform naturally decays to a flat line via the smoother.
+    let isActive = status == .recording
+    let averagePower = isActive ? min(1, max(0, meter.averagePower - 0.003) * 50) : 0.0
+    let peakPower = isActive ? min(1, max(0, meter.peakPower - 0.003) * 50) : 0.0
 
     ZStack {
-      // Frosted glass panel
+      // Dark panel with macOS-style depth
       RoundedRectangle(cornerRadius: panelCornerRadius)
-        .fill(.ultraThinMaterial)
+        .fill(Color.black.opacity(0.75))
         .overlay {
           RoundedRectangle(cornerRadius: panelCornerRadius)
-            .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+            .stroke(Color.white.opacity(0.15), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.15), radius: 20, y: 8)
-        .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
-
-      // Content per state
-      Group {
-        switch status {
-        case .recording:
-          AudioWaveformView(
-            averagePower: averagePower,
-            peakPower: peakPower
-          )
-          .padding(.horizontal, 24)
-
-        case .transcribing, .prewarming, .completed:
-          EmptyView()
-
-        case .optionKeyPressed:
-          Circle()
-            .fill(Color.primary.opacity(0.3))
-            .frame(width: 8, height: 8)
-
-        case .hidden:
-          EmptyView()
+        .overlay {
+          // Top highlight — simulates light catching the top edge
+          RoundedRectangle(cornerRadius: panelCornerRadius)
+            .stroke(
+              LinearGradient(
+                colors: [.white.opacity(0.25), .clear, .clear],
+                startPoint: .top,
+                endPoint: .bottom
+              ),
+              lineWidth: 0.5
+            )
+            .padding(0.5)
         }
-      }
-      .animation(.spring(response: 0.3, dampingFraction: 0.7), value: meter)
+        .shadow(color: .black.opacity(0.5), radius: 12, y: 6)
+        .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+
+      // Waveform stays visible during recording AND processing —
+      // it just smoothly decays to a flat line when power drops to 0.
+      AudioWaveformView(
+        averagePower: averagePower,
+        peakPower: peakPower
+      )
+      .padding(.horizontal, 12)
+      .opacity(status == .recording || isProcessing ? 1 : 0)
+
+      // Option key dot
+      Circle()
+        .fill(Color.white.opacity(0.3))
+        .frame(width: 6, height: 6)
+        .opacity(status == .optionKeyPressed ? 1 : 0)
     }
     .frame(width: panelWidth, height: panelHeight)
-    .opacity(status == .recording || status == .optionKeyPressed ? 1 : 0)
-    .scaleEffect(status == .recording || status == .optionKeyPressed ? 1 : 0.85)
+    .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius))
+    .opacity(panelVisible ? 1 : 0)
+    .scaleEffect(panelVisible ? 1 : 0.85)
     .animation(.spring(response: 0.35, dampingFraction: 0.8), value: status)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(accessibilityStatusLabel)
     .enableInjection()
   }
+
+  private var isProcessing: Bool {
+    status == .transcribing || status == .postProcessing
+  }
+
+  /// Panel stays visible from optionKeyPressed/recording through transcribing/postProcessing.
+  /// Only hides on .hidden and .completed (completed uses the showCompleted overlay in TranscriptionView).
+  private var panelVisible: Bool {
+    switch status {
+    case .optionKeyPressed, .recording, .transcribing, .postProcessing, .prewarming: true
+    case .hidden, .completed: false
+    }
+  }
+
+  private var accessibilityStatusLabel: String {
+    switch status {
+    case .recording: "Recording"
+    case .transcribing: "Transcribing"
+    case .postProcessing: "Processing text"
+    case .prewarming: "Preparing"
+    case .completed: "Transcription complete"
+    case .optionKeyPressed: "Ready to record"
+    case .hidden: ""
+    }
+  }
+
 }
 
 #Preview("Indicator States") {
@@ -82,7 +117,7 @@ struct TranscriptionIndicatorView: View {
     TranscriptionIndicatorView(status: .optionKeyPressed, meter: .init(averagePower: 0, peakPower: 0))
     TranscriptionIndicatorView(status: .recording, meter: .init(averagePower: 0.4, peakPower: 0.5))
     TranscriptionIndicatorView(status: .transcribing, meter: .init(averagePower: 0, peakPower: 0))
-    TranscriptionIndicatorView(status: .completed, meter: .init(averagePower: 0, peakPower: 0))
+    TranscriptionIndicatorView(status: .postProcessing, meter: .init(averagePower: 0, peakPower: 0))
   }
   .padding(40)
 }

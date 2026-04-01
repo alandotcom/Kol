@@ -100,11 +100,17 @@ struct AppFeature {
         return .none
         
       case .task:
+        // Clean up orphan audio files on app launch (background, non-blocking)
+        @Shared(.transcriptionHistory) var transcriptionHistory: TranscriptionHistory
+        let referencedPaths = Set(transcriptionHistory.history.map(\.audioPath))
         return .merge(
           .send(.transcription(.task)),
           startPasteLastTranscriptMonitoring(),
           ensureSelectedModelReadiness(),
-          startPermissionMonitoring()
+          startPermissionMonitoring(),
+          .run { _ in
+            TranscriptPersistenceClient.cleanupOrphanAudioFiles(referencedPaths: referencedPaths)
+          }
         )
         
       case .pasteLastTranscript:

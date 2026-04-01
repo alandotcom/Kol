@@ -136,6 +136,7 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 		])
 		settingsWindow.contentView = visualEffectView
 		settingsWindow.isReleasedWhenClosed = false
+		settingsWindow.setFrameAutosaveName("KolSettingsWindow")
 		settingsWindow.center()
 		settingsWindow.makeKeyAndOrderFront(nil)
 		NSApp.activate(ignoringOtherApps: true)

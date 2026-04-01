@@ -14,6 +14,8 @@ struct WordRemappingsView: View {
 			store.kolSettings.wordRemovals.filter(\.isEnabled).count
 		case .remappings:
 			store.kolSettings.wordRemappings.filter(\.isEnabled).count
+		case .suggestions:
+			store.suggestedRemappings.count
 		}
 	}
 
@@ -21,6 +23,7 @@ struct WordRemappingsView: View {
 		switch activeSection {
 		case .removals: store.kolSettings.wordRemovals.count
 		case .remappings: store.kolSettings.wordRemappings.count
+		case .suggestions: store.suggestedRemappings.count
 		}
 	}
 
@@ -38,17 +41,20 @@ struct WordRemappingsView: View {
 
 				Spacer()
 
-				Button {
-					switch activeSection {
-					case .removals: store.send(.addWordRemoval)
-					case .remappings: store.send(.addWordRemapping)
+				if activeSection != .suggestions {
+					Button {
+						switch activeSection {
+						case .removals: store.send(.addWordRemoval)
+						case .remappings: store.send(.addWordRemapping)
+						case .suggestions: break
+						}
+					} label: {
+						Label("Add Transform", systemImage: "plus")
+							.font(.subheadline.weight(.medium))
 					}
-				} label: {
-					Label("Add Transform", systemImage: "plus")
-						.font(.subheadline.weight(.medium))
+					.buttonStyle(.borderedProminent)
+					.controlSize(.regular)
 				}
-				.buttonStyle(.borderedProminent)
-				.controlSize(.regular)
 			}
 
 			// Active count badge
@@ -84,6 +90,7 @@ struct WordRemappingsView: View {
 			switch activeSection {
 			case .removals: removalsSection
 			case .remappings: remappingsSection
+			case .suggestions: suggestionsSection
 			}
 
 			// Scratchpad
@@ -173,6 +180,75 @@ struct WordRemappingsView: View {
 					}
 				}
 			}
+		}
+	}
+
+	private var suggestionsSection: some View {
+		VStack(alignment: .leading, spacing: 12) {
+			if !store.kolSettings.editTrackingEnabled {
+				// Edit tracking not enabled — guide user
+				HStack(spacing: 16) {
+					Image(systemName: "lightbulb")
+						.font(.title3)
+						.foregroundStyle(.yellow)
+						.frame(width: 40, height: 40)
+						.background(Color.yellow.opacity(0.1))
+						.clipShape(RoundedRectangle(cornerRadius: 12))
+
+					VStack(alignment: .leading, spacing: 4) {
+						Text("Enable edit tracking")
+							.font(.subheadline.weight(.medium))
+						Text("Turn on \"Learn from corrections\" in the LLM section to start tracking edits you make after paste.")
+							.font(.system(size: 13))
+							.foregroundStyle(.secondary)
+					}
+				}
+				.padding(16)
+				.frame(maxWidth: .infinity, alignment: .leading)
+				.background(Color.yellow.opacity(0.04))
+				.clipShape(RoundedRectangle(cornerRadius: 12))
+				.overlay(
+					RoundedRectangle(cornerRadius: 12)
+						.strokeBorder(Color.yellow.opacity(0.15), lineWidth: 0.5)
+				)
+			} else if store.suggestedRemappings.isEmpty {
+				// No suggestions yet
+				HStack(spacing: 16) {
+					Image(systemName: "sparkles")
+						.font(.title3)
+						.foregroundStyle(.secondary)
+						.frame(width: 40, height: 40)
+						.background(Color.gray.opacity(0.06))
+						.clipShape(RoundedRectangle(cornerRadius: 12))
+
+					VStack(alignment: .leading, spacing: 4) {
+						Text("No suggestions yet")
+							.font(.subheadline.weight(.medium))
+						Text("Keep dictating — Kol learns from corrections you make after paste. Suggestions appear when the same correction recurs.")
+							.font(.system(size: 13))
+							.foregroundStyle(.secondary)
+					}
+				}
+				.padding(16)
+				.frame(maxWidth: .infinity, alignment: .leading)
+				.background(GlassColors.cardBackground)
+				.clipShape(RoundedRectangle(cornerRadius: 12))
+				.overlay(
+					RoundedRectangle(cornerRadius: 12)
+						.strokeBorder(GlassColors.cardBorder, lineWidth: 0.5)
+				)
+			} else {
+				ForEach(store.suggestedRemappings) { suggestion in
+					SuggestionCard(
+						suggestion: suggestion,
+						onAccept: { store.send(.acceptSuggestion(suggestion)) },
+						onDismiss: { store.send(.dismissSuggestion(suggestion)) }
+					)
+				}
+			}
+		}
+		.onAppear {
+			store.send(.computeSuggestions)
 		}
 	}
 
@@ -310,9 +386,74 @@ private struct TransformCard<Content: View>: View {
 	}
 }
 
+/// A suggestion card with original→corrected, frequency badge, accept and dismiss buttons.
+private struct SuggestionCard: View {
+	let suggestion: SuggestedRemapping
+	let onAccept: () -> Void
+	let onDismiss: () -> Void
+
+	var body: some View {
+		HStack(spacing: 16) {
+			// Icon
+			Image(systemName: "wand.and.stars")
+				.font(.system(size: 18))
+				.foregroundStyle(.green)
+				.frame(width: 44, height: 44)
+				.background(Color.green.opacity(0.12))
+				.clipShape(RoundedRectangle(cornerRadius: 12))
+
+			// Content
+			VStack(alignment: .leading, spacing: 6) {
+				HStack(spacing: 8) {
+					Text(suggestion.original)
+						.font(.subheadline.weight(.medium))
+						.foregroundStyle(.primary)
+					Image(systemName: "arrow.right")
+						.foregroundStyle(.secondary)
+						.font(.system(size: 12))
+					Text(suggestion.corrected)
+						.font(.subheadline.weight(.medium))
+						.foregroundStyle(.green)
+				}
+
+				Text("corrected \(suggestion.frequency) times")
+					.font(.system(size: 12))
+					.foregroundStyle(.secondary)
+			}
+			.frame(maxWidth: .infinity, alignment: .leading)
+
+			// Dismiss
+			Button(action: onDismiss) {
+				Image(systemName: "xmark")
+					.font(.system(size: 13))
+					.foregroundStyle(.secondary)
+			}
+			.buttonStyle(.plain)
+
+			// Accept
+			Button(action: onAccept) {
+				Image(systemName: "checkmark.circle.fill")
+					.font(.system(size: 20))
+					.foregroundStyle(.green)
+			}
+			.buttonStyle(.plain)
+		}
+		.padding(20)
+		.background(GlassColors.cardBackground)
+		.clipShape(RoundedRectangle(cornerRadius: 16))
+		.overlay(
+			RoundedRectangle(cornerRadius: 16)
+				.strokeBorder(GlassColors.cardBorder, lineWidth: 0.5)
+		)
+		.shadow(color: .black.opacity(0.06), radius: 4, y: 2)
+		.shadow(color: .black.opacity(0.06), radius: 12, y: 8)
+	}
+}
+
 private enum ModificationSection: String, CaseIterable, Identifiable {
 	case removals
 	case remappings
+	case suggestions
 
 	var id: String { rawValue }
 
@@ -320,6 +461,7 @@ private enum ModificationSection: String, CaseIterable, Identifiable {
 		switch self {
 		case .removals: "Word Removals"
 		case .remappings: "Word Remappings"
+		case .suggestions: "Suggestions"
 		}
 	}
 }

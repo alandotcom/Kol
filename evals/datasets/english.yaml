@@ -521,8 +521,8 @@
       value: "Rivka"
     - type: not-contains
       value: "rivka"
-    - type: contains
-      value: "validateItem"
+    - type: javascript
+      value: "output.includes('validateItem') || output.includes('ValidateItem')"
 
 - description: "Screen context: no hallucinated names when not on screen"
   vars:

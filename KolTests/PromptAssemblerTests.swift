@@ -57,8 +57,8 @@ struct PromptAssemblerTests {
 	@Test("Code context includes keyword preservation and operator conversion")
 	func codeContextContent() {
 		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: "Terminal", customRules: nil)
-		#expect(prompt.contains("Programming keywords must stay lowercase exactly as spoken"))
-		#expect(prompt.contains("Convert spoken operators to symbols"))
+		#expect(prompt.contains("Preserve lowercase keywords exactly as spoken"))
+		#expect(prompt.contains("Convert spoken punctuation and operators to symbols"))
 		#expect(prompt.contains("\"equals\" → ="))
 		#expect(prompt.contains("match spoken words to identifiers visible on screen"))
 	}
@@ -464,7 +464,7 @@ struct PromptAssemblerTests {
 	@Test("Core prompt includes anti-rephrase rule")
 	func antiRephraseRule() {
 		let prompt = PromptAssembler.systemPrompt(language: nil, sourceApp: nil, customRules: nil)
-		#expect(prompt.contains("Do NOT rephrase, restructure, or reword sentences"))
+		#expect(prompt.contains("never rephrase, restructure, or reword"))
 		#expect(prompt.contains("Keep the speaker's original sentence structure"))
 	}
 

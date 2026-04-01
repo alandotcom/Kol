@@ -26,21 +26,21 @@ struct AudioWaveformView: View {
 
       Canvas { context, size in
         let midY = size.height / 2
-        let amplitude = midY * 1.2 * effectivePower
+        let amplitude = midY * 0.85 * effectivePower
 
         // Top wave (above center)
         let topPath = waveformPath(
           width: size.width, midY: midY, amplitude: amplitude,
           time: time, sign: -1
         )
-        context.stroke(topPath, with: .color(.primary.opacity(0.55)), lineWidth: 2)
+        context.stroke(topPath, with: .color(.white.opacity(0.6)), lineWidth: 2.5)
 
         // Bottom wave (mirrored below center)
         let bottomPath = waveformPath(
           width: size.width, midY: midY, amplitude: amplitude,
           time: time, sign: 1
         )
-        context.stroke(bottomPath, with: .color(.primary.opacity(0.55)), lineWidth: 2)
+        context.stroke(bottomPath, with: .color(.white.opacity(0.6)), lineWidth: 2.5)
       }
     }
     .enableInjection()

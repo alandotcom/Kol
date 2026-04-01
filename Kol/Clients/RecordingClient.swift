@@ -173,7 +173,8 @@ actor RecordingClientLive {
         forName: NSWorkspace.didWakeNotification,
         object: nil,
         queue: .main
-      ) { _ in
+      ) { [weak self] _ in
+        guard let self else { return }
         Task { await self.enqueueCaptureEnvironmentChange(reason: "system-wake", forceRestart: true) }
       }
     )
@@ -182,7 +183,8 @@ actor RecordingClientLive {
         forName: NSWorkspace.screensDidWakeNotification,
         object: nil,
         queue: .main
-      ) { _ in
+      ) { [weak self] _ in
+        guard let self else { return }
         Task { await self.enqueueCaptureEnvironmentChange(reason: "display-wake", forceRestart: true) }
       }
     )
@@ -193,7 +195,8 @@ actor RecordingClientLive {
         forName: NSNotification.Name(rawValue: "AVCaptureDeviceWasConnected"),
         object: nil,
         queue: .main
-      ) { _ in
+      ) { [weak self] _ in
+        guard let self else { return }
         Task { await self.enqueueCaptureEnvironmentChange(reason: "capture-device-connected", forceRestart: true) }
       }
     )
@@ -202,7 +205,8 @@ actor RecordingClientLive {
         forName: NSNotification.Name(rawValue: "AVCaptureDeviceWasDisconnected"),
         object: nil,
         queue: .main
-      ) { _ in
+      ) { [weak self] _ in
+        guard let self else { return }
         Task { await self.enqueueCaptureEnvironmentChange(reason: "capture-device-disconnected", forceRestart: true) }
       }
     )
@@ -227,7 +231,8 @@ actor RecordingClientLive {
     selector: AudioObjectPropertySelector,
     reason: String
   ) {
-    let listener: CoreAudioPropertyListenerBlock = { _, _ in
+    let listener: CoreAudioPropertyListenerBlock = { [weak self] _, _ in
+      guard let self else { return }
       Task { await self.enqueueCaptureEnvironmentChange(reason: reason, forceRestart: true) }
     }
 

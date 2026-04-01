@@ -461,11 +461,41 @@
       value: "="
 
 # =============================================================================
+# Chain-of-Thought Leakage — model must output ONLY the result, never reasoning
+# =============================================================================
+
+- description: "No COT: file path dictation must not show mappings"
+  vars:
+    input: "source dash components dash button dot tsx"
+  assert:
+    - type: not-contains
+      value: "->"
+    - type: not-contains
+      value: "→"
+    - type: not-icontains
+      value: "final answer"
+    - type: javascript
+      value: "output.split('\\n').length <= 2"
+
+- description: "No COT: operator conversion doesn't leak reasoning format"
+  vars:
+    input: "x equals 5 plus 3"
+  assert:
+    - type: not-contains
+      value: "equals →"
+    - type: not-contains
+      value: "equals ->"
+    - type: not-icontains
+      value: "convert"
+    - type: javascript
+      value: "output.split('\\n').length <= 2"
+
+# =============================================================================
 # Screen Context — identifier resolution from visible text
 # (These tests require the english-code-screen.txt prompt)
 # =============================================================================
 
-- description: "Screen context: resolve PascalCase type from visible text"
+- description: "Screen context: resolve type name from visible text"
   vars:
     input: "type X equals wait allowed hours validation issue"
     screenContext: "export type WaitAllowedHoursValidationIssue = {\n  field: \"mode\" | \"start\" | \"end\" | \"window\";\n  message: string;\n};"
@@ -481,7 +511,7 @@
     - type: not-contains
       value: "wait allowed hours validation issue"
 
-- description: "Screen context: resolve camelCase function name"
+- description: "Screen context: resolve function name casing"
   vars:
     input: "call resolve model and language"
     screenContext: "private static func resolveModelAndLanguage(\n  selectedModel: String,\n  selectedLanguage: String?\n) -> (model: String, language: String?) {"
@@ -491,7 +521,7 @@
     - type: not-contains
       value: "resolve model and language"
 
-- description: "Screen context: resolve variable name"
+- description: "Screen context: resolve identifier from code"
   vars:
     input: "let captured screen context equals screen context dot capture visible text open paren close paren"
     screenContext: "if state.hexSettings.llmPostProcessingEnabled && state.hexSettings.llmScreenContextEnabled {\n  state.capturedScreenContext = screenContext.captureVisibleText()\n}"

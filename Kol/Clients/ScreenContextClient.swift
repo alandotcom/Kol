@@ -12,7 +12,7 @@ struct ScreenContextClient: Sendable {
     /// Returns structured text around the cursor (before/after/selected), or nil on failure.
     var captureCursorContext: @Sendable (_ sourceAppBundleID: String?) -> CursorContext? = { _ in nil }
     /// Returns the character immediately before the cursor in the focused text field, or nil.
-    var characterBeforeCursor: @Sendable () -> Character? = { nil }
+    var characterBeforeCursor: @Sendable () async -> Character? = { nil }
 }
 
 extension ScreenContextClient: DependencyKey {
@@ -98,9 +98,9 @@ extension ScreenContextClient: DependencyKey {
                 }
             },
             characterBeforeCursor: {
-                // Called from .run effect (background thread), not main thread —
-                // use DispatchQueue.main.sync instead of MainActor.assumeIsolated.
-                DispatchQueue.main.sync {
+                // Called from .run effect — use MainActor.run to safely hop
+                // to the main thread for AX API access.
+                await MainActor.run {
                     characterBeforeCursorImpl()
                 }
             }
@@ -236,15 +236,11 @@ extension ScreenContextClient: DependencyKey {
             return nil
         }
 
-        // For terminals: no reliable cursor position — return tail as beforeCursor
+        // For terminals: skip AX screen context entirely. Terminal AX text is rendered
+        // layout (whitespace-padded columns, TUI chrome) that adds noise without helping
+        // dictation cleanup. Vocabulary hints (from OCR) provide the useful signal.
         if isTerminal {
-            let tail = String(fullText.suffix(maxContextLength))
-            return CursorContext(
-                beforeCursor: tail,
-                afterCursor: "",
-                selectedText: nil,
-                isTerminal: true
-            )
+            return nil
         }
 
         // Try to get cursor position from selection range
@@ -336,10 +332,8 @@ extension ScreenContextClient: DependencyKey {
             return String(fullText[startIndex..<endIndex])
         }
 
-        // No cursor info — for terminals, take the tail (recent output); otherwise take the head
-        if let id = sourceAppBundleID, terminalBundleIDs.contains(id) {
-            return String(fullText.suffix(maxContextLength))
-        }
+        // No cursor info — take the head (most relevant for document-like apps)
+        // Terminal text is excluded upstream (captureCursorContextImpl returns nil).
         return String(fullText.prefix(maxContextLength))
     }
 

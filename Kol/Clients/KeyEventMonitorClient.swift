@@ -122,7 +122,9 @@ class KeyEventMonitorClientLive {
   nonisolated(unsafe) private var consecutiveTimeouts = 0
 
   private var isMonitoring = false
+  // SAFETY: Only accessed from the event tap callback (main thread run loop).
   nonisolated(unsafe) private var isFnPressed = false
+  // SAFETY: Only written once from @MainActor, read from nonisolated init path.
   nonisolated(unsafe) private var hasPromptedForAccessibilityTrust = false
   @Shared(.hotkeyPermissionState) private var hotkeyPermissionState: HotkeyPermissionState
 

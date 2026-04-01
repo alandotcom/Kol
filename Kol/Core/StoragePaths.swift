@@ -1,8 +1,24 @@
 import Foundation
 
+/// Cache for kolApplicationSupport to avoid calling createDirectory on every access.
+private let kolAppSupportCache: URL? = {
+	let fm = FileManager.default
+	guard let appSupport = try? fm.url(
+		for: .applicationSupportDirectory,
+		in: .userDomainMask,
+		appropriateFor: nil,
+		create: true
+	) else { return nil }
+	let kolDirectory = appSupport.appendingPathComponent("com.alandotcom.Kol", isDirectory: true)
+	try? fm.createDirectory(at: kolDirectory, withIntermediateDirectories: true)
+	return kolDirectory
+}()
+
 public extension URL {
 	static var kolApplicationSupport: URL {
 		get throws {
+			if let cached = kolAppSupportCache { return cached }
+			// Fallback: re-derive if the static initializer somehow failed
 			let fm = FileManager.default
 			let appSupport = try fm.url(
 				for: .applicationSupportDirectory,

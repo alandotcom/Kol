@@ -14,6 +14,8 @@ struct TranscriptionView: View {
       return .transcribing
     } else if store.isRecording {
       return .recording
+    } else if store.isPostProcessing {
+      return .postProcessing
     } else if store.isPrewarming {
       return .prewarming
     } else {
@@ -32,15 +34,19 @@ struct TranscriptionView: View {
       meter: store.meter
     )
     .onChange(of: storeStatus) { oldStatus, newStatus in
-      if (oldStatus == .transcribing || oldStatus == .prewarming) && newStatus == .hidden {
+      if (oldStatus == .transcribing || oldStatus == .prewarming || oldStatus == .postProcessing) && newStatus == .hidden {
         completedTask?.cancel()
         showCompleted = true
         completedTask = Task {
           try? await Task.sleep(for: .milliseconds(600))
           guard !Task.isCancelled else { return }
           await MainActor.run {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
               showCompleted = false
+            } else {
+              withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                showCompleted = false
+              }
             }
           }
         }

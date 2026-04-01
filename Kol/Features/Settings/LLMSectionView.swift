@@ -40,6 +40,7 @@ struct LLMSectionContent: View {
 						)
 					)
 					.textFieldStyle(.roundedBorder)
+					.accessibilityHint("Enter your LLM provider API key")
 
 					if !store.llmApiKey.isEmpty {
 						Image(systemName: "checkmark.circle.fill")

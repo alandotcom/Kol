@@ -68,10 +68,18 @@ public struct KolSettings: Codable, Equatable, Sendable {
 	public var atMentionInsertionEnabled: Bool
 	public var vadSilenceDetectionEnabled: Bool
 	public var ocrContextEnabled: Bool
+	public var dismissedSuggestionKeys: [String]
 
 	private mutating func normalizeDoubleTapSettings() {
 		if !doubleTapLockEnabled {
 			useDoubleTapOnly = false
+		}
+	}
+
+	/// Prevents unbounded growth of dismissed suggestion keys.
+	private mutating func capDismissedSuggestions() {
+		if dismissedSuggestionKeys.count > 500 {
+			dismissedSuggestionKeys = Array(dismissedSuggestionKeys.suffix(500))
 		}
 	}
 
@@ -115,7 +123,8 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		editTrackingEnabled: Bool = false,
 		atMentionInsertionEnabled: Bool = false,
 		vadSilenceDetectionEnabled: Bool = true,
-		ocrContextEnabled: Bool = false
+		ocrContextEnabled: Bool = false,
+		dismissedSuggestionKeys: [String] = []
 	) {
 		self.soundEffectsEnabled = soundEffectsEnabled
 		self.soundEffectsVolume = soundEffectsVolume
@@ -157,7 +166,9 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		self.atMentionInsertionEnabled = atMentionInsertionEnabled
 		self.vadSilenceDetectionEnabled = vadSilenceDetectionEnabled
 		self.ocrContextEnabled = ocrContextEnabled
+		self.dismissedSuggestionKeys = dismissedSuggestionKeys
 		normalizeDoubleTapSettings()
+		capDismissedSuggestions()
 	}
 
 	public init(from decoder: Decoder) throws {
@@ -167,6 +178,7 @@ public struct KolSettings: Codable, Equatable, Sendable {
 			try field.decode(into: &self, from: container)
 		}
 		normalizeDoubleTapSettings()
+		capDismissedSuggestions()
 	}
 
 	public func encode(to encoder: Encoder) throws {
@@ -221,6 +233,7 @@ private enum KolSettingKey: String, CodingKey, CaseIterable {
 	case atMentionInsertionEnabled
 	case vadSilenceDetectionEnabled
 	case ocrContextEnabled
+	case dismissedSuggestionKeys
 }
 
 private struct SettingsField<Value: Codable & Sendable> {
@@ -356,9 +369,34 @@ private enum KolSettingsSchema {
 			default: defaults.wordRemappings
 		).eraseToAny(),
 		SettingsField(.llmPostProcessingEnabled, keyPath: \.llmPostProcessingEnabled, default: defaults.llmPostProcessingEnabled).eraseToAny(),
-		SettingsField(.llmProviderPreset, keyPath: \.llmProviderPreset, default: defaults.llmProviderPreset).eraseToAny(),
-		SettingsField(.llmProviderBaseURL, keyPath: \.llmProviderBaseURL, default: defaults.llmProviderBaseURL).eraseToAny(),
-		SettingsField(.llmModelName, keyPath: \.llmModelName, default: defaults.llmModelName).eraseToAny(),
+		SettingsField(
+			.llmProviderPreset,
+			keyPath: \.llmProviderPreset,
+			default: defaults.llmProviderPreset,
+			decode: { container, key, defaultValue in
+				let raw = try container.decodeIfPresent(String.self, forKey: key) ?? defaultValue
+				// Cerebras removed — fall back to groq
+				return raw == "cerebras" ? LLMProviderPreset.groq.rawValue : raw
+			}
+		).eraseToAny(),
+		SettingsField(
+			.llmProviderBaseURL,
+			keyPath: \.llmProviderBaseURL,
+			default: defaults.llmProviderBaseURL,
+			decode: { container, key, defaultValue in
+				let url = try container.decodeIfPresent(String.self, forKey: key) ?? defaultValue
+				return url.contains("cerebras.ai") ? LLMProviderPreset.groq.defaultConfig.baseURL : url
+			}
+		).eraseToAny(),
+		SettingsField(
+			.llmModelName,
+			keyPath: \.llmModelName,
+			default: defaults.llmModelName,
+			decode: { container, key, defaultValue in
+				let model = try container.decodeIfPresent(String.self, forKey: key) ?? defaultValue
+				return model.contains("llama3.1-8b") || model.contains("llama-4-scout") ? LLMProviderPreset.groq.defaultConfig.modelName : model
+			}
+		).eraseToAny(),
 		SettingsField(.llmCustomRules, keyPath: \.llmCustomRules, default: defaults.llmCustomRules).eraseToAny(),
 		SettingsField(
 			.llmPromptCode,
@@ -398,5 +436,6 @@ private enum KolSettingsSchema {
 		SettingsField(.atMentionInsertionEnabled, keyPath: \.atMentionInsertionEnabled, default: defaults.atMentionInsertionEnabled).eraseToAny(),
 		SettingsField(.vadSilenceDetectionEnabled, keyPath: \.vadSilenceDetectionEnabled, default: defaults.vadSilenceDetectionEnabled).eraseToAny(),
 		SettingsField(.ocrContextEnabled, keyPath: \.ocrContextEnabled, default: defaults.ocrContextEnabled).eraseToAny(),
+		SettingsField(.dismissedSuggestionKeys, keyPath: \.dismissedSuggestionKeys, default: defaults.dismissedSuggestionKeys).eraseToAny(),
 	]
 }

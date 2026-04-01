@@ -73,14 +73,21 @@ public enum VocabularyExtractor {
 		pattern: #"\b[\w][\w.-]*\.(\w{1,5})\b"#
 	)
 
+	/// Maximum input length for extraction. Screen text beyond this threshold
+	/// adds diminishing returns for vocabulary quality but increases regex cost.
+	private static let maxInputLength = 2000
+
 	public static func extract(from text: String) -> Result {
 		guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
 			return Result(properNouns: [], identifiers: [], fileNames: [])
 		}
 
-		let identifiers = extractIdentifiers(from: text).filter { !looksLikeGarbage($0) }
-		let properNouns = extractProperNouns(from: text).filter { !looksLikeGarbage($0) }
-		let fileNames = extractFileNames(from: text)
+		// Truncate to cap regex work — called every 1s during recording
+		let input = text.count > maxInputLength ? String(text.prefix(maxInputLength)) : text
+
+		let identifiers = extractIdentifiers(from: input).filter { !looksLikeGarbage($0) }
+		let properNouns = extractProperNouns(from: input).filter { !looksLikeGarbage($0) }
+		let fileNames = extractFileNames(from: input)
 
 		let result = Result(
 			properNouns: properNouns,

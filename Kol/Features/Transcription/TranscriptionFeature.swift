@@ -23,6 +23,7 @@ struct TranscriptionFeature {
     var didStartTask: Bool = false
     var isRecording: Bool = false
     var isTranscribing: Bool = false
+    var isPostProcessing: Bool = false
     var isPrewarming: Bool = false
     var error: String?
     var recordingStartTime: Date?
@@ -76,6 +77,20 @@ struct TranscriptionFeature {
     case contextRefreshTick
     case contextRefreshed(CursorContext?, String?, [String]?)
 
+    // Initial context capture (async, dispatched from startRecording)
+    case recordingContextCaptured(
+      screenContext: String?,
+      cursorContext: CursorContext?,
+      vocabulary: [String]?,
+      ideContext: IDEContext?,
+      conversationContext: ConversationContext?,
+      ocrTriggered: Bool
+    )
+
+    // Post-processing state
+    case postProcessingStarted
+    case postProcessingFinished
+
     // OCR fallback for Electron/Chromium apps
     case ocrCaptured(String, [String]?)
 
@@ -94,6 +109,7 @@ struct TranscriptionFeature {
     case recordingCleanup
     case transcription
     case contextRefresh
+    case initialContextCapture
     case ocrCapture
     case editTracking
   }
@@ -268,10 +284,12 @@ struct TranscriptionFeature {
           let flatText: String?
           if let cursorText = cursor?.flatText {
             flatText = cursorText
-          } else {
+          } else if !PromptLayers.isTerminal(bundleID) {
             flatText = await MainActor.run {
               screenContext.captureVisibleText(bundleID)
             }
+          } else {
+            flatText = nil
           }
 
           // If OCR was triggered and AX text is still sparse, re-run OCR
@@ -318,6 +336,28 @@ struct TranscriptionFeature {
         }
         state.lastOCRTickNumber = state.contextUpdateCount
         state.contextUpdateCount += 1
+        return .none
+
+      case let .recordingContextCaptured(screenContext, cursorContext, vocabulary, ide, conversation, ocrTriggered):
+        guard state.isRecording else { return .none }
+        state.capturedScreenContext = screenContext
+        state.capturedCursorContext = cursorContext
+        state.capturedVocabulary = vocabulary
+        state.capturedIDEContext = ide
+        state.capturedConversationContext = conversation
+        if ocrTriggered {
+          state.ocrTriggered = true
+          let axTextCount = screenContext?.count ?? 0
+          transcriptionFeatureLogger.info("OCR triggered: AX text \(axTextCount) chars < \(ocrQualityThreshold) threshold")
+        }
+        return .none
+
+      case .postProcessingStarted:
+        state.isPostProcessing = true
+        return .none
+
+      case .postProcessingFinished:
+        state.isPostProcessing = false
         return .none
 
       // MARK: - Cancel/Discard Flow
@@ -497,17 +537,26 @@ private extension TranscriptionFeature {
       state.sourceAppPID = activeApp.processIdentifier
     }
 
-    captureRecordingContext(&state)
+    // Resolve app category synchronously (cheap NSWorkspace call).
+    // AX tree walks are deferred to an async effect below to avoid
+    // blocking recording start by 50-200ms on Electron apps.
+    if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+      let windowTitle = windowContext.windowTitle(pid)
+      let knownCategory = PromptLayers.appContextCategory(for: state.sourceAppBundleID)
+      let url: String? = knownCategory == nil ? windowContext.browserURL(pid) : nil
+      state.resolvedAppCategory = AppContextResolver.resolve(
+        bundleID: state.sourceAppBundleID,
+        appName: state.sourceAppName,
+        url: url,
+        windowTitle: windowTitle
+      )
+    } else {
+      state.resolvedAppCategory = nil
+    }
 
-    // OCR quality gate: if AX text is too sparse, trigger OCR fallback
-    let axTextCount = state.capturedScreenContext?.count ?? 0
-    if state.kolSettings.ocrContextEnabled,
-       state.kolSettings.llmPostProcessingEnabled,
-       state.kolSettings.llmScreenContextEnabled,
-       axTextCount < ocrQualityThreshold,
-       state.sourceAppPID != nil {
-      state.ocrTriggered = true
-      transcriptionFeatureLogger.info("OCR triggered: AX text \(axTextCount) chars < \(ocrQualityThreshold) threshold")
+    // Stop any in-progress edit tracking from a previous recording
+    if state.editTrackingActive {
+      state.editTrackingActive = false
     }
 
     state.contextUpdateCount = 0
@@ -527,150 +576,115 @@ private extension TranscriptionFeature {
       }
     )
 
-    // Fire initial OCR capture asynchronously (does not block recording start)
-    let ocrEffect: Effect<Action>
-    if state.ocrTriggered, let pid = state.sourceAppPID {
-      ocrEffect = .run { [ocrClient, vocabularyCache] send in
-        if let ocrText = await ocrClient.captureWindowText(pid) {
-          let vocab = VocabularyExtractor.extract(from: ocrText)
-          vocabularyCache.merge(vocab)
-          let terms = vocabularyCache.topTerms(maxVocabularyHints)
-          await send(.ocrCaptured(ocrText, terms))
+    // Async initial context capture — AX tree walks run off the main reducer path.
+    let bundleID = state.sourceAppBundleID
+    let resolvedCategory = state.resolvedAppCategory
+    let llmEnabled = state.kolSettings.llmPostProcessingEnabled
+    let screenContextEnabled = state.kolSettings.llmScreenContextEnabled
+    let conversationEnabled = state.kolSettings.conversationContextEnabled
+    let ocrEnabled = state.kolSettings.ocrContextEnabled
+    let pid = state.sourceAppPID
+    let appName = state.sourceAppName
+
+    let initialContextEffect: Effect<Action> = llmEnabled && screenContextEnabled
+      ? .run { [screenContext, vocabularyCache, ideContext, windowContext, nameCache] send in
+          // Screen context: cursor context preferred, flat text fallback
+          let cursor: CursorContext? = await MainActor.run { screenContext.captureCursorContext(bundleID) }
+          let flatText: String?
+          if let cursorText = cursor?.flatText {
+            flatText = cursorText
+          } else if !PromptLayers.isTerminal(bundleID) {
+            flatText = await MainActor.run { screenContext.captureVisibleText(bundleID) }
+          } else {
+            flatText = nil
+          }
+
+          // Vocabulary extraction
+          var vocabulary: [String]?
+          if let text = flatText, !text.isEmpty {
+            let vocab = VocabularyExtractor.extract(from: text)
+            vocabularyCache.merge(vocab)
+            vocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+          }
+
+          // IDE context (code editors only)
+          var ide: IDEContext?
+          if PromptLayers.appContextCategory(for: bundleID) == .code,
+             let p = pid {
+            let tabTitles = await MainActor.run { ideContext.extractTabTitles(p) }
+            if !tabTitles.isEmpty {
+              ide = IDEContext(openFileNames: tabTitles)
+              let fileVocab = VocabularyExtractor.Result(properNouns: [], identifiers: [], fileNames: tabTitles)
+              vocabularyCache.merge(fileVocab)
+              vocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+            }
+          }
+
+          // Conversation context (messaging/email)
+          var conversation: ConversationContext?
+          if conversationEnabled,
+             let p = pid,
+             let category = resolvedCategory,
+             category == .messaging || category == .email {
+            let windowTitle = await MainActor.run { windowContext.windowTitle(p) }
+            let conversationName = ConversationContext.conversationName(fromWindowTitle: windowTitle)
+            let participants = await MainActor.run { windowContext.messagingParticipants(p) }
+            let conversationID = conversationName ?? windowTitle ?? "unknown"
+            let bid = bundleID ?? "unknown"
+            if !participants.isEmpty {
+              nameCache.merge(participants, bid, conversationID)
+            }
+            let cachedNames = nameCache.allNames(bid, 30)
+            let allParticipants = Array(Set(participants + cachedNames))
+            conversation = ConversationContext(
+              conversationName: conversationName,
+              participants: allParticipants,
+              bundleID: bundleID
+            )
+            if !allParticipants.isEmpty {
+              let nameVocab = VocabularyExtractor.Result(properNouns: allParticipants, identifiers: [], fileNames: [])
+              vocabularyCache.merge(nameVocab)
+              vocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+            }
+          }
+
+          // OCR quality gate: trigger OCR if AX text is too sparse
+          let shouldTriggerOCR = ocrEnabled && (flatText?.count ?? 0) < ocrQualityThreshold && pid != nil
+
+          await send(.recordingContextCaptured(
+            screenContext: flatText,
+            cursorContext: cursor,
+            vocabulary: vocabulary,
+            ideContext: ide,
+            conversationContext: conversation,
+            ocrTriggered: shouldTriggerOCR
+          ))
+
+          // Fire OCR capture immediately if triggered
+          if shouldTriggerOCR, let p = pid {
+            if let ocrText = await ocrClient.captureWindowText(p) {
+              let vocab = VocabularyExtractor.extract(from: ocrText)
+              vocabularyCache.merge(vocab)
+              let terms = vocabularyCache.topTerms(maxVocabularyHints)
+              await send(.ocrCaptured(ocrText, terms))
+            }
+          }
         }
-      }
-      .cancellable(id: CancelID.ocrCapture, cancelInFlight: true)
-    } else {
-      ocrEffect = .none
-    }
+        .cancellable(id: CancelID.initialContextCapture, cancelInFlight: true)
+      : .none
 
     // Start periodic context refresh during recording (1s interval)
-    let shouldRefreshContext = state.kolSettings.llmPostProcessingEnabled
-      && state.kolSettings.llmScreenContextEnabled
-    guard shouldRefreshContext else {
-      return .merge(startRecordingEffect, ocrEffect)
-    }
+    let shouldRefreshContext = llmEnabled && screenContextEnabled
+    let contextRefreshEffect: Effect<Action> = shouldRefreshContext
+      ? .run { [clock] send in
+          for await _ in clock.timer(interval: .seconds(1)) {
+            await send(.contextRefreshTick)
+          }
+        }
+        .cancellable(id: CancelID.contextRefresh, cancelInFlight: true)
+      : .none
 
-    let contextRefreshEffect: Effect<Action> = .run { [clock] send in
-      for await _ in clock.timer(interval: .seconds(1)) {
-        await send(.contextRefreshTick)
-      }
-    }
-    .cancellable(id: CancelID.contextRefresh, cancelInFlight: true)
-
-    return .merge(startRecordingEffect, contextRefreshEffect, ocrEffect)
-  }
-
-  /// Capture all context signals at recording start: app category, screen text,
-  /// IDE tabs, conversation participants, and vocabulary hints.
-  func captureRecordingContext(_ state: inout State) {
-    // Resolve app category early so downstream blocks can use it.
-    // URL-based refinement only runs for unknown apps (avoids AX tree walk for known editors/terminals).
-    if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
-      let windowTitle = windowContext.windowTitle(pid)
-      let knownCategory = PromptLayers.appContextCategory(for: state.sourceAppBundleID)
-      let url: String? = knownCategory == nil ? windowContext.browserURL(pid) : nil
-      state.resolvedAppCategory = AppContextResolver.resolve(
-        bundleID: state.sourceAppBundleID,
-        appName: state.sourceAppName,
-        url: url,
-        windowTitle: windowTitle
-      )
-      let catStr = state.resolvedAppCategory?.rawValue ?? "nil"
-      let bidStr = state.sourceAppBundleID ?? "nil"
-      transcriptionFeatureLogger.debug("App context: category=\(catStr), bundleID=\(bidStr, privacy: .private), url=\(url ?? "nil", privacy: .private)")
-    } else {
-      state.resolvedAppCategory = nil
-    }
-
-    // Capture screen context for LLM post-processing (synchronous AX call)
-    if state.kolSettings.llmPostProcessingEnabled && state.kolSettings.llmScreenContextEnabled {
-      // Prefer structured cursor context; fall back to flat capture
-      if let cursor = screenContext.captureCursorContext(state.sourceAppBundleID) {
-        state.capturedCursorContext = cursor
-        state.capturedScreenContext = cursor.flatText
-      } else {
-        state.capturedCursorContext = nil
-        state.capturedScreenContext = screenContext.captureVisibleText(state.sourceAppBundleID)
-      }
-
-      // Extract vocabulary from screen text and merge into persistent cache
-      if let text = state.capturedScreenContext, !text.isEmpty {
-        let vocab = VocabularyExtractor.extract(from: text)
-        vocabularyCache.merge(vocab)
-        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
-      } else {
-        state.capturedVocabulary = nil
-      }
-    } else {
-      state.capturedScreenContext = nil
-      state.capturedCursorContext = nil
-      state.capturedVocabulary = nil
-    }
-
-    // Capture IDE context (open file names) for code editors.
-    // Uses raw bundle ID (not resolvedAppCategory) — IDE tabs only make sense
-    // for actual editors, not browsers on code hosting sites like github.com.
-    if state.kolSettings.llmPostProcessingEnabled && state.kolSettings.llmScreenContextEnabled,
-       PromptLayers.appContextCategory(for: state.sourceAppBundleID) == .code,
-       let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
-      let tabTitles = ideContext.extractTabTitles(pid)
-      if !tabTitles.isEmpty {
-        let ide = IDEContext(openFileNames: tabTitles)
-        state.capturedIDEContext = ide
-        // Merge file names into vocabulary cache
-        let fileVocab = VocabularyExtractor.Result(properNouns: [], identifiers: [], fileNames: tabTitles)
-        vocabularyCache.merge(fileVocab)
-        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
-        transcriptionFeatureLogger.info("IDE context: \(tabTitles.count) tab(s), language: \(ide.detectedLanguage ?? "unknown")")
-      } else {
-        state.capturedIDEContext = nil
-      }
-    } else {
-      state.capturedIDEContext = nil
-    }
-
-    // Capture conversation context for messaging/email apps
-    if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
-       state.kolSettings.conversationContextEnabled && state.kolSettings.llmPostProcessingEnabled,
-       let category = state.resolvedAppCategory,
-       category == .messaging || category == .email {
-      let windowTitle = windowContext.windowTitle(pid)
-      let conversationName = ConversationContext.conversationName(fromWindowTitle: windowTitle)
-      let participants = windowContext.messagingParticipants(pid)
-      let conversationID = conversationName ?? windowTitle ?? "unknown"
-      let bundleID = state.sourceAppBundleID ?? "unknown"
-
-      // Merge names into persistent cache
-      if !participants.isEmpty {
-        nameCache.merge(participants, bundleID, conversationID)
-      }
-
-      // Build conversation context with cached names (includes names from previous sessions)
-      let cachedNames = nameCache.allNames(bundleID, 30)
-      let allParticipants = Array(Set(participants + cachedNames))
-
-      state.capturedConversationContext = ConversationContext(
-        conversationName: conversationName,
-        participants: allParticipants,
-        bundleID: state.sourceAppBundleID
-      )
-
-      // Merge participant names into vocabulary cache for ASR biasing
-      if !allParticipants.isEmpty {
-        let nameVocab = VocabularyExtractor.Result(properNouns: allParticipants, identifiers: [], fileNames: [])
-        vocabularyCache.merge(nameVocab)
-        state.capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
-      }
-
-      transcriptionFeatureLogger.info("Conversation context: \(conversationName ?? "nil"), \(allParticipants.count) participant(s)")
-    } else {
-      state.capturedConversationContext = nil
-    }
-
-    // Stop any in-progress edit tracking from a previous recording
-    if state.editTrackingActive {
-      state.editTrackingActive = false
-    }
+    return .merge(startRecordingEffect, initialContextEffect, contextRefreshEffect)
   }
 
   func handleStopRecording(_ state: inout State) -> Effect<Action> {
@@ -855,6 +869,12 @@ private extension TranscriptionFeature {
     let sourceAppName = state.sourceAppName
     let transcriptionHistory = state.$transcriptionHistory
     let llmEnabled = state.kolSettings.llmPostProcessingEnabled
+
+    // Set post-processing state synchronously so the indicator stays visible
+    // with no gap between transcribing → postProcessing.
+    if llmEnabled {
+      state.isPostProcessing = true
+    }
     let llmConfig = LLMProviderConfig(
       baseURL: state.kolSettings.llmProviderBaseURL,
       modelName: state.kolSettings.llmModelName
@@ -870,8 +890,13 @@ private extension TranscriptionFeature {
     let resolvedLanguage = state.resolvedLanguage
     let capturedScreenContext = state.capturedScreenContext
     let capturedCursorContext = state.capturedCursorContext
-    // Read vocabulary fresh from the cache — OCR terms may have been merged since recording started
-    let capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+    // Read vocabulary fresh from the cache — OCR terms may have been merged since recording started.
+    // Always include the source app name so the LLM can resolve ASR mishearings of it.
+    var capturedVocabulary = vocabularyCache.topTerms(maxVocabularyHints)
+    if let appName = state.sourceAppName, !appName.isEmpty,
+       !(capturedVocabulary ?? []).contains(appName) {
+      capturedVocabulary = (capturedVocabulary ?? []) + [appName]
+    }
     let capturedIDEContext = state.capturedIDEContext
     let capturedConversationContext = state.capturedConversationContext
     let resolvedAppCategory = state.resolvedAppCategory
@@ -914,8 +939,10 @@ private extension TranscriptionFeature {
             } catch {
               transcriptionFeatureLogger.error("LLM post-processing failed, using original: \(error.localizedDescription)")
             }
+            await send(.postProcessingFinished)
           } else {
             transcriptionFeatureLogger.notice("LLM enabled but no API key, skipping post-processing")
+            await send(.postProcessingFinished)
           }
         }
 
@@ -940,7 +967,7 @@ private extension TranscriptionFeature {
         // Mechanical join: check character before cursor via AX API.
         // Works for text editors and messaging apps. Returns nil for terminals
         // (where AX doesn't expose cursor position), so no join is attempted.
-        if let ch = screenContext.characterBeforeCursor() {
+        if let ch = await screenContext.characterBeforeCursor() {
           if !ch.isWhitespace && !ch.isNewline {
             finalText = " " + finalText
           }
@@ -976,9 +1003,10 @@ private extension TranscriptionFeature {
     audioURL: URL?
   ) -> Effect<Action> {
     state.isTranscribing = false
+    state.isPostProcessing = false
     state.isPrewarming = false
     state.error = error.localizedDescription
-    
+
     if let audioURL {
       try? FileManager.default.removeItem(at: audioURL)
     }
@@ -1042,6 +1070,7 @@ private extension TranscriptionFeature {
   func handleCancel(_ state: inout State) -> Effect<Action> {
     state.isTranscribing = false
     state.isRecording = false
+    state.isPostProcessing = false
     state.isPrewarming = false
     state.capturedScreenContext = nil
     state.capturedCursorContext = nil
@@ -1055,6 +1084,7 @@ private extension TranscriptionFeature {
     return .merge(
       .cancel(id: CancelID.transcription),
       .cancel(id: CancelID.contextRefresh),
+      .cancel(id: CancelID.initialContextCapture),
       .cancel(id: CancelID.ocrCapture),
       .run { [sleepManagement] _ in
         // Allow system to sleep again

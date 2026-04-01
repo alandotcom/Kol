@@ -14,6 +14,8 @@ public struct Meter: Equatable, Sendable {
 /// Broadcasts meter values from a single producer (capture controller / AVAudioRecorder)
 /// to multiple consumers. Each call to `subscribe()` returns a fresh AsyncStream.
 /// Thread-safe: `yield` can be called from any thread (audio callback, DispatchQueue).
+/// `@unchecked Sendable` is safe because all mutable state (`subscribers`) is
+/// protected by `NSLock` — every read and write goes through `lock`/`unlock`.
 public final class MeterBroadcast: @unchecked Sendable {
   private let lock = NSLock()
   private var subscribers: [UUID: AsyncStream<Meter>.Continuation] = [:]
