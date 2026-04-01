@@ -87,13 +87,6 @@ extension ScreenContextClient: DependencyKey {
                 MainActor.assumeIsolated {
                     captureCursorContextImpl(sourceAppBundleID)
                 }
-            },
-            characterBeforeCursor: {
-                // Called from .run effect — use MainActor.run to safely hop
-                // to the main thread for AX API access.
-                await MainActor.run {
-                    characterBeforeCursorImpl()
-                }
             }
         )
     }
@@ -275,27 +268,6 @@ extension ScreenContextClient: DependencyKey {
             selectedText: nil,
             isTerminal: false
         )
-    }
-
-    @MainActor
-    private static func characterBeforeCursorImpl() -> Character? {
-        guard let focused = getFocusedElement(caller: "characterBeforeCursor", bundleID: "n/a") else {
-            return nil
-        }
-
-        // Use AXorcist's parameterized attribute to read char before cursor
-        if let cfRange = focused.selectedTextRange(),
-           cfRange.location > 0 {
-            let charRange = CFRange(location: cfRange.location - 1, length: 1)
-            if let charStr = focused.string(forRange: charRange),
-               let char = charStr.first {
-                return char
-            }
-        }
-
-        // For terminals: AX parameterized attributes aren't supported,
-        // so characterBeforeCursor returns nil.
-        return nil
     }
 
     // MARK: - AX Helpers

@@ -957,15 +957,6 @@ private extension TranscriptionFeature {
           }
         }
 
-        // Mechanical join: check character before cursor via AX API.
-        // Works for text editors and messaging apps. Returns nil for terminals
-        // (where AX doesn't expose cursor position), so no join is attempted.
-        if let ch = await screenContext.characterBeforeCursor() {
-          if !ch.isWhitespace && !ch.isNewline {
-            finalText = " " + finalText
-          }
-        }
-
         let transcriptID = try await finalizeRecordingAndStoreTranscript(
           result: finalText,
           llmMetadata: llmMetadata,
