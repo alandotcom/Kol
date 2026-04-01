@@ -247,4 +247,46 @@ struct SuggestionExtractorTests {
 		)
 		#expect(result.isEmpty)
 	}
+
+	@Test("Punctuation-only differences are filtered out")
+	func punctuationOnlyDifferencesFiltered() {
+		let history = TranscriptionHistory(history: [
+			makeTranscript(edits: [
+				WordEdit(original: "actually", corrected: "|actually", operation: .substitution),
+				WordEdit(original: "the", corrected: "|the", operation: .substitution)
+			]),
+			makeTranscript(edits: [
+				WordEdit(original: "actually", corrected: "|actually", operation: .substitution),
+				WordEdit(original: "the", corrected: "|the", operation: .substitution)
+			])
+		])
+		let result = SuggestionExtractor.extract(
+			from: history,
+			existingRemappings: [],
+			dismissedKeys: []
+		)
+		#expect(result.isEmpty)
+	}
+
+	@Test("Real corrections surface alongside punctuation-only edits")
+	func realCorrectionsWithPunctuationNoise() {
+		let history = TranscriptionHistory(history: [
+			makeTranscript(edits: [
+				WordEdit(original: "clawed", corrected: "Claude", operation: .substitution),
+				WordEdit(original: "the", corrected: "|the", operation: .substitution)
+			]),
+			makeTranscript(edits: [
+				WordEdit(original: "clawed", corrected: "Claude", operation: .substitution),
+				WordEdit(original: "the", corrected: "|the", operation: .substitution)
+			])
+		])
+		let result = SuggestionExtractor.extract(
+			from: history,
+			existingRemappings: [],
+			dismissedKeys: []
+		)
+		#expect(result.count == 1)
+		#expect(result[0].original == "clawed")
+		#expect(result[0].corrected == "Claude")
+	}
 }

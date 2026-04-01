@@ -40,7 +40,7 @@ public struct TranscriptionFeature {
     public var resolvedAppCategory: AppContextCategory?
     public var contextUpdateCount: Int = 0
     public var editTrackingActive: Bool = false
-    public var editTrackingPastedText: String?
+    public var editTrackingBaselineText: String?
     public var editTrackingElementHash: Int?
     public var editTrackingTranscriptID: UUID?
     public var editTrackingPollCount: Int = 0
@@ -94,7 +94,7 @@ public struct TranscriptionFeature {
     case ocrCaptured(String, [String]?)
 
     // Edit tracking
-    case editTrackingStarted(pastedText: String, elementHash: Int, transcriptID: UUID)
+    case editTrackingStarted(baselineText: String, elementHash: Int, transcriptID: UUID)
     case editTrackingTick
     case editTrackingResult(String?)
     case editTrackingStop
@@ -192,9 +192,9 @@ public struct TranscriptionFeature {
 
       // MARK: - Edit Tracking
 
-      case let .editTrackingStarted(pastedText, elementHash, transcriptID):
+      case let .editTrackingStarted(baselineText, elementHash, transcriptID):
         state.editTrackingActive = true
-        state.editTrackingPastedText = pastedText
+        state.editTrackingBaselineText = baselineText
         state.editTrackingElementHash = elementHash
         state.editTrackingTranscriptID = transcriptID
         state.editTrackingPollCount = 0
@@ -231,7 +231,7 @@ public struct TranscriptionFeature {
 
       case .editTrackingStop:
         guard state.editTrackingActive,
-              let pastedText = state.editTrackingPastedText,
+              let baselineText = state.editTrackingBaselineText,
               let transcriptID = state.editTrackingTranscriptID,
               let hash = state.editTrackingElementHash
         else {
@@ -247,9 +247,9 @@ public struct TranscriptionFeature {
             let finalText = await MainActor.run {
               editTrackingClient.readText(hash)
             }
-            guard let finalText, finalText != pastedText else { return }
+            guard let finalText, finalText != baselineText else { return }
 
-            let (vector, edits) = EditVectorComputer.compute(original: pastedText, edited: finalText)
+            let (vector, edits) = EditVectorComputer.compute(original: baselineText, edited: finalText)
             guard !vector.isEmpty, vector.contains(where: { $0 != "M" }) else { return }
 
             transcriptionFeatureLogger.info("Edit vector: \(vector) (\(edits.filter { $0.operation != .match }.count) change(s))")
@@ -980,7 +980,7 @@ private extension TranscriptionFeature {
         if editTrackingEnabled, let transcriptID {
           if let snapshot = await MainActor.run(body: { editTrackingClient.captureSnapshot() }) {
             transcriptionFeatureLogger.info("Starting edit tracking for transcript \(transcriptID)")
-            await send(.editTrackingStarted(pastedText: finalText, elementHash: snapshot.hash, transcriptID: transcriptID))
+            await send(.editTrackingStarted(baselineText: snapshot.text, elementHash: snapshot.hash, transcriptID: transcriptID))
           }
         }
       } catch {

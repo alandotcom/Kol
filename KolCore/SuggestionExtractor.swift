@@ -39,6 +39,11 @@ public enum SuggestionExtractor {
 				let corrected = edit.corrected
 				guard !original.isEmpty, !corrected.isEmpty else { continue }
 
+				// Skip edits that only differ by leading/trailing punctuation (e.g., "word" → "|word")
+				let strippedOriginal = original.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+				let strippedCorrected = corrected.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+				guard strippedOriginal != strippedCorrected else { continue }
+
 				let key = "\(original.lowercased())\u{2192}\(corrected)"
 				if let existing = frequencies[key] {
 					frequencies[key] = (existing.original, existing.corrected, existing.count + 1)
