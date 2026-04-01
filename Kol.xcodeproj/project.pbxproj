@@ -42,6 +42,7 @@
 		377999182F7AD84400FAAFD1 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 9B1137862CEB38C43538B9BE /* Dependencies */; };
 		377999192F7AD84400FAAFD1 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = D0046C259393F2A4938AB19A /* DependenciesMacros */; };
 		3779991A2F7AD84400FAAFD1 /* Sauce in Frameworks */ = {isa = PBXBuildFile; productRef = F54DF918503E20282D61202F /* Sauce */; };
+		4F0D6A042F1A000100000002 /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = 4F0D6A052F1A000100000002 /* Sharing */; };
 		3779991B2F7AD84400FAAFD1 /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = 3F2D910B1F803177B9C3D83A /* IssueReporting */; };
 		3779991C2F7AD84400FAAFD1 /* ConcurrencyExtras in Frameworks */ = {isa = PBXBuildFile; productRef = 93CBD2F56664506274695FFE /* ConcurrencyExtras */; };
 		47512ABF2E14D8C9000E25BA /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 47512ABE2E14D8C9000E25BA /* WhisperKit */; };
@@ -168,19 +169,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2DE422E495504204A8B4D890 /* FluidAudio in Frameworks */,
-				68E96F0176EC4A6C9979E3D6 /* WhisperKit in Frameworks */,
 				3779991C2F7AD84400FAAFD1 /* ConcurrencyExtras in Frameworks */,
 				3779991B2F7AD84400FAAFD1 /* IssueReporting in Frameworks */,
 				3779991A2F7AD84400FAAFD1 /* Sauce in Frameworks */,
 				377999192F7AD84400FAAFD1 /* DependenciesMacros in Frameworks */,
 				377999182F7AD84400FAAFD1 /* Dependencies in Frameworks */,
-				377990942F7A4CF800FAAFD1 /* (null) in Frameworks */,
-				377990932F7A4CF800FAAFD1 /* (null) in Frameworks */,
-				377990922F7A4CF800FAAFD1 /* (null) in Frameworks */,
-				377990912F7A4CF800FAAFD1 /* (null) in Frameworks */,
-				377990902F7A4CF800FAAFD1 /* (null) in Frameworks */,
 				4F0D6A022F1A000100000001 /* ComposableArchitecture in Frameworks */,
+				4F0D6A042F1A000100000002 /* Sharing in Frameworks */,
 				FCDB5A11B2A3B902784F1FA1 /* KolCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -295,6 +290,7 @@
 				93CBD2F56664506274695FFE /* ConcurrencyExtras */,
 				3B9944FCDBF0437F952241BC /* FluidAudio */,
 				F2A621BA7C114F699E1DE995 /* WhisperKit */,
+				4F0D6A052F1A000100000002 /* Sharing */,
 			);
 			productName = KolTests;
 			productReference = 478637A52D48725900319BFA /* KolTests.xctest */;
@@ -537,6 +533,7 @@
 		478637AC2D48725900319BFA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 101;
 				DEAD_CODE_STRIPPING = YES;
@@ -552,12 +549,14 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kol.app/Contents/MacOS/Kol";
 			};
 			name = Debug;
 		};
 		478637AD2D48725900319BFA /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 101;
 				DEAD_CODE_STRIPPING = YES;
@@ -573,6 +572,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kol.app/Contents/MacOS/Kol";
 			};
 			name = Release;
 		};
@@ -977,6 +977,10 @@
 			productName = ConcurrencyExtras;
 		};
 		357C1A50A91F15118BC185C4 /* Sharing */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Sharing;
+		};
+		4F0D6A052F1A000100000002 /* Sharing */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Sharing;
 		};
