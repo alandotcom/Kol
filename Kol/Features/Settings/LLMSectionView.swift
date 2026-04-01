@@ -95,7 +95,7 @@ struct LLMSectionContent: View {
 							set: { store.send(.setLLMCustomRules($0)) }
 						)
 					)
-					.frame(height: 60)
+					.frame(minHeight: 60, maxHeight: 120)
 					.font(.system(size: 13))
 					.scrollContentBackground(.hidden)
 					.background(Color(.textBackgroundColor).opacity(0.5))

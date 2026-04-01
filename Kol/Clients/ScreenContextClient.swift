@@ -158,7 +158,7 @@ extension ScreenContextClient: DependencyKey {
            let app = Element.application(for: pid),
            let window = app.focusedWindow() {
             let windowText = collectVisibleText(from: window, maxDepth: 6, maxNodes: 500)
-            logger.debug("Window walk: \(windowText.count, privacy: .public) chars (focused was \(focusedText?.count ?? 0, privacy: .public))")
+            logger.debug("Window walk: \(windowText.count, privacy: .private) chars (focused was \(focusedText?.count ?? 0, privacy: .private))")
             if windowText.count > (focusedText?.count ?? 0) {
                 let windowed = windowText.count > maxContextLength ? String(windowText.prefix(maxContextLength)) : windowText
                 logger.info("Got text via window walk: \(windowed.count) chars (focused was \(focusedText?.count ?? 0))")
