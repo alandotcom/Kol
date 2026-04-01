@@ -909,17 +909,21 @@ High overall, but each adapter is independent and can be built incrementally. St
 
 **KolCore framework target** — extracted from the app target to fix test infrastructure:
 - Native Xcode framework target (not SPM package — avoids the slow incremental builds that the original Hex SPM package had)
-- Contains: models (LLMPostProcessing, CursorContext, HotKey, KeyEvent, KolSettings, WordRemapping, WordRemoval, TranscriptionHistory, ParakeetModel, QwenModel), logic (HotKeyProcessor, VocabularyExtractor, VocabularyCache, RecordingDecision), shared infra (Logging, Constants)
+- Contains: models, logic, shared infra, **TranscriptionFeature reducer**, and **all dependency client interfaces** (struct definitions only — live implementations stay in the app target)
 - Dependencies: ComposableArchitecture, Dependencies, DependenciesMacros, Sauce + TCA transitive deps
 - App target uses `@_exported import KolCore` — no import changes needed in app source files
 - Test target imports `@testable import KolCore` directly — no host app needed, no debug dylib linker issues
 
-**Test target restructured:**
-- Removed `BUNDLE_LOADER`/`TEST_HOST` — tests are non-hosted, link KolCore framework directly
-- Fixed `PRODUCT_NAME = Kol` (was "Kol Debug"), fixed `DEVELOPMENT_TEAM`
-- 69 tests pass via `xcodebuild test` CLI
-- `HotKeyProcessorTests` disabled — crashes in non-hosted context (uses `withDependencies` which needs investigation)
-- `RecordingRaceTests` disabled — needs hosted test for `TranscriptionFeature` (uses `TestStore`)
+**Dependency client split pattern** (established during TranscriptionFeature migration):
+- `KolCore/Clients/FooClient.swift` — `@DependencyClient public struct` + `TestDependencyKey` + `DependencyValues` extension (no AppKit)
+- `Kol/Clients/FooClient.swift` — `extension FooClient: DependencyKey { public static var liveValue }` with platform implementation
+- 13 clients split this way; KeychainClient and LLMPostProcessingClient moved entirely to KolCore (no platform deps)
+- See `docs/solutions/build-errors/spm-c-module-transitive-dependency-non-hosted-tests.md` for the full pattern
+
+**Test target (non-hosted):**
+- No `BUNDLE_LOADER`/`TEST_HOST` — tests link KolCore framework directly
+- 250 tests pass via `xcodebuild test` CLI
+- TestStore tests for TranscriptionFeature blocked by `@Shared(.fileStorage)` SEGV in test bundles (swiftlang/swift#87316) — pure logic and type accessibility tests work
 
 ### Phase B — done
 
