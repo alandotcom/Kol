@@ -5,11 +5,8 @@
 //  Created by Kit Langton on 1/24/25.
 //
 
-import AppKit
-import Carbon
 import ComposableArchitecture
 import Foundation
-import WhisperKit
 
 private let transcriptionFeatureLogger = KolLog.transcription
 
@@ -17,43 +14,45 @@ private let maxVocabularyHints = 30
 private let ocrQualityThreshold = 50
 
 @Reducer
-struct TranscriptionFeature {
+public struct TranscriptionFeature {
+  public init() {}
+
   @ObservableState
-  struct State: Equatable {
-    var didStartTask: Bool = false
-    var isRecording: Bool = false
-    var isTranscribing: Bool = false
-    var isPostProcessing: Bool = false
-    var isPrewarming: Bool = false
-    var error: String?
-    var recordingStartTime: Date?
-    var meter: Meter = .init(averagePower: 0, peakPower: 0)
-    var sourceAppBundleID: String?
-    var sourceAppName: String?
-    var sourceAppPID: pid_t?
-    var resolvedLanguage: String?
-    var capturedScreenContext: String?
-    var capturedCursorContext: CursorContext?
-    var capturedVocabulary: [String]?
-    var capturedIDEContext: IDEContext?
-    var capturedConversationContext: ConversationContext?
-    var resolvedAppCategory: AppContextCategory?
-    var contextUpdateCount: Int = 0
-    // Edit tracking state
-    var editTrackingActive: Bool = false
-    var editTrackingPastedText: String?
-    var editTrackingElementHash: Int?
-    var editTrackingTranscriptID: UUID?
-    var editTrackingPollCount: Int = 0
-    var ocrTriggered: Bool = false
-    var lastOCRTickNumber: Int = 0  // contextUpdateCount at last OCR run
-    @Shared(.kolSettings) var kolSettings: KolSettings
-    @Shared(.isRemappingScratchpadFocused) var isRemappingScratchpadFocused: Bool = false
-    @Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
-    @Shared(.transcriptionHistory) var transcriptionHistory: TranscriptionHistory
+  public struct State: Equatable {
+    public init() {}
+    public var didStartTask: Bool = false
+    public var isRecording: Bool = false
+    public var isTranscribing: Bool = false
+    public var isPostProcessing: Bool = false
+    public var isPrewarming: Bool = false
+    public var error: String?
+    public var recordingStartTime: Date?
+    public var meter: Meter = .init(averagePower: 0, peakPower: 0)
+    public var sourceAppBundleID: String?
+    public var sourceAppName: String?
+    public var sourceAppPID: pid_t?
+    public var resolvedLanguage: String?
+    public var capturedScreenContext: String?
+    public var capturedCursorContext: CursorContext?
+    public var capturedVocabulary: [String]?
+    public var capturedIDEContext: IDEContext?
+    public var capturedConversationContext: ConversationContext?
+    public var resolvedAppCategory: AppContextCategory?
+    public var contextUpdateCount: Int = 0
+    public var editTrackingActive: Bool = false
+    public var editTrackingPastedText: String?
+    public var editTrackingElementHash: Int?
+    public var editTrackingTranscriptID: UUID?
+    public var editTrackingPollCount: Int = 0
+    public var ocrTriggered: Bool = false
+    public var lastOCRTickNumber: Int = 0
+    @Shared(.kolSettings) public var kolSettings: KolSettings
+    @Shared(.isRemappingScratchpadFocused) public var isRemappingScratchpadFocused: Bool = false
+    @Shared(.modelBootstrapState) public var modelBootstrapState: ModelBootstrapState
+    @Shared(.transcriptionHistory) public var transcriptionHistory: TranscriptionHistory
   }
 
-  enum Action {
+  public enum Action {
     case task
     case audioLevelUpdated(Meter)
 
@@ -104,7 +103,7 @@ struct TranscriptionFeature {
     case modelMissing
   }
 
-  enum CancelID {
+  public enum CancelID {
     case metering
     case recordingCleanup
     case transcription
@@ -131,9 +130,11 @@ struct TranscriptionFeature {
   @Dependency(\.nameCache) var nameCache
   @Dependency(\.editTracking) var editTrackingClient
   @Dependency(\.ocrClient) var ocrClient
+  @Dependency(\.workspace) var workspace
+  @Dependency(\.inputSource) var inputSource
   @Dependency(\.continuousClock) var clock
 
-  var body: some ReducerOf<Self> {
+  public var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
       // MARK: - Lifecycle / Setup
@@ -531,7 +532,7 @@ private extension TranscriptionFeature {
     state.recordingStartTime = startTime
     
     // Capture the active application (PID stored for OCR/AX effects during recording)
-    if let activeApp = NSWorkspace.shared.frontmostApplication {
+    if let activeApp = workspace.frontmostApplication() {
       state.sourceAppBundleID = activeApp.bundleIdentifier
       state.sourceAppName = activeApp.localizedName
       state.sourceAppPID = activeApp.processIdentifier
@@ -540,7 +541,7 @@ private extension TranscriptionFeature {
     // Resolve app category synchronously (cheap NSWorkspace call).
     // AX tree walks are deferred to an async effect below to avoid
     // blocking recording start by 50-200ms on Electron apps.
-    if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+    if let pid = workspace.frontmostApplication()?.processIdentifier {
       let windowTitle = windowContext.windowTitle(pid)
       let knownCategory = PromptLayers.appContextCategory(for: state.sourceAppBundleID)
       let url: String? = knownCategory == nil ? windowContext.browserURL(pid) : nil
@@ -737,7 +738,7 @@ private extension TranscriptionFeature {
 
     // Auto-switch model based on keyboard input source:
     // Hebrew keyboard → Caspi (Hebrew ASR), otherwise → selected model (Parakeet/Whisper)
-    let (model, language) = Self.resolveModelAndLanguage(
+    let (model, language) = resolveModelAndLanguage(
       selectedModel: state.kolSettings.selectedModel,
       selectedLanguage: state.kolSettings.outputLanguage
     )
@@ -763,13 +764,13 @@ private extension TranscriptionFeature {
 
           // Create transcription options with the selected language
           // Note: cap concurrency to avoid audio I/O overloads on some Macs
-          let decodeOptions = DecodingOptions(
+          let options = TranscriptionOptions(
             language: language,
-            detectLanguage: language == nil, // Only auto-detect if no language specified
-            chunkingStrategy: .vad,
+            detectLanguage: language == nil,
+            useVADChunking: true
           )
 
-          let result = try await transcription.transcribe(capturedURL, model, decodeOptions, vadEnabled, capturedVocabulary) { _ in }
+          let result = try await transcription.transcribe(capturedURL, model, options, vadEnabled, capturedVocabulary) { _ in }
 
           transcriptionFeatureLogger.notice("Transcribed audio from \(capturedURL.lastPathComponent) to text length \(result.count)")
           await send(.transcriptionResult(result, capturedURL))
@@ -784,11 +785,11 @@ private extension TranscriptionFeature {
 
   /// Checks the current macOS keyboard input source and routes to the appropriate model.
   /// Hebrew keyboard → Caspi + Hebrew language; otherwise → user's selected model + language.
-  private static func resolveModelAndLanguage(
+  private func resolveModelAndLanguage(
     selectedModel: String,
     selectedLanguage: String?
   ) -> (model: String, language: String?) {
-    if isHebrewKeyboardActive() {
+    if inputSource.isHebrewKeyboardActive() {
       transcriptionFeatureLogger.notice("Hebrew keyboard detected — using Caspi")
       return (QwenModel.caspiHebrew.identifier, "he")
     }
@@ -800,12 +801,6 @@ private extension TranscriptionFeature {
     return (selectedModel, selectedLanguage)
   }
 
-  private static func isHebrewKeyboardActive() -> Bool {
-    guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else { return false }
-    guard let idRef = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return false }
-    let inputSourceID = Unmanaged<CFString>.fromOpaque(idRef).takeUnretainedValue() as String
-    return inputSourceID.lowercased().contains("hebrew")
-  }
 }
 
 // MARK: - Transcription Handlers
@@ -824,9 +819,7 @@ private extension TranscriptionFeature {
       transcriptionFeatureLogger.fault("Force quit voice command recognized; terminating Kol.")
       return .run { _ in
         try? FileManager.default.removeItem(at: audioURL)
-        await MainActor.run {
-          NSApp.terminate(nil)
-        }
+        exit(0)
       }
     }
 

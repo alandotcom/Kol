@@ -1,34 +1,12 @@
 import ApplicationServices
 import Dependencies
-import DependenciesMacros
 import Foundation
+import KolCore
 
 private let logger = KolLog.editTracking
 
-/// Snapshot of a focused text element's state, used for post-paste edit tracking.
-public struct ElementSnapshot: Sendable, Equatable {
-	public let hash: Int
-	public let text: String
-
-	public init(hash: Int, text: String) {
-		self.hash = hash
-		self.text = text
-	}
-}
-
-/// Reads the focused text element for post-paste edit tracking.
-@DependencyClient
-struct EditTrackingClient: Sendable {
-	/// Capture a snapshot of the currently focused text element.
-	var captureSnapshot: @Sendable () -> ElementSnapshot? = { nil }
-
-	/// Re-read the focused element's text, verifying it matches the given hash.
-	/// Returns nil if the element changed or can't be read.
-	var readText: @Sendable (_ expectedHash: Int) -> String? = { _ in nil }
-}
-
 extension EditTrackingClient: DependencyKey {
-	static var liveValue: Self {
+	public static var liveValue: Self {
 		Self(
 			captureSnapshot: {
 				captureCurrentElementSnapshot()
@@ -83,11 +61,4 @@ extension EditTrackingClient: DependencyKey {
 		return hasher.finalize()
 	}
 
-}
-
-extension DependencyValues {
-	var editTracking: EditTrackingClient {
-		get { self[EditTrackingClient.self] }
-		set { self[EditTrackingClient.self] = newValue }
-	}
 }

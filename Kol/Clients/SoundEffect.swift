@@ -10,38 +10,8 @@ import ComposableArchitecture
 import Dependencies
 import DependenciesMacros
 import Foundation
+import KolCore
 import SwiftUI
-
-public enum SoundEffect: String, CaseIterable {
-  case pasteTranscript
-  case startRecording
-  case stopRecording
-  case cancel
-
-  /// Returns the audio file name for the given theme, falling back to the default name
-  /// if a themed variant doesn't exist in the bundle.
-  func fileName(for theme: SoundTheme) -> String {
-    guard theme != .standard else { return rawValue }
-    let themed = "\(rawValue)_\(theme.rawValue)"
-    if Bundle.main.url(forResource: themed, withExtension: "mp3") != nil {
-      return themed
-    }
-    return rawValue
-  }
-
-  var fileExtension: String {
-    "mp3"
-  }
-}
-
-@DependencyClient
-public struct SoundEffectsClient {
-  public var play: @Sendable (SoundEffect) -> Void
-  public var stop: @Sendable (SoundEffect) -> Void
-  public var stopAll: @Sendable () -> Void
-  public var preloadSounds: @Sendable () async -> Void
-  public var reloadSounds: @Sendable () -> Void
-}
 
 extension SoundEffectsClient: DependencyKey {
   public static var liveValue: SoundEffectsClient {
@@ -63,13 +33,6 @@ extension SoundEffectsClient: DependencyKey {
         Task { await live.reloadSounds() }
       }
     )
-  }
-}
-
-public extension DependencyValues {
-  var soundEffects: SoundEffectsClient {
-    get { self[SoundEffectsClient.self] }
-    set { self[SoundEffectsClient.self] = newValue }
   }
 }
 

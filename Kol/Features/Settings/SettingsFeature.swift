@@ -4,6 +4,7 @@ import ComposableArchitecture
 import CoreAudio
 import Dependencies
 import IdentifiedCollections
+import KolCore
 import Sauce
 import ServiceManagement
 import SwiftUI
@@ -14,22 +15,6 @@ private typealias SettingsAudioPropertyListenerBlock = @convention(block) (UInt3
 private enum HotKeyCaptureTarget {
   case recording
   case pasteLastTranscript
-}
-
-extension SharedReaderKey
-  where Self == InMemoryKey<Bool>.Default
-{
-  static var isSettingHotKey: Self {
-    Self[.inMemory("isSettingHotKey"), default: false]
-  }
-  
-  static var isSettingPasteLastTranscriptHotkey: Self {
-    Self[.inMemory("isSettingPasteLastTranscriptHotkey"), default: false]
-  }
-
-  static var isRemappingScratchpadFocused: Self {
-    Self[.inMemory("isRemappingScratchpadFocused"), default: false]
-  }
 }
 
 // MARK: - Settings Feature

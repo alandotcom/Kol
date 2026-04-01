@@ -12,30 +12,13 @@ import CoreAudio
 import Dependencies
 import DependenciesMacros
 import Foundation
+import KolCore
 
 private let recordingLogger = KolLog.recording
 private typealias CoreAudioPropertyListenerBlock = @convention(block) (UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void
 
-/// Represents an audio input device
-struct AudioInputDevice: Identifiable, Equatable {
-  var id: String
-  var name: String
-}
-
-@DependencyClient
-struct RecordingClient {
-  var startRecording: @Sendable () async -> Void = {}
-  var stopRecording: @Sendable () async -> URL = { URL(fileURLWithPath: "") }
-  var requestMicrophoneAccess: @Sendable () async -> Bool = { false }
-  var observeAudioLevel: @Sendable () async -> AsyncStream<Meter> = { AsyncStream { _ in } }
-  var getAvailableInputDevices: @Sendable () async -> [AudioInputDevice] = { [] }
-  var getDefaultInputDeviceName: @Sendable () async -> String? = { nil }
-  var warmUpRecorder: @Sendable () async -> Void = {}
-  var cleanup: @Sendable () async -> Void = {}
-}
-
 extension RecordingClient: DependencyKey {
-  static var liveValue: Self {
+  public static var liveValue: Self {
     let live = RecordingClientLive()
     Task {
       await live.startObservingSystemChanges()
@@ -994,9 +977,3 @@ actor RecordingClientLive {
   }
 }
 
-extension DependencyValues {
-  var recording: RecordingClient {
-    get { self[RecordingClient.self] }
-    set { self[RecordingClient.self] = newValue }
-  }
-}

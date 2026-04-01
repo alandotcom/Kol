@@ -9,20 +9,14 @@ import ComposableArchitecture
 import Dependencies
 import DependenciesMacros
 import Foundation
+import KolCore
 import Sauce
 import SwiftUI
 
 private let pasteboardLogger = KolLog.pasteboard
 
-@DependencyClient
-struct PasteboardClient {
-    var paste: @Sendable (String) async -> Void
-    var copy: @Sendable (String) async -> Void
-    var sendKeyboardCommand: @Sendable (KeyboardCommand) async -> Void
-}
-
 extension PasteboardClient: DependencyKey {
-    static var liveValue: Self {
+    public static var liveValue: Self {
         let live = PasteboardClientLive()
         return .init(
             paste: { text in
@@ -35,13 +29,6 @@ extension PasteboardClient: DependencyKey {
                 await live.sendKeyboardCommand(command)
             }
         )
-    }
-}
-
-extension DependencyValues {
-    var pasteboard: PasteboardClient {
-        get { self[PasteboardClient.self] }
-        set { self[PasteboardClient.self] = newValue }
     }
 }
 

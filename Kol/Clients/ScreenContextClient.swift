@@ -1,19 +1,10 @@
 import AppKit
 import AXorcist
 import Dependencies
-import DependenciesMacros
 import Foundation
+import KolCore
 
 private let logger = KolLog.screenContext
-
-@DependencyClient
-struct ScreenContextClient: Sendable {
-    var captureVisibleText: @Sendable (_ sourceAppBundleID: String?) -> String? = { _ in nil }
-    /// Returns structured text around the cursor (before/after/selected), or nil on failure.
-    var captureCursorContext: @Sendable (_ sourceAppBundleID: String?) -> CursorContext? = { _ in nil }
-    /// Returns the character immediately before the cursor in the focused text field, or nil.
-    var characterBeforeCursor: @Sendable () async -> Character? = { nil }
-}
 
 extension ScreenContextClient: DependencyKey {
     /// Maximum characters to extract, centered on cursor position.
@@ -85,7 +76,7 @@ extension ScreenContextClient: DependencyKey {
         return nil
     }
 
-    static var liveValue: Self {
+    public static var liveValue: Self {
         Self(
             captureVisibleText: { sourceAppBundleID in
                 MainActor.assumeIsolated {
@@ -434,12 +425,5 @@ extension ScreenContextClient: DependencyKey {
         }
 
         return nil
-    }
-}
-
-extension DependencyValues {
-    var screenContext: ScreenContextClient {
-        get { self[ScreenContextClient.self] }
-        set { self[ScreenContextClient.self] = newValue }
     }
 }

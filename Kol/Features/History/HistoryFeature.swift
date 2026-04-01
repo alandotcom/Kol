@@ -4,29 +4,6 @@ import Dependencies
 
 private let historyLogger = KolLog.history
 
-// MARK: - Models
-
-extension SharedReaderKey
-	where Self == FileStorageKey<TranscriptionHistory>.Default
-{
-	static var transcriptionHistory: Self {
-		Self[
-			.fileStorage(.transcriptionHistoryURL),
-			default: .init()
-		]
-	}
-}
-
-// MARK: - Storage Migration
-
-extension URL {
-	static var transcriptionHistoryURL: URL {
-		get {
-			URL.kolMigratedFileURL(named: "transcription_history.json")
-		}
-	}
-}
-
 // MARK: - History Feature
 
 @Reducer

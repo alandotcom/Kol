@@ -19,49 +19,39 @@ private let transcriptionLogger = KolLog.transcription
 private let modelsLogger = KolLog.models
 private let parakeetLogger = KolLog.parakeet
 
-/// A client that downloads and loads WhisperKit models, then transcribes audio files using the loaded model.
-/// Exposes progress callbacks to report overall download-and-load percentage and transcription progress.
-@DependencyClient
-struct TranscriptionClient {
-  /// Transcribes an audio file at the specified `URL` using the named `model`.
-  /// When `skipSilence` is true, runs Silero VAD first and returns empty string if no speech detected.
-  /// Reports transcription progress via `progressCallback`.
-  var transcribe: @Sendable (URL, String, DecodingOptions, Bool, [String]?, @escaping (Progress) -> Void) async throws -> String
-
-  /// Ensures a model is downloaded (if missing) and loaded into memory, reporting progress via `progressCallback`.
-  var downloadModel: @Sendable (String, @escaping (Progress) -> Void) async throws -> Void
-
-  /// Deletes a model from disk if it exists
-  var deleteModel: @Sendable (String) async throws -> Void
-
-  /// Checks if a named model is already downloaded on this system.
-  var isModelDownloaded: @Sendable (String) async -> Bool = { _ in false }
-
-  /// Fetches a recommended set of models for the user's hardware from Hugging Face's `argmaxinc/whisperkit-coreml`.
-  var getRecommendedModels: @Sendable () async throws -> ModelSupport
+/// App-target methods that ModelDownloadFeature needs but aren't in the KolCore struct
+/// (they depend on WhisperKit types).
+extension TranscriptionClient {
+  /// Fetches a recommended set of models for the user's hardware from Hugging Face.
+  /// Only available in the app target (uses WhisperKit's ModelSupport type).
+  var getRecommendedModels: @Sendable () async throws -> ModelSupport {
+    { try await TranscriptionClientLive.shared.getRecommendedModels() }
+  }
 
   /// Lists all model variants found in `argmaxinc/whisperkit-coreml`.
-  var getAvailableModels: @Sendable () async throws -> [String]
-}
-
-extension TranscriptionClient: DependencyKey {
-  static var liveValue: Self {
-    let live = TranscriptionClientLive()
-    return Self(
-      transcribe: { try await live.transcribe(url: $0, model: $1, options: $2, skipSilence: $3, vocabularyHints: $4, progressCallback: $5) },
-      downloadModel: { try await live.downloadAndLoadModel(variant: $0, progressCallback: $1) },
-      deleteModel: { try await live.deleteModel(variant: $0) },
-      isModelDownloaded: { await live.isModelDownloaded($0) },
-      getRecommendedModels: { await live.getRecommendedModels() },
-      getAvailableModels: { try await live.getAvailableModels() }
-    )
+  var getAvailableModels: @Sendable () async throws -> [String] {
+    { try await TranscriptionClientLive.shared.getAvailableModels() }
   }
 }
 
-extension DependencyValues {
-  var transcription: TranscriptionClient {
-    get { self[TranscriptionClient.self] }
-    set { self[TranscriptionClient.self] = newValue }
+extension TranscriptionClient: DependencyKey {
+  public static var liveValue: Self {
+    let live = TranscriptionClientLive.shared
+    return Self(
+      transcribe: { url, model, options, skipSilence, vocab, progress in
+        let decodeOptions = DecodingOptions(
+          language: options.language,
+          detectLanguage: options.detectLanguage,
+          chunkingStrategy: options.useVADChunking ? .vad : nil
+        )
+        return try await live.transcribe(url: url, model: model, options: decodeOptions, skipSilence: skipSilence, vocabularyHints: vocab, progressCallback: progress)
+      },
+      downloadModel: { try await live.downloadAndLoadModel(variant: $0, progressCallback: $1) },
+      deleteModel: { try await live.deleteModel(variant: $0) },
+      isModelDownloaded: { await live.isModelDownloaded($0) },
+      isParakeet: { live.isParakeetSync($0) },
+      isQwen: { live.isQwenSync($0) }
+    )
   }
 }
 
@@ -69,6 +59,8 @@ extension DependencyValues {
 //  loading them into memory, and then performing transcriptions.
 
 actor TranscriptionClientLive {
+  static let shared = TranscriptionClientLive()
+
   // MARK: - Stored Properties
 
   /// The current in-memory `WhisperKit` instance, if any.
@@ -364,7 +356,15 @@ actor TranscriptionClientLive {
     ParakeetModel(rawValue: name) != nil
   }
 
+  nonisolated func isParakeetSync(_ name: String) -> Bool {
+    ParakeetModel(rawValue: name) != nil
+  }
+
   private func isQwen(_ name: String) -> Bool {
+    QwenModel(rawValue: name) != nil
+  }
+
+  nonisolated func isQwenSync(_ name: String) -> Bool {
     QwenModel(rawValue: name) != nil
   }
 

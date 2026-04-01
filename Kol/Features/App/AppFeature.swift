@@ -8,6 +8,7 @@
 import AppKit
 import ComposableArchitecture
 import Dependencies
+import KolCore
 
 @Reducer
 struct AppFeature {

@@ -35,6 +35,10 @@ public struct SleepManagementClient: Sendable {
   public var allowSleep: @Sendable () async -> Void = {}
 }
 
+extension SleepManagementClient: TestDependencyKey {
+  public static let testValue = SleepManagementClient()
+}
+
 extension DependencyValues {
   /// Access the sleep management client dependency.
   public var sleepManagement: SleepManagementClient {

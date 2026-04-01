@@ -1,5 +1,6 @@
 import Dependencies
 import IOKit.pwr_mgt
+import KolCore
 
 extension SleepManagementClient: DependencyKey {
   public static var liveValue: Self {

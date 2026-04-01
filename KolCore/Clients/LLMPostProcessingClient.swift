@@ -5,8 +5,8 @@ import Foundation
 private let logger = KolLog.llm
 
 @DependencyClient
-struct LLMPostProcessingClient: Sendable {
-	var process: @Sendable (
+public struct LLMPostProcessingClient: Sendable {
+	public var process: @Sendable (
 		_ context: PostProcessingContext,
 		_ config: LLMProviderConfig,
 		_ apiKey: String
@@ -23,7 +23,7 @@ extension LLMPostProcessingClient: DependencyKey {
 		return URLSession(configuration: config)
 	}()
 
-	static var liveValue: Self {
+	public static var liveValue: Self {
 		Self(
 			process: { context, config, apiKey in
 				let systemPrompt = PromptAssembler.systemPrompt(
@@ -117,11 +117,11 @@ extension LLMPostProcessingClient: DependencyKey {
 	}
 }
 
-enum LLMError: Error, LocalizedError {
+public enum LLMError: Error, LocalizedError {
 	case invalidResponse
 	case apiError(statusCode: Int, body: String)
 
-	var errorDescription: String? {
+	public var errorDescription: String? {
 		switch self {
 		case .invalidResponse:
 			return "Invalid response from LLM API"
@@ -131,7 +131,7 @@ enum LLMError: Error, LocalizedError {
 	}
 }
 
-extension DependencyValues {
+public extension DependencyValues {
 	var llmPostProcessing: LLMPostProcessingClient {
 		get { self[LLMPostProcessingClient.self] }
 		set { self[LLMPostProcessingClient.self] = newValue }

@@ -8,24 +8,11 @@ import DependenciesMacros
 import Foundation
 import IOKit
 import IOKit.hidsystem
+import KolCore
 import os
 import Sauce
 
 private let logger = KolLog.keyEvent
-
-struct KeyEventMonitorToken: Sendable {
-  private let cancelHandler: @Sendable () -> Void
-
-  init(cancel: @escaping @Sendable () -> Void) {
-    self.cancelHandler = cancel
-  }
-
-  func cancel() {
-    cancelHandler()
-  }
-
-  static let noop = KeyEventMonitorToken(cancel: {})
-}
 
 public extension KeyEvent {
   init(cgEvent: CGEvent, type: CGEventType, isFnPressed: Bool) {
@@ -57,17 +44,8 @@ public extension KeyEvent {
   }
 }
 
-@DependencyClient
-struct KeyEventMonitorClient {
-  var listenForKeyPress: @Sendable () async -> AsyncThrowingStream<KeyEvent, Error> = { .never }
-  var handleKeyEvent: @Sendable (@Sendable @escaping (KeyEvent) -> Bool) -> KeyEventMonitorToken = { _ in .noop }
-  var handleInputEvent: @Sendable (@Sendable @escaping (InputEvent) -> Bool) -> KeyEventMonitorToken = { _ in .noop }
-  var startMonitoring: @Sendable () async -> Void = {}
-  var stopMonitoring: @Sendable () -> Void = {}
-}
-
 extension KeyEventMonitorClient: DependencyKey {
-  static var liveValue: KeyEventMonitorClient {
+  public static var liveValue: KeyEventMonitorClient {
     let live = KeyEventMonitorClientLive()
     return KeyEventMonitorClient(
       listenForKeyPress: {
@@ -86,13 +64,6 @@ extension KeyEventMonitorClient: DependencyKey {
         live.stopMonitoring()
       }
     )
-  }
-}
-
-extension DependencyValues {
-  var keyEventMonitor: KeyEventMonitorClient {
-    get { self[KeyEventMonitorClient.self] }
-    set { self[KeyEventMonitorClient.self] = newValue }
   }
 }
 

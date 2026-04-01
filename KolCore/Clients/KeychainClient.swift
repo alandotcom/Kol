@@ -4,14 +4,14 @@ import Foundation
 import Security
 
 @DependencyClient
-struct KeychainClient: Sendable {
-	var save: @Sendable (_ key: String, _ value: String) async throws -> Void
-	var load: @Sendable (_ key: String) async -> String?
-	var delete: @Sendable (_ key: String) async throws -> Void
+public struct KeychainClient: Sendable {
+	public var save: @Sendable (_ key: String, _ value: String) async throws -> Void
+	public var load: @Sendable (_ key: String) async -> String?
+	public var delete: @Sendable (_ key: String) async throws -> Void
 }
 
 extension KeychainClient: DependencyKey {
-	static var liveValue: Self {
+	public static var liveValue: Self {
 		let service = "com.alandotcom.Kol"
 		let logger = KolLog.settings
 
@@ -88,7 +88,7 @@ extension KeychainClient: DependencyKey {
 	}
 }
 
-extension DependencyValues {
+public extension DependencyValues {
 	var keychain: KeychainClient {
 		get { self[KeychainClient.self] }
 		set { self[KeychainClient.self] = newValue }

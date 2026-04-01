@@ -1,24 +1,13 @@
 import Dependencies
-import DependenciesMacros
 import Foundation
+import KolCore
 import ScreenCaptureKit
 import Vision
 
 private let logger = KolLog.screenContext
 
-/// Captures window screenshots via ScreenCaptureKit and extracts text via Vision OCR.
-/// Used as a fallback when AX-captured text is too sparse (< 50 chars), which happens
-/// for all Electron/Chromium apps (Slack, Discord, Teams, browsers).
-@DependencyClient
-struct OCRClient: Sendable {
-	/// Capture a window screenshot for the given PID and return OCR-extracted text.
-	/// Returns nil if Screen Recording permission is not granted, the window can't be found,
-	/// or OCR produces no results.
-	var captureWindowText: @Sendable (_ pid: pid_t) async -> String? = { _ in nil }
-}
-
 extension OCRClient: DependencyKey {
-	static var liveValue: Self {
+	public static var liveValue: Self {
 		Self(
 			captureWindowText: { pid in
 				await captureAndOCR(pid: pid)
@@ -90,12 +79,5 @@ extension OCRClient: DependencyKey {
 			logger.error("OCR: capture failed for pid \(pid): \(error.localizedDescription)")
 			return nil
 		}
-	}
-}
-
-extension DependencyValues {
-	var ocrClient: OCRClient {
-		get { self[OCRClient.self] }
-		set { self[OCRClient.self] = newValue }
 	}
 }

@@ -5,18 +5,8 @@ import SwiftUI
 
 @main
 struct KolApp: App {
-	/// Live store — nil when running under XCTest to avoid conflicting
-	/// with TestStore dependency injection.
-	private static let _appStore: Store<AppFeature.State, AppFeature.Action>? = {
-		guard !isTesting else { return nil }
-		return Store(initialState: AppFeature.State()) {
-			AppFeature()
-		}
-	}()
-
-	/// Access the live store. Falls back to a no-op store if somehow accessed during tests.
-	static var appStore: Store<AppFeature.State, AppFeature.Action> {
-		_appStore ?? Store(initialState: AppFeature.State()) { EmptyReducer() }
+	static let appStore = Store(initialState: AppFeature.State()) {
+		AppFeature()
 	}
 
 	@NSApplicationDelegateAdaptor(KolAppDelegate.self) var appDelegate

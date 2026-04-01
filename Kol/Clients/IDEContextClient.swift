@@ -1,20 +1,12 @@
 import ApplicationServices
 import Dependencies
-import DependenciesMacros
 import Foundation
+import KolCore
 
 private let logger = KolLog.screenContext
 
-/// Extracts IDE-specific context (open file names) from the AX tree of code editors.
-/// Uses raw AX API to walk the window's toolbar/tab bar and extract tab titles.
-@DependencyClient
-struct IDEContextClient: Sendable {
-	/// Extract open file names from the IDE tab bar for the given process.
-	var extractTabTitles: @Sendable (_ pid: pid_t) -> [String] = { _ in [] }
-}
-
 extension IDEContextClient: DependencyKey {
-	static var liveValue: Self {
+	public static var liveValue: Self {
 		Self(
 			extractTabTitles: { pid in
 				extractTabTitlesFromAXTree(pid: pid)
@@ -101,11 +93,4 @@ extension IDEContextClient: DependencyKey {
 		return false
 	}
 
-}
-
-extension DependencyValues {
-	var ideContext: IDEContextClient {
-		get { self[IDEContextClient.self] }
-		set { self[IDEContextClient.self] = newValue }
-	}
 }

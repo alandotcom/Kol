@@ -1,27 +1,12 @@
 import AXorcist
 import Dependencies
-import DependenciesMacros
 import Foundation
+import KolCore
 
 private let logger = KolLog.conversation
 
-/// Extracts window-level metadata from the AX tree: window title, browser URL, and messaging participant names.
-/// Used for conversation awareness (§5) and app context reclassification (§10).
-@DependencyClient
-struct WindowContextClient: Sendable {
-	/// Read the title of the focused window for a process.
-	var windowTitle: @Sendable (_ pid: pid_t) -> String? = { _ in nil }
-
-	/// Extract a URL from a browser's AX tree (address bar content).
-	var browserURL: @Sendable (_ pid: pid_t) -> String? = { _ in nil }
-
-	/// Extract participant names from a messaging app's AX tree.
-	/// Best-effort: walks the AX tree looking for sender-like text elements.
-	var messagingParticipants: @Sendable (_ pid: pid_t) -> [String] = { _ in [] }
-}
-
 extension WindowContextClient: DependencyKey {
-	static var liveValue: Self {
+	public static var liveValue: Self {
 		Self(
 			windowTitle: { pid in
 				MainActor.assumeIsolated { readWindowTitle(pid: pid) }
@@ -180,11 +165,4 @@ extension WindowContextClient: DependencyKey {
 		}
 	}
 
-}
-
-extension DependencyValues {
-	var windowContext: WindowContextClient {
-		get { self[WindowContextClient.self] }
-		set { self[WindowContextClient.self] = newValue }
-	}
 }
