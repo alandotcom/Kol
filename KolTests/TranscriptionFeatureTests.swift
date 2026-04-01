@@ -6,13 +6,7 @@ import Testing
 @testable import Kol
 @testable import KolCore
 
-/// TranscriptionFeature TCA TestStore tests.
-///
-/// Currently disabled: TestStore crashes when running inside the host app (TEST_HOST)
-/// because the app's @main entry point initializes a live TCA Store that conflicts
-/// with TestStore's dependency injection. Fix: guard app init with
-/// `ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil` check.
-@Suite(.serialized, .disabled("TestStore crashes in host-app context — needs app init guard"))
+@Suite(.serialized, .disabled("TestStore SEGV in host-app test bundle — may need separate non-hosted test target"))
 @MainActor
 struct TranscriptionFeatureTests {
 
@@ -33,11 +27,19 @@ struct TranscriptionFeatureTests {
     } withDependencies: {
       $0.date.now = now
       // Minimal mocks to prevent crashes
+      // Mock all dependencies to prevent unimplemented crashes
       $0.recording.startRecording = {}
       $0.recording.stopRecording = { URL(fileURLWithPath: "/tmp/test.wav") }
+      $0.recording.requestMicrophoneAccess = { true }
+      $0.recording.observeAudioLevel = { AsyncStream { _ in } }
+      $0.recording.getAvailableInputDevices = { [] }
+      $0.recording.getDefaultInputDeviceName = { nil }
+      $0.recording.warmUpRecorder = {}
+      $0.recording.cleanup = {}
       $0.sleepManagement.preventSleep = { _ in }
       $0.sleepManagement.allowSleep = {}
       $0.soundEffects.play = { _ in }
+      $0.soundEffects.preloadSounds = {}
       $0.screenContext.captureVisibleText = { _ in nil }
       $0.screenContext.captureCursorContext = { _ in nil }
       $0.screenContext.characterBeforeCursor = { nil }
@@ -45,6 +47,19 @@ struct TranscriptionFeatureTests {
       $0.windowContext.browserURL = { _ in nil }
       $0.windowContext.messagingParticipants = { _ in [] }
       $0.ideContext.extractTabTitles = { _ in [] }
+      $0.pasteboard = PasteboardClient(
+        paste: { _ in },
+        copy: { _ in },
+        sendKeyboardCommand: { _ in }
+      )
+      $0.keychain.save = { _, _ in }
+      $0.keychain.load = { _ in nil }
+      $0.keychain.delete = { _ in }
+      $0.transcriptPersistence.save = { text, _, _, _, _, _ in
+        Transcript(timestamp: Date(), text: text, audioPath: URL(fileURLWithPath: "/tmp/out.wav"), duration: 1.0)
+      }
+      $0.transcriptPersistence.deleteAudio = { _ in }
+      $0.ocrClient.captureWindowText = { _ in nil }
       configure(&$0)
     }
     store.exhaustivity = .off

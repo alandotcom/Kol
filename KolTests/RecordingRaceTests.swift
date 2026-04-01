@@ -8,7 +8,7 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct RecordingRaceTests {
-  @Test(.disabled("Crashes in host-app test — needs investigation"))
+  @Test(.disabled("TestStore SEGV in host-app test bundle"))
   func newRecordingCancelsPendingDiscardCleanup() async throws {
     let now = Date(timeIntervalSince1970: 1_234)
     let activeApp = NSWorkspace.shared.frontmostApplication
