@@ -34,7 +34,7 @@ Kol (קול, Hebrew for "voice") is a macOS menu bar application for on‑device
   - `PromptAssembler.systemPrompt()` composes applicable layers in order: core → language → app context → IDE context → screen context → vocabulary hints → custom rules
 - **Key files**: `KolCore/LLMPostProcessing.swift`, `LLMPostProcessingClient.swift`, `ScreenContextClient.swift`, `IDEContextClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
 - **Insertion point**: `TranscriptionFeature.handleTranscriptionResult()`, after word removals/remappings, before `finalizeRecordingAndStoreTranscript()`
-- **Screen context capture**: `ScreenContextClient` uses AX APIs at recording start (synchronous), then refreshes every 1s during recording via `contextRefreshTick` timer effect. State stored in `TranscriptionFeature.State.capturedScreenContext` / `capturedCursorContext`, cleared on cancel/discard.
+- **Screen context capture**: `ScreenContextClient` uses AX APIs via an async effect dispatched at recording start (`recordingContextCaptured` action), then refreshes every 1s during recording via `contextRefreshTick` timer effect. State stored in `TranscriptionFeature.State.capturedScreenContext` / `capturedCursorContext`, cleared on cancel/discard.
 - **IDE context capture**: `IDEContextClient` extracts open file tab titles from code editors (VS Code, Cursor, Xcode, Zed) via AX tree walk. File names feed into vocabulary cache and a dedicated prompt layer. Captured at recording start only.
 - **Graceful fallback**: on any LLM error, original text is pasted
 - **API key**: stored in macOS Keychain via `KeychainClient`, NOT in settings JSON
@@ -116,22 +116,27 @@ macOS TCC (Transparency, Consent, and Control) grants accessibility, input monit
 The app uses **The Composable Architecture (TCA)** for state management. Key architectural components:
 
 ### Features (TCA Reducers)
+- `TranscriptionFeature` **(KolCore)**: Core recording and transcription logic — lives in the framework for testability
 - `AppFeature`: Root feature coordinating the app lifecycle
-- `TranscriptionFeature`: Core recording and transcription logic
 - `SettingsFeature`: User preferences and configuration
 - `HistoryFeature`: Transcription history management
 
-### Dependency Clients
+### Dependency Clients (interface/implementation split)
+
+Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no AppKit). Live implementations (`DependencyKey` with `liveValue`) live in **Kol/Clients/** (AppKit/platform APIs). See `docs/solutions/build-errors/spm-c-module-transitive-dependency-non-hosted-tests.md` for the full pattern.
+
 - `TranscriptionClient`: Routes to WhisperKit, ParakeetClient, or QwenClient based on model
 - `ParakeetClient`: FluidAudio ASR for Parakeet models
 - `QwenClient`: FluidAudio Qwen3AsrManager for Caspi Hebrew model
-- `LLMPostProcessingClient`: OpenAI-compatible API for transcription cleanup
+- `LLMPostProcessingClient` **(entirely in KolCore)**: OpenAI-compatible API for transcription cleanup
 - `ScreenContextClient`: Captures focused text field content via macOS Accessibility API for LLM context; refreshed every 1s during recording
 - `IDEContextClient`: Extracts open file tab titles from code editors via AX tree walk
-- `KeychainClient`: macOS Keychain for API key storage
+- `KeychainClient` **(entirely in KolCore)**: macOS Keychain for API key storage
 - `RecordingClient`: AVAudioRecorder wrapper for audio capture
 - `PasteboardClient`: Clipboard operations
 - `KeyEventMonitorClient`: Global hotkey monitoring via Sauce framework
+- `WorkspaceClient`: NSWorkspace.frontmostApplication abstraction (no AppKit in interface)
+- `InputSourceClient`: Carbon TIS keyboard input source detection (no Carbon in interface)
 
 ### Key Dependencies
 - **WhisperKit**: Core ML transcription (tracking main branch)
