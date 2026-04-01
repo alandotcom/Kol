@@ -1,4 +1,4 @@
-import ApplicationServices
+import AXorcist
 import Dependencies
 import Foundation
 import KolCore
@@ -9,25 +9,21 @@ extension IDEContextClient: DependencyKey {
 	public static var liveValue: Self {
 		Self(
 			extractTabTitles: { pid in
-				extractTabTitlesFromAXTree(pid: pid)
+				MainActor.assumeIsolated { extractTabTitlesFromAXTree(pid: pid) }
 			}
 		)
 	}
 
 	/// Walk the AX tree for a process and extract tab titles.
 	/// Looks for AXRadioButton or AXTab elements that typically represent editor tabs.
+	@MainActor
 	private static func extractTabTitlesFromAXTree(pid: pid_t) -> [String] {
-		let app = AXUIElementCreateApplication(pid)
-
-		// Get the focused/frontmost window
-		var windowRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &windowRef) == .success,
-			  let windowRef
+		guard let app = Element.application(for: pid),
+			  let window = app.focusedWindow()
 		else {
 			logger.debug("IDEContext: failed to get focused window for pid \(pid)")
 			return []
 		}
-		let window = windowRef as! AXUIElement
 
 		// Collect tab-like elements from the window's children (limited depth)
 		var titles: [String] = []
@@ -43,8 +39,9 @@ extension IDEContextClient: DependencyKey {
 	/// Recursively search for tab-like elements and extract their titles.
 	/// Tab elements in IDEs typically have role AXRadioButton (in tab groups), AXTab, or AXButton
 	/// with a title that looks like a filename.
+	@MainActor
 	private static func collectTabTitles(
-		element: AXUIElement,
+		element: Element,
 		depth: Int,
 		maxDepth: Int,
 		titles: inout [String],
@@ -52,9 +49,9 @@ extension IDEContextClient: DependencyKey {
 	) {
 		guard depth < maxDepth else { return }
 
-		let role = axStringAttribute(element, kAXRoleAttribute)
-		let subrole = axStringAttribute(element, kAXSubroleAttribute)
-		let title = axStringAttribute(element, kAXTitleAttribute)
+		let role = element.role()
+		let subrole = element.subrole()
+		let title = element.title()
 
 		// Tab elements in IDEs:
 		// - VS Code / Cursor (Electron): AXRadioButton inside AXTabGroup with title = filename
@@ -71,12 +68,8 @@ extension IDEContextClient: DependencyKey {
 		}
 
 		// Recurse into children
-		var childrenRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-			  let children = childrenRef as? [AXUIElement]
-		else { return }
+		guard let children = element.children() else { return }
 
-		// Optimization: if we find an AXTabGroup, only search its children (skip the rest of the tree at this level)
 		for child in children {
 			collectTabTitles(element: child, depth: depth + 1, maxDepth: maxDepth, titles: &titles, seen: &seen)
 		}

@@ -1,4 +1,4 @@
-import ApplicationServices
+import AXorcist
 import Dependencies
 import Foundation
 import KolCore
@@ -9,55 +9,45 @@ extension EditTrackingClient: DependencyKey {
 	public static var liveValue: Self {
 		Self(
 			captureSnapshot: {
-				captureCurrentElementSnapshot()
+				MainActor.assumeIsolated { captureCurrentElementSnapshot() }
 			},
 			readText: { expectedHash in
-				readCurrentElementText(expectedHash: expectedHash)
+				MainActor.assumeIsolated { readCurrentElementText(expectedHash: expectedHash) }
 			}
 		)
 	}
 
+	@MainActor
 	private static func captureCurrentElementSnapshot() -> ElementSnapshot? {
-		let systemWide = AXUIElementCreateSystemWide()
-		var focusedRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-			  let focusedRef
+		guard let focused = Element.systemWide().focusedUIElement() else { return nil }
+		guard let text = focused.stringValue(),
+			  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 		else { return nil }
-		let element = focusedRef as! AXUIElement
 
-		guard let text = axStringAttribute(element, kAXValueAttribute) else { return nil }
-
-		let hash = computeElementHash(element)
+		let hash = computeElementHash(focused)
 		return ElementSnapshot(hash: hash, text: text)
 	}
 
+	@MainActor
 	private static func readCurrentElementText(expectedHash: Int) -> String? {
-		let systemWide = AXUIElementCreateSystemWide()
-		var focusedRef: CFTypeRef?
-		guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-			  let focusedRef
-		else { return nil }
-		let element = focusedRef as! AXUIElement
+		guard let focused = Element.systemWide().focusedUIElement() else { return nil }
 
-		let hash = computeElementHash(element)
+		let hash = computeElementHash(focused)
 		guard hash == expectedHash else {
 			logger.debug("Element hash mismatch: expected \(expectedHash), got \(hash)")
 			return nil
 		}
 
-		return axStringAttribute(element, kAXValueAttribute)
+		return focused.stringValue()
 	}
 
 	/// Compute a hash from the element's role + title + PID for identity tracking.
-	private static func computeElementHash(_ element: AXUIElement) -> Int {
+	@MainActor
+	private static func computeElementHash(_ element: Element) -> Int {
 		var hasher = Hasher()
-		hasher.combine(axStringAttribute(element, kAXRoleAttribute) ?? "")
-		hasher.combine(axStringAttribute(element, kAXTitleAttribute) ?? "")
-
-		var pid: pid_t = 0
-		AXUIElementGetPid(element, &pid)
-		hasher.combine(pid)
-
+		hasher.combine(element.role() ?? "")
+		hasher.combine(element.title() ?? "")
+		hasher.combine(element.pid() ?? 0)
 		return hasher.finalize()
 	}
 
