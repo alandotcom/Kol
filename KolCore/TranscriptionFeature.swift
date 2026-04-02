@@ -127,7 +127,6 @@ public struct TranscriptionFeature {
   @Dependency(\.vocabularyCache) var vocabularyCache
   @Dependency(\.ideContext) var ideContext
   @Dependency(\.windowContext) var windowContext
-  @Dependency(\.nameCache) var nameCache
   @Dependency(\.editTracking) var editTrackingClient
   @Dependency(\.ocrClient) var ocrClient
   @Dependency(\.workspace) var workspace
@@ -588,7 +587,7 @@ private extension TranscriptionFeature {
     let appName = state.sourceAppName
 
     let initialContextEffect: Effect<Action> = llmEnabled && screenContextEnabled
-      ? .run { [screenContext, vocabularyCache, ideContext, windowContext, nameCache] send in
+      ? .run { [screenContext, vocabularyCache, ideContext, windowContext] send in
           // Screen context: cursor context preferred, flat text fallback
           let cursor: CursorContext? = await MainActor.run { screenContext.captureCursorContext(bundleID) }
           let flatText: String?
@@ -621,7 +620,9 @@ private extension TranscriptionFeature {
             }
           }
 
-          // Conversation context (messaging/email)
+          // Conversation context (messaging/email): channel/conversation name from window title.
+          // Participant names come from screen context (visible in the text the LLM already sees),
+          // not from fragile AX element heuristics.
           var conversation: ConversationContext?
           if conversationEnabled,
              let p = pid,
@@ -629,24 +630,10 @@ private extension TranscriptionFeature {
              category == .messaging || category == .email {
             let windowTitle = await MainActor.run { windowContext.windowTitle(p) }
             let conversationName = ConversationContext.conversationName(fromWindowTitle: windowTitle)
-            let participants = await MainActor.run { windowContext.messagingParticipants(p) }
-            let conversationID = conversationName ?? windowTitle ?? "unknown"
-            let bid = bundleID ?? "unknown"
-            if !participants.isEmpty {
-              nameCache.merge(participants, bid, conversationID)
-            }
-            let cachedNames = nameCache.allNames(bid, 30)
-            let allParticipants = Array(Set(participants + cachedNames))
             conversation = ConversationContext(
               conversationName: conversationName,
-              participants: allParticipants,
               bundleID: bundleID
             )
-            if !allParticipants.isEmpty {
-              let nameVocab = VocabularyExtractor.Result(properNouns: allParticipants, identifiers: [], fileNames: [])
-              vocabularyCache.merge(nameVocab)
-              vocabulary = vocabularyCache.topTerms(maxVocabularyHints)
-            }
           }
 
           // OCR quality gate: trigger OCR if AX text is too sparse
@@ -897,7 +884,7 @@ private extension TranscriptionFeature {
       && state.kolSettings.conversationContextEnabled
     let editTrackingEnabled = state.kolSettings.editTrackingEnabled
 
-    return .run { [llmPostProcessing, keychain, nameCache, editTrackingClient] send in
+    return .run { [llmPostProcessing, keychain, editTrackingClient] send in
       do {
         var finalText = modifiedResult
         var llmMetadata: LLMMetadata?
@@ -919,7 +906,8 @@ private extension TranscriptionFeature {
               structuredContext: capturedCursorContext,
               vocabularyHints: capturedVocabulary,
               conversationContext: capturedConversationContext,
-              resolvedCategory: resolvedAppCategory
+              resolvedCategory: resolvedAppCategory,
+              atMentionEnabled: atMentionEnabled
             )
             do {
               let result = try await llmPostProcessing.process(context, llmConfig, apiKey)
@@ -945,15 +933,6 @@ private extension TranscriptionFeature {
           if remappedText != finalText {
             transcriptionFeatureLogger.info("Applied \(remappings.count) word remapping(s)")
             finalText = remappedText
-          }
-        }
-
-        // @-mention rewriting: "at Alice" → "@Alice" for known participants
-        if atMentionEnabled, let convo = capturedConversationContext, !convo.participants.isEmpty {
-          let rewritten = AtMentionRewriter.rewrite(finalText, knownNames: convo.participants)
-          if rewritten != finalText {
-            transcriptionFeatureLogger.info("Applied @-mention rewriting")
-            finalText = rewritten
           }
         }
 

@@ -31,6 +31,8 @@ public struct PostProcessingContext: Sendable {
 	/// Resolved app category (when URL-based reclassification was applied).
 	/// If nil, the assembler resolves from sourceApp as before.
 	public let resolvedCategory: AppContextCategory?
+	/// When true, the LLM is instructed to convert "at Name" → "@Name" for names visible in screen context.
+	public let atMentionEnabled: Bool
 	public init(
 		text: String,
 		inputLanguage: String? = nil,
@@ -42,7 +44,8 @@ public struct PostProcessingContext: Sendable {
 		structuredContext: CursorContext? = nil,
 		vocabularyHints: [String]? = nil,
 		conversationContext: ConversationContext? = nil,
-		resolvedCategory: AppContextCategory? = nil
+		resolvedCategory: AppContextCategory? = nil,
+		atMentionEnabled: Bool = false
 	) {
 		self.text = text
 		self.inputLanguage = inputLanguage
@@ -55,6 +58,7 @@ public struct PostProcessingContext: Sendable {
 		self.vocabularyHints = vocabularyHints
 		self.conversationContext = conversationContext
 		self.resolvedCategory = resolvedCategory
+		self.atMentionEnabled = atMentionEnabled
 	}
 }
 
@@ -210,6 +214,15 @@ public enum PromptLayers {
 	public static let appContextMessaging = """
 	The text will be pasted into a messaging app. \
 	Do not formalize the tone. Do not add bullet points or structured formatting.
+	"""
+
+	/// @-mention instruction: tells the LLM to convert spoken "at Name" to "@Name"
+	/// using names visible in the screen context as the source of truth.
+	public static let atMentionInstruction = """
+	When the speaker says "at" followed by a person's name (e.g., "at Alice", "at Bob Smith"), \
+	convert it to an @-mention: "@Alice", "@Bob Smith". \
+	Only do this for names that appear as message senders in the screen context. \
+	Clean up redundant patterns like "at at Name" → "@Name".
 	"""
 
 	public static let appContextDocument = """
@@ -391,7 +404,8 @@ public enum PromptAssembler {
 		structuredContext: CursorContext? = nil,
 		vocabularyHints: [String]? = nil,
 		conversationContext: ConversationContext? = nil,
-		resolvedCategory: AppContextCategory? = nil
+		resolvedCategory: AppContextCategory? = nil,
+		atMentionEnabled: Bool = false
 	) -> String {
 		var parts: [String] = [PromptLayers.core]
 
@@ -436,6 +450,11 @@ public enum PromptAssembler {
 				visibleText: ctx,
 				isTerminal: PromptLayers.isTerminal(sourceApp)
 			))
+		}
+
+		// @-mention instruction: convert "at Name" → "@Name" using screen context names
+		if atMentionEnabled {
+			parts.append(PromptLayers.atMentionInstruction)
 		}
 
 		// Vocabulary hints: extracted identifiers and proper nouns

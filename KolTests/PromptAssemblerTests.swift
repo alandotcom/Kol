@@ -524,6 +524,42 @@ struct PromptAssemblerTests {
 		#expect(convoIdx < screenIdx)
 	}
 
+	// MARK: - @-mention Instruction
+
+	@Test("@-mention instruction included when enabled")
+	func atMentionEnabled() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "Slack", customRules: nil,
+			atMentionEnabled: true
+		)
+		#expect(prompt.contains("@-mention"))
+		#expect(prompt.contains("@Alice"))
+	}
+
+	@Test("@-mention instruction excluded when disabled")
+	func atMentionDisabled() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "Slack", customRules: nil,
+			atMentionEnabled: false
+		)
+		#expect(!prompt.contains("@-mention"))
+	}
+
+	@Test("@-mention instruction appears after screen context and before vocabulary hints")
+	func atMentionOrdering() {
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "Slack", customRules: nil,
+			screenContext: "Alice Johnson\nHello",
+			vocabularyHints: ["handleFoo"],
+			atMentionEnabled: true
+		)
+		let screenIdx = prompt.range(of: "visible on the user's screen")!.lowerBound
+		let mentionIdx = prompt.range(of: "@-mention")!.lowerBound
+		let vocabIdx = prompt.range(of: "Names and identifiers visible on screen")!.lowerBound
+		#expect(screenIdx < mentionIdx)
+		#expect(mentionIdx < vocabIdx)
+	}
+
 	// MARK: - Email App Context
 
 	@Test("Email app gets email-specific prompt")

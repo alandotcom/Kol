@@ -1,0 +1,72 @@
+# @-mention conversion test cases
+# Run: source .env && npx promptfoo@latest eval --tests datasets/mentions.yaml --prompts prompts/english-messaging-screen-mentions.txt
+
+# =============================================================================
+# Basic @-mention conversion
+# =============================================================================
+
+- description: "Single @-mention with first name"
+  vars:
+    input: "hey at Alice can you review the PR"
+    screenContext: "Alice Johnson\nSure, I'll take a look at it now\nBob Smith\nGreat, let me know if you need help"
+  assert:
+    - type: contains
+      value: "@Alice"
+    - type: not-contains
+      value: "at Alice"
+    - type: contains
+      value: "review"
+
+- description: "Single @-mention with full name"
+  vars:
+    input: "at Bob Smith can you check the deploy"
+    screenContext: "Alice Johnson\nThe deploy is ready\nBob Smith\nI'll check it after lunch"
+  assert:
+    - type: contains
+      value: "@Bob"
+    - type: not-contains
+      value: "at Bob"
+    - type: contains
+      value: "deploy"
+
+- description: "Multiple @-mentions in one sentence"
+  vars:
+    input: "at Alice and at Bob please review the changes"
+    screenContext: "Alice Johnson\nStarted the review\nBob Smith\nOn it"
+  assert:
+    - type: contains
+      value: "@Alice"
+    - type: contains
+      value: "@Bob"
+
+- description: "No conversion when name not in screen context"
+  vars:
+    input: "at Charlie can you help with this"
+    screenContext: "Alice Johnson\nSure thing\nBob Smith\nSounds good"
+  assert:
+    - type: not-contains
+      value: "@Charlie"
+
+- description: "No conversion for 'at' as preposition"
+  vars:
+    input: "let's meet at the office at three"
+    screenContext: "Alice Johnson\nSee you there\nBob Smith\nI'll be late"
+  assert:
+    - type: not-contains
+      value: "@the"
+    - type: not-contains
+      value: "@three"
+    - type: contains
+      value: "office"
+
+- description: "@-mention preserves surrounding text"
+  vars:
+    input: "hey at Alice I pushed the fix can you take a look"
+    screenContext: "Alice Johnson\nLet me know when it's ready\nDan Lee\nI'm also interested"
+  assert:
+    - type: contains
+      value: "@Alice"
+    - type: contains
+      value: "pushed"
+    - type: contains
+      value: "fix"

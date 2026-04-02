@@ -36,7 +36,8 @@ extension LLMPostProcessingClient: DependencyKey {
 					structuredContext: context.structuredContext,
 					vocabularyHints: context.vocabularyHints,
 					conversationContext: context.conversationContext,
-					resolvedCategory: context.resolvedCategory
+					resolvedCategory: context.resolvedCategory,
+					atMentionEnabled: context.atMentionEnabled
 				)
 				let userMessage = PromptAssembler.userMessage(text: context.text)
 
