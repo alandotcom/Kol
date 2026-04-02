@@ -472,18 +472,12 @@ struct PromptAssemblerTests {
 
 	@Test("Conversation context included when provided")
 	func conversationContextIncluded() {
-		let convo = ConversationContext(
-			conversationName: "#engineering",
-			participants: ["Alice", "Bob"],
-			bundleID: "com.tinyspeck.slackmacgap"
-		)
+		let convo = ConversationContext(conversationName: "#engineering")
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: "Slack", customRules: nil,
 			conversationContext: convo
 		)
 		#expect(prompt.contains("Conversation: #engineering"))
-		#expect(prompt.contains("Participants: Alice, Bob"))
-		#expect(prompt.contains("Use these exact names"))
 	}
 
 	@Test("Conversation context excluded when nil")
@@ -493,32 +487,38 @@ struct PromptAssemblerTests {
 			conversationContext: nil
 		)
 		#expect(!prompt.contains("Conversation:"))
-		#expect(!prompt.contains("Participants:"))
 	}
 
-	@Test("Conversation context excluded when empty")
+	@Test("Conversation context excluded when no name")
 	func conversationContextEmpty() {
-		let convo = ConversationContext(conversationName: nil, participants: [])
+		let convo = ConversationContext(conversationName: nil)
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: "Slack", customRules: nil,
 			conversationContext: convo
 		)
-		#expect(!prompt.contains("Participants:"))
+		#expect(!prompt.contains("Conversation:"))
+	}
+
+	@Test("Conversation context excluded when name is empty string")
+	func conversationContextEmptyString() {
+		let convo = ConversationContext(conversationName: "")
+		let prompt = PromptAssembler.systemPrompt(
+			language: "en", sourceApp: "Slack", customRules: nil,
+			conversationContext: convo
+		)
+		#expect(!prompt.contains("Conversation:"))
 	}
 
 	@Test("Conversation context appears after app context and before screen context")
 	func conversationContextOrdering() {
-		let convo = ConversationContext(
-			conversationName: "#test",
-			participants: ["Alice"]
-		)
+		let convo = ConversationContext(conversationName: "#test")
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: "Slack", customRules: nil,
 			screenContext: "some visible text",
 			conversationContext: convo
 		)
 		let messagingIdx = prompt.range(of: "messaging app")!.lowerBound
-		let convoIdx = prompt.range(of: "Participants:")!.lowerBound
+		let convoIdx = prompt.range(of: "Conversation: #test")!.lowerBound
 		let screenIdx = prompt.range(of: "visible on the user's screen")!.lowerBound
 		#expect(messagingIdx < convoIdx)
 		#expect(convoIdx < screenIdx)

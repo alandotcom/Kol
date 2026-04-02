@@ -630,10 +630,7 @@ private extension TranscriptionFeature {
              category == .messaging || category == .email {
             let windowTitle = await MainActor.run { windowContext.windowTitle(p) }
             let conversationName = ConversationContext.conversationName(fromWindowTitle: windowTitle)
-            conversation = ConversationContext(
-              conversationName: conversationName,
-              bundleID: bundleID
-            )
+            conversation = ConversationContext(conversationName: conversationName)
           }
 
           // OCR quality gate: trigger OCR if AX text is too sparse

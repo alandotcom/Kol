@@ -174,7 +174,7 @@ struct LLMSectionContent: View {
 						set: { store.send(.setConversationContextEnabled($0)) }
 					)
 				)
-				Text("Extracts channel names and participant names in messaging and email apps.")
+				Text("Adds channel and conversation context in messaging and email apps.")
 					.font(.system(size: 13))
 					.foregroundColor(.secondary)
 
@@ -187,7 +187,7 @@ struct LLMSectionContent: View {
 						)
 					)
 					.padding(.leading, 16)
-					Text("Converts \"at Name\" to \"@Name\" for known participants.")
+					Text("Converts \"at Name\" to \"@Name\" for names visible on screen.")
 						.font(.system(size: 13))
 						.foregroundColor(.secondary)
 						.padding(.leading, 16)

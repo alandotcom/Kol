@@ -289,17 +289,9 @@ public enum PromptLayers {
 		"""
 	}
 
-	/// Conversation context layer: participant names and conversation identity for messaging/email apps.
-	public static func conversationContext(participants: [String], conversationName: String?) -> String {
-		var parts: [String] = []
-		if let name = conversationName, !name.isEmpty {
-			parts.append("Conversation: \(name)")
-		}
-		if !participants.isEmpty {
-			parts.append("Participants: \(participants.joined(separator: ", "))")
-		}
-		parts.append("Use these exact names when they appear in the transcription.")
-		return parts.joined(separator: "\n")
+	/// Conversation context layer: conversation identity for messaging/email apps.
+	public static func conversationContext(conversationName: String) -> String {
+		"Conversation: \(conversationName)"
 	}
 
 	/// IDE context layer: open file names and detected language from the active code editor.
@@ -433,13 +425,10 @@ public enum PromptAssembler {
 			parts.append(PromptLayers.ideContext(fileNames: ide.openFileNames, language: ide.detectedLanguage))
 		}
 
-		// Conversation context: participant names and conversation identity
+		// Conversation context: conversation identity (channel/DM name)
 		if let convo = conversationContext,
-		   (!convo.participants.isEmpty || convo.conversationName != nil) {
-			parts.append(PromptLayers.conversationContext(
-				participants: convo.participants,
-				conversationName: convo.conversationName
-			))
+		   let name = convo.conversationName, !name.isEmpty {
+			parts.append(PromptLayers.conversationContext(conversationName: name))
 		}
 
 		// Screen context: prefer structured (before/after cursor) over flat string

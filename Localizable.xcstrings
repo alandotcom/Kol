@@ -192,9 +192,6 @@
     "Conversation awareness" : {
 
     },
-    "Converts \"at Name\" to \"@Name\" for known participants." : {
-
-    },
     "Copied" : {
       "comment" : "Transcription from history copied.",
       "localizations" : {
@@ -367,9 +364,6 @@
           }
         }
       }
-    },
-    "Extracts channel names and participant names in messaging and email apps." : {
-
     },
     "Fast but may not restore all clipboard content. Turn off to use simulated keypresses." : {
 

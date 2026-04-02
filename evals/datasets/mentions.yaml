@@ -59,6 +59,18 @@
     - type: contains
       value: "office"
 
+- description: "Redundant 'at at' cleaned up"
+  vars:
+    input: "hey at at Alice can you check this"
+    screenContext: "Alice Johnson\nSure thing\nBob Smith\nOn it"
+  assert:
+    - type: contains
+      value: "@Alice"
+    - type: not-contains
+      value: "at at"
+    - type: not-contains
+      value: "at @"
+
 - description: "@-mention preserves surrounding text"
   vars:
     input: "hey at Alice I pushed the fix can you take a look"
