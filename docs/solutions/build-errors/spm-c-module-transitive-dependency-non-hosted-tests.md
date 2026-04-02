@@ -9,7 +9,7 @@ component: testing_framework
 symptoms:
   - "xcodebuild test fails with 'Unable to resolve module dependency: FastClusterWrapper'"
   - "xcodebuild test fails with 'Unable to resolve module dependency: MachTaskSelfWrapper'"
-  - "Undefined symbol: static Kol.WindowContextClient.looksLikePersonName in non-hosted test target"
+  - "Undefined symbol in non-hosted test target for app-target types"
   - "TestStore tests crash with SEGV in hosted test bundle (TEST_HOST) on macOS 26 / Swift 6.2"
   - "@Shared(.fileStorage) triggers SEGV when TCA State is initialized in any test bundle"
 root_cause: missing_include
@@ -52,8 +52,8 @@ A subsequent, larger problem: TCA TestStore tests for TranscriptionFeature (the 
 - Same failure on clean `main` branch (not caused by recent changes)
 - After fixing module resolution, a second failure appears:
   ```
-  Undefined symbol: static Kol.WindowContextClient.looksLikePersonName(_:)
-  Undefined symbol: nominal type descriptor for Kol.WindowContextClient
+  Undefined symbol: static Kol.<AppTargetType>.<method>(_:)
+  Undefined symbol: nominal type descriptor for Kol.<AppTargetType>
   ```
 - When TEST_HOST/BUNDLE_LOADER is added to run hosted tests: TestStore tests crash with SEGV during `@MainActor` class deallocation (swiftlang/swift#87316)
 - When TEST_HOST is removed but TranscriptionFeature moved to KolCore: `TranscriptionFeature.State()` initialization crashes due to `@Shared(.fileStorage)` triggering file I/O that SEGVs in the test bundle context
@@ -91,17 +91,7 @@ KolTests is non-hosted (no `BUNDLE_LOADER` / `TEST_HOST`). It compiles against `
 
 **Simple case — pure function extraction:**
 
-Extracted pure parsing logic from `Kol/Clients/WindowContextClient.swift` into `KolCore/NameParser.swift`:
-
-```swift
-// KolCore/NameParser.swift
-public enum NameParser {
-    public static func looksLikePersonName(_ text: String) -> Bool { ... }
-    public static func parseNamesFromDescription(_ description: String) -> [String] { ... }
-}
-```
-
-`WindowContextClient` delegates to `NameParser`. Tests import `@testable import KolCore` and call `NameParser` directly.
+Extract pure logic from an app-target client into a KolCore type. For example, vocabulary extraction logic lives in `KolCore/VocabularyExtractor.swift` — the app-target `ScreenContextClient` captures raw text, then delegates to the KolCore type for parsing. Tests import `@testable import KolCore` and call the extractor directly.
 
 **Complex case — full reducer migration with dependency client split:**
 

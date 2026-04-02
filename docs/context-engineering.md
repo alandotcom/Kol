@@ -977,18 +977,18 @@ High overall, but each adapter is independent and can be built incrementally. St
 ### Phase C — done
 
 **§5 Conversation Awareness — done**
-- `ConversationContext` model in `KolCore/ConversationContext.swift` — `conversationName`, `participants`, `bundleID` + window title parsing via `components(separatedBy: " - ")`
-- `WindowContextClient` in `Kol/Clients/WindowContextClient.swift` — three AX methods: `windowTitle(pid:)`, `browserURL(pid:)`, `messagingParticipants(pid:)`
-- `NameCacheClient` in `KolCore/NameCache.swift` — per-conversation LRU cache (max 50 names, max 20 conversations per app), NSLock-backed
-- `PromptLayers.conversationContext(participants:conversationName:)` — new prompt layer between IDE context and screen context
-- Integrated in `TranscriptionFeature.handleStartRecording()` — captures window title → conversation name → participant names for messaging/email apps, merges into NameCache
-- 9 ConversationContextTests, 7 NameCacheTests
+- `ConversationContext` model in `KolCore/ConversationContext.swift` — `conversationName` + window title parsing via `components(separatedBy: " - ")`
+- `WindowContextClient` in `Kol/Clients/WindowContextClient.swift` — two AX methods: `windowTitle(pid:)`, `browserURL(pid:)`
+- `PromptLayers.conversationContext(conversationName:)` — prompt layer between IDE context and screen context
+- Integrated in `TranscriptionFeature.handleStartRecording()` — captures window title → conversation name for messaging/email apps
+- 4 ConversationContext prompt assembly tests
 
-**§5 @-Mention Insertion — done**
-- `AtMentionRewriter` in `KolCore/AtMentionRewriter.swift` — detects `\bat\s+[Name]\b` → replaces with `@Name` for known participants
-- Applied after LLM post-processing + word remappings in `TranscriptionFeature`
+**§5 @-Mention Insertion — done (reworked)**
+- Originally used regex-based `AtMentionRewriter` + `NameCache` + AX tree name extraction — removed as too fragile for Electron apps
+- Now handled by `PromptLayers.atMentionInstruction` — LLM prompt layer that instructs the model to convert "at Name" → "@Name" using names visible in screen context
+- `atMentionEnabled: Bool` plumbed through `PostProcessingContext` → `PromptAssembler.systemPrompt()`
 - Gated by `atMentionInsertionEnabled` + `conversationContextEnabled`
-- 7 AtMentionRewriterTests
+- 3 prompt assembly tests, 7 promptfoo eval cases (`evals/datasets/mentions.yaml`)
 
 **§7 Post-Paste Edit Tracking (Phase 1-2) — done**
 - `EditVectorComputer` in `KolCore/EditVector.swift` — Wagner-Fischer word-level edit distance → M/S/D/I/C vector + `[WordEdit]` array, casing-only detection post-pass
@@ -1022,13 +1022,6 @@ High overall, but each adapter is independent and can be built incrementally. St
 - **Conclusion**: Chromium-based apps (Slack, Discord, Teams, browsers) require OCR for content. Native apps (iMessage, Notes, TextEdit) have rich AX trees — OCR unnecessary.
 
 ### Phase D — done
-
-**Enhanced AX metadata extraction — done**
-- `WindowContextClient.parseNamesFromDescription()` — pure function that extracts names from Slack-style button descriptions ("Includes X and Y", "Includes X, Y, and Z")
-- `collectParticipantNames()` extended to check `element.descriptionText()` on `AXButton` elements for "Includes" patterns
-- Names parsed from descriptions are merged into existing participant name flow (NameCache → VocabularyCache → ASR biasing)
-- `looksLikePersonName()` promoted to `static` visibility for testability
-- 12 WindowContextMetadataTests (two names, Oxford comma, no-Oxford, simple pattern, no match, empty, trailing period, non-name filtering, unicode, hyphenated, valid/invalid name detection)
 
 **§9 On-device OCR — done**
 - `OCRClient` in `Kol/Clients/OCRClient.swift` — TCA `@DependencyClient` with `captureWindowText(pid:)`
