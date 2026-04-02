@@ -127,6 +127,7 @@ public struct TranscriptionFeature {
   @Dependency(\.vocabularyCache) var vocabularyCache
   @Dependency(\.ideContext) var ideContext
   @Dependency(\.windowContext) var windowContext
+  @Dependency(\.llmVocabulary) var llmVocabulary
   @Dependency(\.editTracking) var editTrackingClient
   @Dependency(\.ocrClient) var ocrClient
   @Dependency(\.workspace) var workspace
@@ -585,9 +586,12 @@ private extension TranscriptionFeature {
     let ocrEnabled = state.kolSettings.ocrContextEnabled
     let pid = state.sourceAppPID
     let appName = state.sourceAppName
+    let llmPreset = state.kolSettings.llmProviderPreset
+    let llmBaseURL = state.kolSettings.llmProviderBaseURL
+    let llmModelName = state.kolSettings.llmModelName
 
     let initialContextEffect: Effect<Action> = llmEnabled && screenContextEnabled
-      ? .run { [screenContext, vocabularyCache, ideContext, windowContext] send in
+      ? .run { [screenContext, vocabularyCache, ideContext, windowContext, keychain, llmVocabulary] send in
           // Screen context: cursor context preferred, flat text fallback
           let cursor: CursorContext? = await MainActor.run { screenContext.captureCursorContext(bundleID) }
           let flatText: String?
@@ -654,6 +658,26 @@ private extension TranscriptionFeature {
               await send(.ocrCaptured(ocrText, terms))
             }
           }
+
+          // LLM vocabulary extraction — extract single-word names that regex misses.
+          // Races with transcription; if it finishes in time, names appear in vocabulary hints.
+          if let text = flatText, !text.isEmpty {
+            var apiKey = await keychain.load("llmApiKey_\(llmPreset)")
+            if apiKey == nil { apiKey = await keychain.load("llmApiKey") }
+            if let apiKey, !apiKey.isEmpty {
+              let config = LLMProviderConfig(baseURL: llmBaseURL, modelName: llmModelName)
+              let conversationID = conversation?.conversationName
+              do {
+                let names = try await llmVocabulary.extractNames(text, conversationID, config, apiKey)
+                if !names.isEmpty {
+                  let vocab = VocabularyExtractor.Result(properNouns: names, identifiers: [], fileNames: [])
+                  vocabularyCache.merge(vocab)
+                }
+              } catch {
+                // Regex results already in cache — graceful degradation
+              }
+            }
+          }
         }
         .cancellable(id: CancelID.initialContextCapture, cancelInFlight: true)
       : .none
@@ -707,6 +731,7 @@ private extension TranscriptionFeature {
       return .merge(
         .cancel(id: CancelID.contextRefresh),
         .cancel(id: CancelID.ocrCapture),
+        .cancel(id: CancelID.initialContextCapture),
         .run { _ in
           let url = await recording.stopRecording()
           guard !Task.isCancelled else { return }
@@ -1075,6 +1100,7 @@ private extension TranscriptionFeature {
     return .merge(
       .cancel(id: CancelID.contextRefresh),
       .cancel(id: CancelID.ocrCapture),
+      .cancel(id: CancelID.initialContextCapture),
       .run { [sleepManagement] _ in
         // Allow system to sleep again
         await sleepManagement.allowSleep()
