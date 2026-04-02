@@ -185,33 +185,7 @@ struct WordRemappingsView: View {
 
 	private var suggestionsSection: some View {
 		VStack(alignment: .leading, spacing: 12) {
-			if !store.kolSettings.editTrackingEnabled {
-				// Edit tracking not enabled — guide user
-				HStack(spacing: 16) {
-					Image(systemName: "lightbulb")
-						.font(.title3)
-						.foregroundStyle(.yellow)
-						.frame(width: 40, height: 40)
-						.background(Color.yellow.opacity(0.1))
-						.clipShape(RoundedRectangle(cornerRadius: 12))
-
-					VStack(alignment: .leading, spacing: 4) {
-						Text("Enable edit tracking")
-							.font(.subheadline.weight(.medium))
-						Text("Turn on \"Learn from corrections\" in the LLM section to start tracking edits you make after paste.")
-							.font(.system(size: 13))
-							.foregroundStyle(.secondary)
-					}
-				}
-				.padding(16)
-				.frame(maxWidth: .infinity, alignment: .leading)
-				.background(Color.yellow.opacity(0.04))
-				.clipShape(RoundedRectangle(cornerRadius: 12))
-				.overlay(
-					RoundedRectangle(cornerRadius: 12)
-						.strokeBorder(Color.yellow.opacity(0.15), lineWidth: 0.5)
-				)
-			} else if store.suggestedRemappings.isEmpty {
+			if store.suggestedRemappings.isEmpty {
 				// No suggestions yet
 				HStack(spacing: 16) {
 					Image(systemName: "sparkles")

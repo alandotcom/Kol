@@ -84,7 +84,7 @@ actor ParakeetClient {
     let models = try await AsrModels.downloadAndLoad(version: variant.asrVersion)
     self.models = models
     let manager = AsrManager(config: .init())
-    try await manager.initialize(models: models)
+    try await manager.loadModels(models)
     self.asr = manager
     self.currentVariant = variant
     p.completedUnitCount = 100

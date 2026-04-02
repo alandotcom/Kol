@@ -193,17 +193,6 @@ struct LLMSectionContent: View {
 						.padding(.leading, 16)
 				}
 
-				Toggle(
-					"Learn from corrections",
-					isOn: Binding(
-						get: { store.kolSettings.editTrackingEnabled },
-						set: { store.send(.setEditTrackingEnabled($0)) }
-					)
-				)
-				Text("Tracks edits you make after paste to improve future transcriptions.")
-					.font(.system(size: 13))
-					.foregroundColor(.secondary)
-
 				Button("Customize App Context Prompts...") {
 					store.send(.showPromptCustomization)
 				}
