@@ -32,7 +32,7 @@ if [ -n "$(git diff HEAD 2>/dev/null)" ] || [ -n "$(git ls-files --others --excl
   exit 1
 fi
 
-REMOTE="fork"
+REMOTE="origin"
 BRANCH=$(git branch --show-current)
 
 echo "==> Releasing Kol v${VERSION} from branch ${BRANCH}"

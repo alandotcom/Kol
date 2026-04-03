@@ -23,7 +23,8 @@ Kol (קול, Hebrew for "voice") is a macOS menu bar application for on‑device
 - **Insertion point**: `TranscriptionFeature.handleTranscriptionResult()`, after word removals/remappings, before `finalizeRecordingAndStoreTranscript()`
 - **Screen context capture**: `ScreenContextClient` uses AX APIs via an async effect dispatched at recording start (`recordingContextCaptured` action), then refreshes every 1s during recording via `contextRefreshTick` timer effect. All AX calls use `withMainActorTimeout` (2s) to prevent UI hangs from unresponsive apps. State stored in `TranscriptionFeature.State.capturedScreenContext` / `capturedCursorContext`, cleared on cancel/discard.
 - **IDE context capture**: `IDEContextClient` extracts open file tab titles from code editors (VS Code, Cursor, Xcode, Zed) via AX tree walk. File names feed into vocabulary cache and a dedicated prompt layer. Captured at recording start only.
-- **Graceful fallback**: on any LLM error, original text is pasted
+- **Configuration validation**: both `LLMPostProcessingClient` and `LLMVocabularyClient` guard against empty `baseURL` and `modelName` before making requests, throwing `LLMError.invalidConfiguration` instead of crashing on force-unwrap. This protects against partially-configured Custom provider presets.
+- **Graceful fallback**: on any LLM error (including invalid configuration), original text is pasted
 - **API key**: stored in macOS Keychain via `KeychainClient`, NOT in settings JSON
 - **Tests**: `PromptAssemblerTests.swift` for prompt composition
 - **Evals**: promptfoo-based eval suite — see Eval Workflow section below
@@ -142,9 +143,9 @@ Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no
 
 3. **Sound Effects**: Audio feedback is provided via `SoundEffect.swift` using files in `Resources/Audio/`
 
-4. **Window Management**: Uses an `InvisibleWindow` for the transcription indicator overlay
+4. **Window Management**: Uses an `InvisibleWindow` for the transcription indicator overlay. On multi-monitor setups, the window repositions to the screen containing the mouse via a demand-driven notification posted by `TranscriptionView` when the indicator becomes visible (once per recording, not continuously).
 
-5. **Continuous Context Refresh**: During recording, a 1-second timer (`contextRefreshTick`) re-captures screen text via AX APIs and updates the vocabulary cache. Gated by `llmPostProcessingEnabled && llmScreenContextEnabled`. Timer cancelled on stop/cancel/discard via `CancelID.contextRefresh`.
+5. **Continuous Context Refresh**: During recording, a 1-second timer (`contextRefreshTick`) re-captures screen text via AX APIs and updates the vocabulary cache. Gated by `llmPostProcessingEnabled && llmScreenContextEnabled`. Timer cancelled on stop/cancel/discard via `CancelID.contextRefresh`. **Change detection**: the `contextRefreshed` handler skips state mutation when screen text and vocabulary are unchanged from the previous tick, avoiding redundant TCA observation / view re-renders during long recordings into static content.
 
 6. **Permissions**: Requires audio input and automation entitlements (see `Kol.entitlements`)
 
@@ -274,5 +275,5 @@ Releases use `scripts/release.sh`, which bumps versions, builds, signs, creates 
 5. Builds with xcodebuild (Release configuration)
 6. Signs with Apple Development identity
 7. Creates ZIP artifact in `build/`
-8. Pushes commit + tag to `fork` remote
+8. Pushes commit + tag to `origin` remote
 9. Creates GitHub release via `gh release create` with ZIP attached
