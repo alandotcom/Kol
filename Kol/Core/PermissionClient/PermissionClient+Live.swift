@@ -36,31 +36,28 @@ extension PermissionClient: DependencyKey {
 /// for reactive permission updates.
 actor PermissionClientLive {
   private let (activationStream, activationContinuation) = AsyncStream<AppActivation>.makeStream()
-  private nonisolated(unsafe) var observations: [Any] = []
+  private let observations: [Any]
 
   init() {
     logger.debug("Initializing PermissionClient, setting up app activation observers")
+    let continuation = activationContinuation
     // Subscribe to app activation notifications
     let didBecomeActiveObserver = NotificationCenter.default.addObserver(
       forName: NSApplication.didBecomeActiveNotification,
       object: nil,
       queue: .main
-    ) { [weak self] _ in
+    ) { _ in
       logger.debug("App became active")
-      Task {
-        self?.activationContinuation.yield(.didBecomeActive)
-      }
+      continuation.yield(.didBecomeActive)
     }
 
     let willResignActiveObserver = NotificationCenter.default.addObserver(
       forName: NSApplication.willResignActiveNotification,
       object: nil,
       queue: .main
-    ) { [weak self] _ in
+    ) { _ in
       logger.debug("App will resign active")
-      Task {
-        self?.activationContinuation.yield(.willResignActive)
-      }
+      continuation.yield(.willResignActive)
     }
 
     observations = [didBecomeActiveObserver, willResignActiveObserver]

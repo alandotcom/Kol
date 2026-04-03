@@ -1,6 +1,19 @@
 import Foundation
 
 extension Date {
+	private static let dayOfWeekFormatter: DateFormatter = {
+		let f = DateFormatter()
+		f.dateFormat = "EEEE"
+		return f
+	}()
+
+	private static let mediumDateFormatter: DateFormatter = {
+		let f = DateFormatter()
+		f.dateStyle = .medium
+		f.timeStyle = .none
+		return f
+	}()
+
 	func relativeFormatted() -> String {
 		let calendar = Calendar.current
 		let now = Date()
@@ -10,14 +23,9 @@ extension Date {
 		} else if calendar.isDateInYesterday(self) {
 			return "Yesterday"
 		} else if let daysAgo = calendar.dateComponents([.day], from: self, to: now).day, daysAgo < 7 {
-			let formatter = DateFormatter()
-			formatter.dateFormat = "EEEE" // Day of week
-			return formatter.string(from: self)
+			return Self.dayOfWeekFormatter.string(from: self)
 		} else {
-			let formatter = DateFormatter()
-			formatter.dateStyle = .medium
-			formatter.timeStyle = .none
-			return formatter.string(from: self)
+			return Self.mediumDateFormatter.string(from: self)
 		}
 	}
 }

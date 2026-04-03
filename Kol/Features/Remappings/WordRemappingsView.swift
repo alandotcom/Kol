@@ -11,9 +11,9 @@ struct WordRemappingsView: View {
 	private var activeCount: Int {
 		switch activeSection {
 		case .removals:
-			store.kolSettings.wordRemovals.filter(\.isEnabled).count
+			store.kolSettings.wordRemovals.reduce(0) { $0 + ($1.isEnabled ? 1 : 0) }
 		case .remappings:
-			store.kolSettings.wordRemappings.filter(\.isEnabled).count
+			store.kolSettings.wordRemappings.reduce(0) { $0 + ($1.isEnabled ? 1 : 0) }
 		case .suggestions:
 			store.suggestedRemappings.count
 		}
@@ -255,27 +255,21 @@ struct WordRemappingsView: View {
 	}
 
 	private func removalBinding(for id: UUID) -> Binding<WordRemoval>? {
-		guard store.kolSettings.wordRemovals.contains(where: { $0.id == id }) else { return nil }
+		guard let idx = store.kolSettings.wordRemovals.firstIndex(where: { $0.id == id }) else {
+			return nil
+		}
 		return Binding(
-			get: {
-				guard let idx = store.kolSettings.wordRemovals.firstIndex(where: { $0.id == id }) else {
-					return WordRemoval(pattern: "")
-				}
-				return store.kolSettings.wordRemovals[idx]
-			},
+			get: { store.kolSettings.wordRemovals[idx] },
 			set: { store.send(.updateWordRemoval($0)) }
 		)
 	}
 
 	private func remappingBinding(for id: UUID) -> Binding<WordRemapping>? {
-		guard store.kolSettings.wordRemappings.contains(where: { $0.id == id }) else { return nil }
+		guard let idx = store.kolSettings.wordRemappings.firstIndex(where: { $0.id == id }) else {
+			return nil
+		}
 		return Binding(
-			get: {
-				guard let idx = store.kolSettings.wordRemappings.firstIndex(where: { $0.id == id }) else {
-					return WordRemapping(match: "", replacement: "")
-				}
-				return store.kolSettings.wordRemappings[idx]
-			},
+			get: { store.kolSettings.wordRemappings[idx] },
 			set: { store.send(.updateWordRemapping($0)) }
 		)
 	}
@@ -354,8 +348,7 @@ private struct TransformCard<Content: View>: View {
 			RoundedRectangle(cornerRadius: 16)
 				.strokeBorder(GlassColors.cardBorder, lineWidth: 0.5)
 		)
-		.shadow(color: .black.opacity(0.06), radius: 4, y: 2)
-		.shadow(color: .black.opacity(0.06), radius: 12, y: 8)
+		.shadow(color: .black.opacity(0.08), radius: 8, y: 4)
 		.onHover { isHovered = $0 }
 	}
 }
@@ -419,8 +412,7 @@ private struct SuggestionCard: View {
 			RoundedRectangle(cornerRadius: 16)
 				.strokeBorder(GlassColors.cardBorder, lineWidth: 0.5)
 		)
-		.shadow(color: .black.opacity(0.06), radius: 4, y: 2)
-		.shadow(color: .black.opacity(0.06), radius: 12, y: 8)
+		.shadow(color: .black.opacity(0.08), radius: 8, y: 4)
 	}
 }
 

@@ -166,9 +166,13 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 
 	func applicationWillTerminate(_: Notification) {
 		NotificationCenter.default.removeObserver(self)
+		// Fire-and-forget: Task.detached avoids deadlocking the @MainActor
+		// (a plain Task would need the main actor, which is blocked by sema.wait).
+		// Best-effort cleanup — the OS will reclaim resources regardless.
+		let rec = recording
 		let sema = DispatchSemaphore(value: 0)
-		Task {
-			await recording.cleanup()
+		Task.detached {
+			await rec.cleanup()
 			sema.signal()
 		}
 		_ = sema.wait(timeout: .now() + 2.0)

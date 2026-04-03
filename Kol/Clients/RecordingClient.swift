@@ -20,8 +20,8 @@ private typealias CoreAudioPropertyListenerBlock = @convention(block) (UInt32, U
 extension RecordingClient: DependencyKey {
   public static var liveValue: Self {
     let live = RecordingClientLive()
-    Task {
-      await live.startObservingSystemChanges()
+    Task { [weak live] in
+      await live?.startObservingSystemChanges()
     }
     return Self(
       startRecording: { await live.startRecording() },

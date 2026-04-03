@@ -62,12 +62,15 @@ struct TranscriptionIndicatorView: View {
 
       // Waveform stays visible during recording AND processing —
       // it just smoothly decays to a flat line when power drops to 0.
-      AudioWaveformView(
-        averagePower: averagePower,
-        peakPower: peakPower
-      )
-      .padding(.horizontal, 12)
-      .opacity(status == .recording || isProcessing ? 1 : 0)
+      // Only in the hierarchy when needed to avoid 60-120fps TimelineView
+      // computation when the panel is hidden.
+      if status == .recording || isProcessing {
+        AudioWaveformView(
+          averagePower: averagePower,
+          peakPower: peakPower
+        )
+        .padding(.horizontal, 12)
+      }
 
       // Option key dot
       Circle()

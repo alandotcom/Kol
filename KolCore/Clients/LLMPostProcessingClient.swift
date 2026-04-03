@@ -16,7 +16,7 @@ public struct LLMPostProcessingClient: Sendable {
 extension LLMPostProcessingClient: DependencyKey {
 	private static let llmSession: URLSession = {
 		let config = URLSessionConfiguration.default
-		config.waitsForConnectivity = true
+		config.waitsForConnectivity = false
 		config.allowsExpensiveNetworkAccess = false
 		config.timeoutIntervalForRequest = 5
 		config.timeoutIntervalForResource = 30
@@ -47,12 +47,18 @@ extension LLMPostProcessingClient: DependencyKey {
 				logger.notice("LLM vocabulary hints: \(vocabPreview, privacy: .private)")
 				logger.notice("LLM system prompt preview: \(String(systemPrompt.suffix(200)), privacy: .private)")
 
-				let url = URL(string: "\(config.baseURL)/chat/completions")!
+				guard !config.baseURL.isEmpty,
+					  let url = URL(string: "\(config.baseURL)/chat/completions")
+				else {
+					throw LLMError.invalidConfiguration("Base URL is empty or malformed: \(config.baseURL)")
+				}
 				var request = URLRequest(url: url)
 				request.httpMethod = "POST"
 				request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 				request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-				request.timeoutInterval = 5
+				guard !config.modelName.isEmpty else {
+					throw LLMError.invalidConfiguration("Model name is empty")
+				}
 
 				let body: [String: Any] = [
 					"model": config.modelName,
@@ -120,12 +126,15 @@ extension LLMPostProcessingClient: DependencyKey {
 
 public enum LLMError: Error, LocalizedError {
 	case invalidResponse
+	case invalidConfiguration(String)
 	case apiError(statusCode: Int, body: String)
 
 	public var errorDescription: String? {
 		switch self {
 		case .invalidResponse:
 			return "Invalid response from LLM API"
+		case .invalidConfiguration(let reason):
+			return "LLM configuration error: \(reason)"
 		case .apiError(let code, let body):
 			return "LLM API error \(code): \(body)"
 		}

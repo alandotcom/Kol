@@ -12,13 +12,14 @@ struct TranscriptView: View {
 	let onCopy: () -> Void
 	let onDelete: () -> Void
 
+	@State private var appIcon: NSImage?
+
 	var body: some View {
 		VStack(alignment: .leading, spacing: 0) {
 			// Metadata bar
 			HStack(spacing: 6) {
-				if let bundleID = transcript.sourceAppBundleID,
-				   let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-					Image(nsImage: NSWorkspace.shared.icon(forFile: appURL.path))
+				if let appIcon {
+					Image(nsImage: appIcon)
 						.resizable()
 						.frame(width: 14, height: 14)
 					if let appName = transcript.sourceAppName {
@@ -167,8 +168,15 @@ struct TranscriptView: View {
 			RoundedRectangle(cornerRadius: 12)
 				.strokeBorder(GlassColors.cardBorder, lineWidth: 0.5)
 		)
-		.shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-		.shadow(color: .black.opacity(0.08), radius: 12, y: 8)
+		.shadow(color: .black.opacity(0.10), radius: 8, y: 4)
+		.task(id: transcript.sourceAppBundleID) {
+			guard let bundleID = transcript.sourceAppBundleID else { return }
+			appIcon = await Task.detached(priority: .utility) {
+				guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+				else { return nil as NSImage? }
+				return NSWorkspace.shared.icon(forFile: url.path)
+			}.value
+		}
 		.task(id: showCopied) {
 			guard showCopied else { return }
 			try? await Task.sleep(for: .seconds(1.5))
@@ -235,8 +243,7 @@ private struct StatCard: View {
 			RoundedRectangle(cornerRadius: 12)
 				.strokeBorder(GlassColors.cardBorder, lineWidth: 0.5)
 		)
-		.shadow(color: .black.opacity(0.08), radius: 4, y: 2)
-		.shadow(color: .black.opacity(0.08), radius: 12, y: 8)
+		.shadow(color: .black.opacity(0.10), radius: 8, y: 4)
 	}
 }
 

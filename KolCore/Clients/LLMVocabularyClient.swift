@@ -43,12 +43,18 @@ extension LLMVocabularyClient: DependencyKey {
 				}
 				userMessage += screenText
 
-				let url = URL(string: "\(config.baseURL)/chat/completions")!
+				guard !config.baseURL.isEmpty,
+					  let url = URL(string: "\(config.baseURL)/chat/completions")
+				else {
+					throw LLMError.invalidConfiguration("Base URL is empty or malformed: \(config.baseURL)")
+				}
 				var request = URLRequest(url: url)
 				request.httpMethod = "POST"
 				request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 				request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-				request.timeoutInterval = 3
+				guard !config.modelName.isEmpty else {
+					throw LLMError.invalidConfiguration("Model name is empty")
+				}
 
 				let body: [String: Any] = [
 					"model": config.modelName,

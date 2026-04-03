@@ -5,6 +5,7 @@ import MarkdownUI
 struct ChangelogView: View {
     @ObserveInjection var inject
     @Environment(\.dismiss) var dismiss
+    @State private var changelogContent: String?
 
     var body: some View {
         ScrollView {
@@ -13,10 +14,7 @@ struct ChangelogView: View {
                     .font(.title)
                     .padding(.bottom, 10)
 
-                if let changelogPath = Bundle.main.path(forResource: "changelog", ofType: "md"),
-                    let changelogContent = try? String(
-                        contentsOfFile: changelogPath, encoding: .utf8)
-                {
+                if let changelogContent {
                     Markdown(changelogContent)
                 } else {
                     Text("Changelog could not be loaded.")
@@ -32,6 +30,10 @@ struct ChangelogView: View {
                 .padding(.top, 20)
             }
             .padding()
+        }
+        .task {
+            changelogContent = Bundle.main.path(forResource: "changelog", ofType: "md")
+                .flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }
         }
         .enableInjection()
     }

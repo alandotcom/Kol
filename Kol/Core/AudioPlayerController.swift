@@ -1,5 +1,8 @@
 import AVFoundation
 
+// TODO: Extract into a PlaybackClient dependency for full @MainActor isolation
+// and testability. Currently stored directly in HistoryFeature.State which
+// prevents @MainActor annotation (State mutating methods aren't actor-isolated).
 class AudioPlayerController: NSObject, AVAudioPlayerDelegate {
 	private var player: AVAudioPlayer?
 	var onPlaybackFinished: (() -> Void)?
