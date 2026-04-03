@@ -6,23 +6,16 @@ struct CuratedList: View {
 	@ObserveInjection var inject
 	@Bindable var store: StoreOf<ModelDownloadFeature>
 
-	private var englishModels: [CuratedModelInfo] {
+	private var models: [CuratedModelInfo] {
 		store.curatedModels.filter { $0.isParakeet }
 	}
 
-	private var hebrewModels: [CuratedModelInfo] {
-		store.curatedModels.filter { $0.isQwen }
-	}
-
 	private var hiddenModels: [CuratedModelInfo] {
-		store.curatedModels.filter { !$0.isParakeet && !$0.isQwen }
+		store.curatedModels.filter { !$0.isParakeet }
 	}
 
 	private func isSelected(_ model: CuratedModelInfo) -> Bool {
-		if model.isQwen {
-			return model.isSelected(forSetting: store.kolSettings.selectedHebrewModel)
-		}
-		return model.isSelected(forSetting: store.kolSettings.selectedModel)
+		model.isSelected(forSetting: store.kolSettings.selectedModel)
 	}
 
 	/// Returns the model to display as "selected" in a dropdown group.
@@ -36,9 +29,9 @@ struct CuratedList: View {
 	var body: some View {
 		VStack(alignment: .leading, spacing: 16) {
 			ModelDropdown(
-				label: "ENGLISH MODEL",
-				models: englishModels,
-				selectedModel: displayedModel(in: englishModels),
+				label: "MODEL",
+				models: models,
+				selectedModel: displayedModel(in: models),
 				isDownloading: store.isDownloading,
 				downloadingName: store.downloadingModelName,
 				downloadProgress: store.downloadProgress,
@@ -50,26 +43,6 @@ struct CuratedList: View {
 					store.send(.downloadSelectedModel)
 				}
 			)
-
-			ModelDropdown(
-				label: "HEBREW MODEL",
-				models: hebrewModels,
-				selectedModel: displayedModel(in: hebrewModels),
-				isDownloading: store.isDownloading,
-				downloadingName: store.downloadingModelName,
-				downloadProgress: store.downloadProgress,
-				isSelected: isSelected,
-				onSelect: { name in
-					store.send(.selectHebrewModel(name))
-				},
-				onDownload: {
-					store.send(.downloadSelectedHebrewModel)
-				}
-			)
-
-			Text("Kol switches automatically based on your keyboard layout.")
-				.font(.system(size: 13))
-				.foregroundStyle(.secondary)
 
 			if !hiddenModels.isEmpty {
 				Button(action: { store.send(.toggleModelDisplay) }) {

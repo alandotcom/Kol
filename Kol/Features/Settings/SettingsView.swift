@@ -28,9 +28,7 @@ struct SettingsView: View {
 			VStack(alignment: .leading, spacing: 20) {
 				SectionHeader(title: "Transcription Models", style: .section)
 				ModelSectionContent(store: store, shouldFlash: store.shouldFlashModelSection)
-				if ParakeetModel(rawValue: store.kolSettings.selectedModel) == nil
-					|| QwenModel(rawValue: store.kolSettings.selectedModel) != nil
-				{
+				if ParakeetModel(rawValue: store.kolSettings.selectedModel) == nil {
 					LanguageSectionContent(store: store)
 				}
 			}

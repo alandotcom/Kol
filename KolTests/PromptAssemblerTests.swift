@@ -11,24 +11,6 @@ struct PromptAssemblerTests {
 		#expect(prompt.contains("filler words"))
 	}
 
-	@Test("Hebrew layer added for Hebrew language")
-	func hebrewLayer() {
-		let prompt = PromptAssembler.systemPrompt(language: "he", sourceApp: nil, customRules: nil)
-		#expect(prompt.contains("maqaf"))
-		#expect(prompt.contains("על/אל"))
-		#expect(prompt.contains("code-switching"))
-		#expect(prompt.contains("מאמי"))
-		#expect(prompt.contains("NOT ASR errors"))
-	}
-
-	@Test("Hebrew layer includes no-transliterate rule")
-	func hebrewNoTransliterate() {
-		let prompt = PromptAssembler.systemPrompt(language: "he", sourceApp: nil, customRules: nil)
-		#expect(prompt.contains("output MUST be in Hebrew script"))
-		#expect(prompt.contains("Do NOT transliterate Hebrew to Latin characters"))
-		#expect(prompt.contains("vocabulary hints or screen context"))
-	}
-
 	@Test("English layer added for English language")
 	func englishLayer() {
 		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: nil, customRules: nil)
@@ -44,15 +26,10 @@ struct PromptAssemblerTests {
 		#expect(!prompt.contains("maqaf"))
 	}
 
-	@Test("Hebrew and English layers are mutually exclusive")
-	func languagesExclusive() {
-		let he = PromptAssembler.systemPrompt(language: "he", sourceApp: nil, customRules: nil)
-		#expect(he.contains("maqaf"))
-		#expect(!he.contains("camelCase"))
-
-		let en = PromptAssembler.systemPrompt(language: "en", sourceApp: nil, customRules: nil)
-		#expect(en.contains("camelCase"))
-		#expect(!en.contains("maqaf"))
+	@Test("English layer always present regardless of language param")
+	func englishLayerAlwaysPresent() {
+		let prompt = PromptAssembler.systemPrompt(language: nil, sourceApp: nil, customRules: nil)
+		#expect(prompt.contains("camelCase"))
 	}
 
 	@Test("Terminal maps to code context")
@@ -135,23 +112,21 @@ struct PromptAssemblerTests {
 		#expect(msg == "RAW_TRANSCRIPTION: \"hello world\"")
 	}
 
-	@Test("Full composition: Hebrew + code + custom")
+	@Test("Full composition: English + code + custom")
 	func fullComposition() {
 		let prompt = PromptAssembler.systemPrompt(
-			language: "he",
+			language: "en",
 			sourceApp: "com.apple.Terminal",
-			customRules: "My name is אלן"
+			customRules: "My name is Alan"
 		)
 		// Core
 		#expect(prompt.contains("Fix punctuation"))
-		// Hebrew
-		#expect(prompt.contains("maqaf"))
+		// English
+		#expect(prompt.contains("camelCase"))
 		// Code
 		#expect(prompt.contains("code editor"))
 		// Custom
-		#expect(prompt.contains("אלן"))
-		// Not English (check for English-only layer content, not code context which also uses camelCase)
-		#expect(!prompt.contains("clawed code"))
+		#expect(prompt.contains("Alan"))
 	}
 
 	@Test("App context override replaces default for code apps")
@@ -281,13 +256,12 @@ struct PromptAssemblerTests {
 	func overrideIsolation() {
 		let overrides = AppContextOverrides(code: "Custom code prompt")
 		let prompt = PromptAssembler.systemPrompt(
-			language: "he", sourceApp: "Terminal", customRules: "My name is Test",
+			language: "en", sourceApp: "Terminal", customRules: "My name is Test",
 			appContextOverrides: overrides
 		)
-		#expect(prompt.contains("maqaf"))
+		#expect(prompt.contains("camelCase"))
 		#expect(prompt.contains("Custom code prompt"))
 		#expect(prompt.contains("My name is Test"))
-		#expect(!prompt.contains("camelCase"))
 	}
 
 	@Test("Structured screen context is included")

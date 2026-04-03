@@ -1,6 +1,6 @@
-# Kol — Voice → Text (with Hebrew/Caspi support)
+# Kol — Voice → Text
 
-Kol (קול, Hebrew for "voice") is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added support for **Hebrew speech recognition** via [Caspi-1.7B CoreML](https://huggingface.co/alandotcom/caspi-1.7b-coreml), a Hebrew-optimized fine-tune of Qwen3-ASR running on Apple Silicon.
+Kol (קול, Hebrew for "voice") is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) — a macOS menu bar app for on-device voice-to-text using [Parakeet TDT](https://github.com/FluidInference/FluidAudio) on Apple Silicon, with optional LLM post-processing.
 
 <img width="812" alt="Kol Settings" src="docs/screenshots/settings.png" />
 
@@ -12,24 +12,16 @@ Kol (קול, Hebrew for "voice") is a fork of [kitlangton/Hex](https://github.co
 
 </details>
 
-## What's added
+## Features
 
-- **Caspi 1.7B (Hebrew)** model option — on-device Hebrew ASR via CoreML on Apple Silicon
-- Auto-downloads model from [HuggingFace](https://huggingface.co/alandotcom/caspi-1.7b-coreml) on first use (~2.8 GB)
-- **Auto language switching** — Hebrew keyboard active? Uses Caspi. Otherwise uses Parakeet. No manual switching needed.
+- **On-device transcription** via [Parakeet TDT](https://github.com/FluidInference/FluidAudio) — fast, accurate, multilingual, runs entirely on Apple Silicon
 - **AI post-processing** — optional LLM cleanup via [Groq](https://groq.com), [Cerebras](https://cerebras.ai), or any OpenAI-compatible API (~80ms latency):
   - Fixes punctuation, removes filler words, corrects ASR errors
   - Formats lists as bullet points in docs, keeps casual tone in messaging
   - Adapts to the target app (Terminal, Slack, Notes, etc.)
   - Composable prompt architecture: core rules + language-specific + app-context + your custom rules
-- Uses [alandotcom/FluidAudio](https://github.com/alandotcom/FluidAudio/tree/caspi-1.7b-compat) fork with Qwen3-ASR 1.7B support
-
-## Performance
-
-- ~2x real-time on Apple Silicon (M-series)
-- ~5% WER on Hebrew benchmarks
-- ~6 GB peak memory (int8 quantized)
-- ~80ms LLM post-processing (Groq)
+- **Context-aware** — captures screen text, IDE file names, and vocabulary near the cursor to improve transcription accuracy
+- **Press-and-hold** or **double-tap** hotkey recording modes
 
 ## Building from source
 
@@ -52,17 +44,7 @@ open /Applications/Kol.app
 
 Or open `Kol.xcodeproj` in Xcode, set your signing team under Signing & Capabilities, and hit Cmd+R.
 
-On first launch, grant microphone and accessibility permissions. Select **Caspi 1.7B (Hebrew)** in Settings — the model downloads automatically (~2.8 GB).
-
----
-
-*Originally forked from [kitlangton/Hex](https://github.com/kitlangton/Hex):*
-
-Press-and-hold a hotkey to transcribe your voice and paste the result wherever you're typing.
-
-> **Note:** Kol is currently only available for **Apple Silicon** Macs.
-
-Kol supports [Parakeet TDT v3](https://github.com/FluidInference/FluidAudio) via the awesome [FluidAudio](https://github.com/FluidInference/FluidAudio) (the default—it's frickin' unbelievable: fast, multilingual, and cloud-optimized), [WhisperKit](https://github.com/argmaxinc/WhisperKit) for on-device transcription, and now **Caspi-1.7B** for Hebrew. We use the incredible [Swift Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture) for structuring the app.
+On first launch, grant microphone and accessibility permissions. The Parakeet model downloads automatically (~650 MB).
 
 ## Instructions
 

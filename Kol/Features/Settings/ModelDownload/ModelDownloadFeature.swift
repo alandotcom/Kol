@@ -45,9 +45,6 @@ public struct CuratedModelInfo: Equatable, Identifiable, Codable {
 		case nil:
 			break
 		}
-		if qwenModel != nil {
-			return "BEST FOR HEBREW"
-		}
 		return nil
 	}
 
@@ -55,16 +52,8 @@ public struct CuratedModelInfo: Equatable, Identifiable, Codable {
 		ParakeetModel(rawValue: internalName)
 	}
 
-	var qwenModel: QwenModel? {
-		QwenModel(rawValue: internalName)
-	}
-
 	var isParakeet: Bool {
 		parakeetModel != nil
-	}
-
-	var isQwen: Bool {
-		qwenModel != nil
 	}
 
 	/// Whether this model matches the given selected model identifier.
@@ -177,10 +166,8 @@ public struct ModelDownloadFeature {
 		// Requests
 		case fetchModels
 		case selectModel(String)
-		case selectHebrewModel(String)
 		case toggleModelDisplay
 		case downloadSelectedModel
-		case downloadSelectedHebrewModel
 		// Effects
 		case modelsLoaded(recommended: String, available: [ModelInfo])
 		case downloadProgress(Double)
@@ -254,11 +241,6 @@ public struct ModelDownloadFeature {
 			updateBootstrapState(&state)
 			return .none
 
-		case let .selectHebrewModel(model):
-			let resolved = resolvePattern(model, from: Array(state.availableModels)) ?? model
-			state.$kolSettings.withLock { $0.selectedHebrewModel = resolved }
-			updateBootstrapState(&state)
-			return .none
 
 		// MARK: – Fetch Models
 
@@ -266,44 +248,21 @@ public struct ModelDownloadFeature {
 			guard !state.isLoadingModels else { return .none }
 			state.isLoadingModels = true
 			return .run { send in
-				do {
-					async let recommendedSupportTask = transcription.getRecommendedModels()
-					async let availableNamesTask = transcription.getAvailableModels()
-					let recommendedSupport = try await recommendedSupportTask
-					let names = try await availableNamesTask
-					let recommended = recommendedSupport.default
-					var infos = try await withThrowingTaskGroup(of: ModelInfo.self) { group -> [ModelInfo] in
-						for name in names {
-							group.addTask {
-								ModelInfo(
-									name: name,
-									isDownloaded: await transcription.isModelDownloaded(name)
-								)
-							}
-						}
-						return try await group.reduce(into: []) { $0.append($1) }
-					}
-					// Check Qwen model availability
-					for model in QwenModel.allCases {
-						let downloaded = await transcription.isModelDownloaded(model.identifier)
-						infos.append(ModelInfo(name: model.identifier, isDownloaded: downloaded))
-					}
-					await send(.modelsLoaded(recommended: recommended, available: infos))
-				} catch {
-					await send(.modelsLoaded(recommended: "", available: []))
+				// Build availability info from known Parakeet models
+				var infos: [ModelInfo] = []
+				for model in ParakeetModel.allCases {
+					let downloaded = await transcription.isModelDownloaded(model.identifier)
+					infos.append(ModelInfo(name: model.identifier, isDownloaded: downloaded))
 				}
+				let recommended = ParakeetModel.multilingualV3.identifier
+				await send(.modelsLoaded(recommended: recommended, available: infos))
 			}
 
 		case let .modelsLoaded(recommended, available):
 			state.isLoadingModels = false
-			// Ensure our curated Parakeet and Qwen options are visible even if WhisperKit doesn't list them
+			// Ensure our curated Parakeet options are visible
 			var availablePlus = available
 			for model in ParakeetModel.allCases.reversed() {
-				if !availablePlus.contains(where: { $0.name == model.identifier }) {
-					availablePlus.insert(ModelInfo(name: model.identifier, isDownloaded: false), at: 0)
-				}
-			}
-			for model in QwenModel.allCases.reversed() {
 				if !availablePlus.contains(where: { $0.name == model.identifier }) {
 					availablePlus.insert(ModelInfo(name: model.identifier, isDownloaded: false), at: 0)
 				}
@@ -348,9 +307,6 @@ public struct ModelDownloadFeature {
 
 		case .downloadSelectedModel:
 			return startDownload(modelName: state.kolSettings.selectedModel, state: &state)
-
-		case .downloadSelectedHebrewModel:
-			return startDownload(modelName: state.kolSettings.selectedHebrewModel, state: &state)
 
 		case let .downloadProgress(progress):
 			state.downloadProgress = progress

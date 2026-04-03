@@ -2,7 +2,7 @@ import Dependencies
 import DependenciesMacros
 import Foundation
 
-/// Options for transcription, abstracting away WhisperKit's DecodingOptions.
+/// Options for transcription.
 public struct TranscriptionOptions: Sendable {
 	public var language: String?
 	public var detectLanguage: Bool
@@ -16,8 +16,8 @@ public struct TranscriptionOptions: Sendable {
 }
 
 /// A client that transcribes audio files using ASR models.
-/// The struct definition lives in KolCore (no WhisperKit dependency);
-/// the liveValue in the app target bridges to WhisperKit/FluidAudio.
+/// The struct definition lives in KolCore;
+/// the liveValue in the app target bridges to FluidAudio (Parakeet).
 @DependencyClient
 public struct TranscriptionClient: Sendable {
 	/// Transcribes an audio file using the named model with given options.
@@ -44,9 +44,6 @@ public struct TranscriptionClient: Sendable {
 
 	/// Checks whether a model identifier is a Parakeet model.
 	public var isParakeet: @Sendable (_ model: String) -> Bool = { _ in false }
-
-	/// Checks whether a model identifier is a Qwen/Caspi model.
-	public var isQwen: @Sendable (_ model: String) -> Bool = { _ in false }
 }
 
 extension TranscriptionClient: TestDependencyKey {

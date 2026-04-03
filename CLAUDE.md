@@ -4,28 +4,15 @@ This file provides guidance for coding agents working in this repo.
 
 ## Project Overview
 
-Kol (קול, Hebrew for "voice") is a macOS menu bar application for on‑device voice‑to‑text. This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with added Hebrew ASR and LLM post-processing. It supports Whisper (Core ML via WhisperKit), Parakeet TDT v3 (Core ML via FluidAudio), and Caspi 1.7B (Hebrew, Core ML via Qwen3-ASR). Users activate transcription with hotkeys; text can be auto‑pasted into the active app.
+Kol (קול, Hebrew for "voice") is a macOS menu bar application for on‑device voice‑to‑text. This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with LLM post-processing. It uses Parakeet TDT (Core ML via FluidAudio) for transcription. Users activate transcription with hotkeys; text can be auto‑pasted into the active app.
 
 ## Fork-Specific Features
-
-### Caspi 1.7B Hebrew ASR
-- **Model**: [alandotcom/caspi-1.7b-coreml](https://huggingface.co/alandotcom/caspi-1.7b-coreml) — Hebrew fine-tune of Qwen3-ASR-1.7B
-- **FluidAudio fork**: [alandotcom/FluidAudio](https://github.com/alandotcom/FluidAudio/tree/caspi-1.7b-compat) — adds Qwen3-ASR 1.7B config + Caspi repo
-- **Conversion scripts**: [alandotcom/caspi-hebrew-asr](https://github.com/alandotcom/caspi-hebrew-asr) — CoreML conversion from PyTorch
-- **Key files**: `QwenModel.swift`, `QwenClient.swift`
-- **Model dispatch**: `TranscriptionClient.isQwen()` routes to `QwenClient`, same pattern as `isParakeet()`
-
-### Automatic Language Switching
-- Checks macOS keyboard input source via `TISCopyCurrentKeyboardInputSource()` (Carbon)
-- Hebrew keyboard → Caspi model + `language: "he"`
-- Any other keyboard → Parakeet (fast English/multilingual)
-- Logic in `TranscriptionFeature.resolveModelAndLanguage()`
 
 ### LLM Post-Processing
 - Optional cleanup of transcriptions via OpenAI-compatible API (Groq, Cerebras, or custom)
 - **Composable prompt architecture** — NOT a monolithic system prompt:
   - `PromptLayers.core` — always present (punctuation, filler removal)
-  - `PromptLayers.hebrew` / `.english` — language-specific, selected based on detected language
+  - `PromptLayers.english` — English-specific tech term corrections
   - `PromptLayers.appContextCode` / `.appContextMessaging` / `.appContextDocument` — adapts to target app
   - `PromptLayers.ideContext(fileNames:language:)` — open file names from IDE tab bar (code editors only)
   - `PromptLayers.screenContext(visibleText:)` / `.structuredScreenContext(context:)` — opt-in, captures text near cursor via Accessibility API
@@ -34,7 +21,7 @@ Kol (קול, Hebrew for "voice") is a macOS menu bar application for on‑device
   - `PromptAssembler.systemPrompt()` composes applicable layers in order: core → language → app context → IDE context → screen context → vocabulary hints → custom rules
 - **Key files**: `KolCore/LLMPostProcessing.swift`, `LLMPostProcessingClient.swift`, `ScreenContextClient.swift`, `IDEContextClient.swift`, `KeychainClient.swift`, `LLMSectionView.swift`
 - **Insertion point**: `TranscriptionFeature.handleTranscriptionResult()`, after word removals/remappings, before `finalizeRecordingAndStoreTranscript()`
-- **Screen context capture**: `ScreenContextClient` uses AX APIs via an async effect dispatched at recording start (`recordingContextCaptured` action), then refreshes every 1s during recording via `contextRefreshTick` timer effect. State stored in `TranscriptionFeature.State.capturedScreenContext` / `capturedCursorContext`, cleared on cancel/discard.
+- **Screen context capture**: `ScreenContextClient` uses AX APIs via an async effect dispatched at recording start (`recordingContextCaptured` action), then refreshes every 1s during recording via `contextRefreshTick` timer effect. All AX calls use `withMainActorTimeout` (2s) to prevent UI hangs from unresponsive apps. State stored in `TranscriptionFeature.State.capturedScreenContext` / `capturedCursorContext`, cleared on cancel/discard.
 - **IDE context capture**: `IDEContextClient` extracts open file tab titles from code editors (VS Code, Cursor, Xcode, Zed) via AX tree walk. File names feed into vocabulary cache and a dedicated prompt layer. Captured at recording start only.
 - **Graceful fallback**: on any LLM error, original text is pasted
 - **API key**: stored in macOS Keychain via `KeychainClient`, NOT in settings JSON
@@ -125,9 +112,8 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 
 Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no AppKit). Live implementations (`DependencyKey` with `liveValue`) live in **Kol/Clients/** (AppKit/platform APIs). See `docs/solutions/build-errors/spm-c-module-transitive-dependency-non-hosted-tests.md` for the full pattern.
 
-- `TranscriptionClient`: Routes to WhisperKit, ParakeetClient, or QwenClient based on model
+- `TranscriptionClient`: Routes to ParakeetClient for Parakeet models
 - `ParakeetClient`: FluidAudio ASR for Parakeet models
-- `QwenClient`: FluidAudio Qwen3AsrManager for Caspi Hebrew model
 - `LLMPostProcessingClient` **(entirely in KolCore)**: OpenAI-compatible API for transcription cleanup
 - `ScreenContextClient`: Captures focused text field content via macOS Accessibility API for LLM context; refreshed every 1s during recording
 - `IDEContextClient`: Extracts open file tab titles from code editors via AX tree walk
@@ -136,11 +122,9 @@ Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no
 - `PasteboardClient`: Clipboard operations
 - `KeyEventMonitorClient`: Global hotkey monitoring via Sauce framework
 - `WorkspaceClient`: NSWorkspace.frontmostApplication abstraction (no AppKit in interface)
-- `InputSourceClient`: Carbon TIS keyboard input source detection (no Carbon in interface)
 
 ### Key Dependencies
-- **WhisperKit**: Core ML transcription (tracking main branch)
-- **FluidAudio**: Core ML ASR — Parakeet (multilingual) + Qwen3-ASR/Caspi (Hebrew). Uses [alandotcom/FluidAudio](https://github.com/alandotcom/FluidAudio) fork (`caspi-1.7b-compat` branch)
+- **FluidAudio**: Core ML ASR — Parakeet (multilingual). Uses [FluidInference/FluidAudio](https://github.com/FluidInference/FluidAudio) (upstream, `main` branch)
 - **Sauce**: Keyboard event monitoring
 - **Sparkle**: Auto-updates (feed: https://hex-updates.s3.amazonaws.com/appcast.xml)
 - **Swift Composable Architecture**: State management
@@ -154,7 +138,7 @@ Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no
    - Mouse clicks and extra modifiers are discarded within threshold, ignored after
    - Only ESC cancels recordings after the threshold
 
-2. **Model Management**: Models are managed by `ModelDownloadFeature`. Curated defaults live in `Kol/Resources/Data/models.json`. The Settings UI shows Parakeet, Caspi, and Whisper models. Caspi auto-downloads from HuggingFace on first use.
+2. **Model Management**: Models are managed by `ModelDownloadFeature`. Curated defaults live in `Kol/Resources/Data/models.json`. The Settings UI shows Parakeet models only (TDT v2 for English, TDT v3 for multilingual).
 
 3. **Sound Effects**: Audio feedback is provided via `SoundEffect.swift` using files in `Resources/Audio/`
 
@@ -162,24 +146,17 @@ Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no
 
 5. **Continuous Context Refresh**: During recording, a 1-second timer (`contextRefreshTick`) re-captures screen text via AX APIs and updates the vocabulary cache. Gated by `llmPostProcessingEnabled && llmScreenContextEnabled`. Timer cancelled on stop/cancel/discard via `CancelID.contextRefresh`.
 
-6. **WhisperKit Vocabulary Biasing**: When vocabulary hints are available, they're encoded as prompt tokens via `whisperKit.tokenizer.encode()` and set on `DecodingOptions.promptTokens`. Only applies to WhisperKit models (Parakeet and Qwen paths are unaffected).
+6. **Permissions**: Requires audio input and automation entitlements (see `Kol.entitlements`)
 
-7. **Permissions**: Requires audio input and automation entitlements (see `Kol.entitlements`)
-
-8. **Logging**: All diagnostics should use the unified logging helper `KolLog` (`Kol/Core/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
+7. **Logging**: All diagnostics should use the unified logging helper `KolLog` (`Kol/Core/Logging.swift`). Pick an existing category (e.g., `.transcription`, `.recording`, `.settings`) or add a new case so Console predicates stay consistent. Avoid `print` and prefer privacy annotations (`, privacy: .private`) for anything potentially sensitive like transcript text or file paths.
 
 ## Models
 
-- Default: Parakeet TDT v3 (multilingual, ~650MB) via FluidAudio
-- **Caspi 1.7B** (Hebrew, ~2.8GB int8) via FluidAudio Qwen3AsrManager — auto-downloads from [HuggingFace](https://huggingface.co/alandotcom/caspi-1.7b-coreml)
-- Whisper Small (Tiny), Whisper Medium (Base), Whisper Large v3
-- Note: Distil‑Whisper is English‑only and not shown by default
-- Model dispatch: `TranscriptionClient` checks `isParakeet()` then `isQwen()` then falls through to WhisperKit
+- **Parakeet TDT v2** (English, ~650MB) — fast, high accuracy for English
+- **Parakeet TDT v3** (multilingual, ~650MB) — default, supports multiple languages
 
 ### Storage Locations
 
-- WhisperKit models
-  - `~/Library/Application Support/com.alandotcom.Kol/models/argmaxinc/whisperkit-coreml/<model>`
 - Parakeet (FluidAudio)
   - We set `XDG_CACHE_HOME` on launch so Parakeet caches under the app container:
   - `~/Library/Containers/com.alandotcom.Kol/Data/Library/Application Support/FluidAudio/Models/parakeet-tdt-0.6b-v3-coreml`
@@ -187,7 +164,6 @@ Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no
 
 ### Progress + Availability
 
-- WhisperKit: native progress
 - Parakeet: best‑effort progress by polling the model directory size during download
 - Availability detection scans both `Application Support/FluidAudio/Models` and our app cache path
 
@@ -197,8 +173,7 @@ Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no
 
 ### Packages
 
-- WhisperKit: `https://github.com/argmaxinc/WhisperKit`
-- FluidAudio: `https://github.com/alandotcom/FluidAudio.git` branch `caspi-1.7b-compat` (fork with Qwen3-ASR 1.7B support)
+- FluidAudio: `https://github.com/FluidInference/FluidAudio.git` (upstream, `main` branch)
 
 ### Entitlements (Sandbox)
 
@@ -219,8 +194,7 @@ FluidAudio models reside under `Application Support/FluidAudio/Models`.
 
 ## UI
 
-- Settings → Transcription Model shows a compact list with radio selection, accuracy/speed dots, size on right, and trailing menu / download‑check icon.
-- Context menu offers Show in Finder / Delete.
+- Settings → Transcription Model shows a dropdown with radio selection, size on right, and download status icon.
 
 ## Troubleshooting
 
@@ -256,7 +230,6 @@ bun run eval:view
 - `evals/datasets/english.yaml` — general, messaging, document test cases (~31 cases)
 - `evals/datasets/code-dictation.yaml` — code keyword, operator, and screen context test cases (~23 cases)
 - `evals/datasets/edge-cases.yaml` — adversarial and edge case inputs
-- `evals/datasets/hebrew.yaml` — Hebrew-specific test cases
 
 ### Adding new eval cases
 - Code dictation tests go in `datasets/code-dictation.yaml` (NOT `english.yaml`)

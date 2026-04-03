@@ -168,21 +168,6 @@ public enum PromptLayers {
 	Output: EMPTY
 	"""
 
-	public static let hebrew = """
-	Hebrew-specific rules: \
-	The input is Hebrew — output MUST be in Hebrew script. Do NOT transliterate Hebrew to Latin characters, even if Latin-script names appear in vocabulary hints or screen context. \
-	Use maqaf (־) for Hebrew compound words. \
-	Preserve natural Hebrew-English code-switching. When English words appear in Hebrew speech, keep them in English/Latin script — do NOT transliterate to Hebrew characters (e.g., keep "deploy" not "דיפלוי", keep "commit" not "קומיט"). \
-	Fix ambiguous short words based on context (על/אל, אם/עם, לא/לו). \
-	Preserve Israeli slang and colloquialisms exactly as spoken — these are NOT ASR errors, do not "correct" them to formal Hebrew. \
-	Common slang to preserve: מאמי, מותק, נשמה, כפרה, אחי, גבר (endearments); \
-	יאללה, וואלה, אחלה, חלאס, סבבה, יא (Arabic-origin); \
-	נו, תכלס, בלאגן (Yiddish-origin); \
-	קרינג׳, בייסיק, צ׳יל, וייב (English borrowings); \
-	אין מצב, סוף הדרך, לזרום (idioms). \
-	Remove Hebrew filler words (אממ, אהה, ככה, אז אה).
-	"""
-
 	public static let english = """
 	English-specific rules: \
 	Fix common tech ASR errors (e.g. "clawed code" → "Claude Code", "next js" → "Next.js", "react" → "React", "typescript" → "TypeScript"). \
@@ -402,16 +387,7 @@ public enum PromptAssembler {
 	) -> String {
 		var parts: [String] = [PromptLayers.core]
 
-		if let lang = language?.lowercased() {
-			if lang.hasPrefix("he") {
-				parts.append(PromptLayers.hebrew)
-			} else if lang.hasPrefix("en") {
-				parts.append(PromptLayers.english)
-			}
-		} else {
-			// No language specified — include both since we don't know
-			parts.append(PromptLayers.english)
-		}
+		parts.append(PromptLayers.english)
 
 		// App context: use resolved category (from URL reclassification) if available,
 		// otherwise fall back to bundle ID / display name matching

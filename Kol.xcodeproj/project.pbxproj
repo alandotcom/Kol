@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		16847F9110C1C667D621AC45 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E23613B199896A5DD0FC2BB /* Cocoa.framework */; };
-		2DE422E495504204A8B4D890 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 3B9944FCDBF0437F952241BC /* FluidAudio */; };
 		37798B7E2F7A4B2000FAAFD1 /* AXorcist in Frameworks */ = {isa = PBXBuildFile; productRef = 026BEE407424C5C195DE8F03 /* AXorcist */; };
 		37798B7F2F7A4B2000FAAFD1 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = 15C0465AEB781CAC239453CD /* CasePaths */; };
 		37798B802F7A4B2000FAAFD1 /* IdentifiedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = 1A49FDC9D3A96580756DD5ED /* IdentifiedCollections */; };
@@ -34,19 +33,12 @@
 		3779908D2F7A4CF800FAAFD1 /* SwiftNavigation in Frameworks */ = {isa = PBXBuildFile; productRef = 47F37C5EC9694CD4D44182EC /* SwiftNavigation */; };
 		3779908E2F7A4CF800FAAFD1 /* CombineSchedulers in Frameworks */ = {isa = PBXBuildFile; productRef = C5562093AA581178D34EC294 /* CombineSchedulers */; };
 		3779908F2F7A4CF800FAAFD1 /* XCTestDynamicOverlay in Frameworks */ = {isa = PBXBuildFile; productRef = 7433F6E64A031D1C4AE440B4 /* XCTestDynamicOverlay */; };
-		377990902F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
-		377990912F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
-		377990922F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
-		377990932F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
-		377990942F7A4CF800FAAFD1 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
 		377999182F7AD84400FAAFD1 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 9B1137862CEB38C43538B9BE /* Dependencies */; };
 		377999192F7AD84400FAAFD1 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = D0046C259393F2A4938AB19A /* DependenciesMacros */; };
 		3779991A2F7AD84400FAAFD1 /* Sauce in Frameworks */ = {isa = PBXBuildFile; productRef = F54DF918503E20282D61202F /* Sauce */; };
-		4F0D6A042F1A000100000002 /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = 4F0D6A052F1A000100000002 /* Sharing */; };
-		4F0D6A062F1A000100000003 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = 4F0D6A072F1A000100000003 /* CasePaths */; };
 		3779991B2F7AD84400FAAFD1 /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = 3F2D910B1F803177B9C3D83A /* IssueReporting */; };
 		3779991C2F7AD84400FAAFD1 /* ConcurrencyExtras in Frameworks */ = {isa = PBXBuildFile; productRef = 93CBD2F56664506274695FFE /* ConcurrencyExtras */; };
-		47512ABF2E14D8C9000E25BA /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 47512ABE2E14D8C9000E25BA /* WhisperKit */; };
+		37C4BDD52F7F7F330076FA68 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 3B9944FCDBF0437F952241BC /* FluidAudio */; };
 		4765045E2D45900200C7EA60 /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = 4765045D2D45900200C7EA60 /* Pow */; };
 		47C08AB62DE9F61B00564AE6 /* Inject in Frameworks */ = {isa = PBXBuildFile; productRef = 47C08AB52DE9F61B00564AE6 /* Inject */; };
 		47E05E022D444EE900D26DA6 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E012D444EE900D26DA6 /* ComposableArchitecture */; };
@@ -55,7 +47,8 @@
 		47E05E0C2D44525B00D26DA6 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E0B2D44525B00D26DA6 /* DependenciesMacros */; };
 		47E16A622EC6C9D300885CF7 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 47E16A612EC6C9D300885CF7 /* FluidAudio */; };
 		4F0D6A022F1A000100000001 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E012D444EE900D26DA6 /* ComposableArchitecture */; };
-		68E96F0176EC4A6C9979E3D6 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = F2A621BA7C114F699E1DE995 /* WhisperKit */; };
+		4F0D6A042F1A000100000002 /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = 4F0D6A052F1A000100000002 /* Sharing */; };
+		4F0D6A062F1A000100000003 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = 4F0D6A072F1A000100000003 /* CasePaths */; };
 		B5045C972D78DED500D0A119 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = B5045C962D78DED500D0A119 /* MarkdownUI */; };
 		B53356002D7B8D4900E5F542 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B53355FF2D7B8D4900E5F542 /* Localizable.xcstrings */; };
 		C84995FA9130723B621B5575 /* KolCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7F7962AB52729F8E987112D /* KolCore.framework */; };
@@ -170,6 +163,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				37C4BDD52F7F7F330076FA68 /* FluidAudio in Frameworks */,
 				3779991C2F7AD84400FAAFD1 /* ConcurrencyExtras in Frameworks */,
 				3779991B2F7AD84400FAAFD1 /* IssueReporting in Frameworks */,
 				3779991A2F7AD84400FAAFD1 /* Sauce in Frameworks */,
@@ -198,7 +192,6 @@
 				37798B7E2F7A4B2000FAAFD1 /* AXorcist in Frameworks */,
 				47E05E0A2D44525B00D26DA6 /* Dependencies in Frameworks */,
 				B5045C972D78DED500D0A119 /* MarkdownUI in Frameworks */,
-				47512ABF2E14D8C9000E25BA /* WhisperKit in Frameworks */,
 				47E05E052D444EF800D26DA6 /* Sauce in Frameworks */,
 				47E16A622EC6C9D300885CF7 /* FluidAudio in Frameworks */,
 				47C08AB62DE9F61B00564AE6 /* Inject in Frameworks */,
@@ -291,7 +284,6 @@
 				3F2D910B1F803177B9C3D83A /* IssueReporting */,
 				93CBD2F56664506274695FFE /* ConcurrencyExtras */,
 				3B9944FCDBF0437F952241BC /* FluidAudio */,
-				F2A621BA7C114F699E1DE995 /* WhisperKit */,
 				4F0D6A052F1A000100000002 /* Sharing */,
 				4F0D6A072F1A000100000003 /* CasePaths */,
 			);
@@ -325,7 +317,6 @@
 				4765045D2D45900200C7EA60 /* Pow */,
 				B5045C962D78DED500D0A119 /* MarkdownUI */,
 				47C08AB52DE9F61B00564AE6 /* Inject */,
-				47512ABE2E14D8C9000E25BA /* WhisperKit */,
 				47E16A612EC6C9D300885CF7 /* FluidAudio */,
 				026BEE407424C5C195DE8F03 /* AXorcist */,
 				15C0465AEB781CAC239453CD /* CasePaths */,
@@ -415,7 +406,6 @@
 				4765045C2D45900200C7EA60 /* XCRemoteSwiftPackageReference "Pow" */,
 				B5045C952D78DED500D0A119 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 				47C08AB42DE9F61B00564AE6 /* XCRemoteSwiftPackageReference "Inject" */,
-				47512ABD2E14D8C9000E25BA /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				47E16A602EC6C9D300885CF7 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				00ACE93179EC4A99179E8CC3 /* XCRemoteSwiftPackageReference "AXorcist" */,
 			);
@@ -883,14 +873,6 @@
 				minimumVersion = 0.1.0;
 			};
 		};
-		47512ABD2E14D8C9000E25BA /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.15.0;
-			};
-		};
 		4765045C2D45900200C7EA60 /* XCRemoteSwiftPackageReference "Pow" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/EmergeTools/Pow";
@@ -933,9 +915,9 @@
 		};
 		47E16A602EC6C9D300885CF7 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/alandotcom/FluidAudio";
+			repositoryURL = "https://github.com/FluidInference/FluidAudio";
 			requirement = {
-				branch = "caspi-1.7b-compat";
+				branch = main;
 				kind = branch;
 			};
 		};
@@ -979,14 +961,6 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = Sharing;
 		};
-		4F0D6A052F1A000100000002 /* Sharing */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = Sharing;
-		};
-		4F0D6A072F1A000100000003 /* CasePaths */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = CasePaths;
-		};
 		3B9944FCDBF0437F952241BC /* FluidAudio */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 47E16A602EC6C9D300885CF7 /* XCRemoteSwiftPackageReference "FluidAudio" */;
@@ -999,11 +973,6 @@
 		4303D8322FB668DC38AB6018 /* IssueReporting */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = IssueReporting;
-		};
-		47512ABE2E14D8C9000E25BA /* WhisperKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 47512ABD2E14D8C9000E25BA /* XCRemoteSwiftPackageReference "WhisperKit" */;
-			productName = WhisperKit;
 		};
 		4765045D2D45900200C7EA60 /* Pow */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1043,6 +1012,14 @@
 		47F37C5EC9694CD4D44182EC /* SwiftNavigation */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SwiftNavigation;
+		};
+		4F0D6A052F1A000100000002 /* Sharing */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Sharing;
+		};
+		4F0D6A072F1A000100000003 /* CasePaths */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CasePaths;
 		};
 		510DE99898ED98A98EA00074 /* DependenciesMacros */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1124,11 +1101,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 47E05E002D444EE900D26DA6 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
 			productName = ComposableArchitecture;
-		};
-		F2A621BA7C114F699E1DE995 /* WhisperKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 47512ABD2E14D8C9000E25BA /* XCRemoteSwiftPackageReference "WhisperKit" */;
-			productName = WhisperKit;
 		};
 		F54DF918503E20282D61202F /* Sauce */ = {
 			isa = XCSwiftPackageProductDependency;

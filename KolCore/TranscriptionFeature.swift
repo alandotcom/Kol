@@ -150,7 +150,6 @@ public struct TranscriptionFeature {
   @Dependency(\.editTracking) var editTrackingClient
   @Dependency(\.ocrClient) var ocrClient
   @Dependency(\.workspace) var workspace
-  @Dependency(\.inputSource) var inputSource
   @Dependency(\.continuousClock) var clock
 
   public var body: some ReducerOf<Self> {
@@ -764,13 +763,8 @@ private extension TranscriptionFeature {
     state.isTranscribing = true
     state.error = nil
 
-    // Auto-switch model based on keyboard input source:
-    // Hebrew keyboard → Caspi (Hebrew ASR), otherwise → selected model (Parakeet/Whisper)
-    let (model, language) = resolveModelAndLanguage(
-      selectedModel: state.kolSettings.selectedModel,
-      selectedHebrewModel: state.kolSettings.selectedHebrewModel,
-      selectedLanguage: state.kolSettings.outputLanguage
-    )
+    let model = state.kolSettings.selectedModel
+    let language = state.kolSettings.outputLanguage
     state.resolvedLanguage = language
 
     state.isPrewarming = true
@@ -810,28 +804,6 @@ private extension TranscriptionFeature {
       }
       .cancellable(id: CancelID.transcription)
     )
-  }
-
-  /// Checks the current macOS keyboard input source and routes to the appropriate model.
-  /// Hebrew keyboard → Caspi + Hebrew language; otherwise → user's selected model + language.
-  private func resolveModelAndLanguage(
-    selectedModel: String,
-    selectedHebrewModel: String,
-    selectedLanguage: String?
-  ) -> (model: String, language: String?) {
-    if inputSource.isHebrewKeyboardActive() {
-      let hebrewModel = QwenModel(rawValue: selectedHebrewModel) != nil
-        ? selectedHebrewModel
-        : QwenModel.caspiHebrew.identifier
-      transcriptionFeatureLogger.notice("Hebrew keyboard detected — using \(hebrewModel)")
-      return (hebrewModel, "he")
-    }
-    // Guard against stale settings where selectedModel is a Qwen model
-    if QwenModel(rawValue: selectedModel) != nil {
-      transcriptionFeatureLogger.notice("Non-Hebrew keyboard with Caspi selected — falling back to Parakeet")
-      return (ParakeetModel.multilingualV3.identifier, selectedLanguage)
-    }
-    return (selectedModel, selectedLanguage)
   }
 
 }
@@ -940,6 +912,9 @@ private extension TranscriptionFeature {
           if apiKey == nil {
             apiKey = await keychain.load("llmApiKey")
           }
+          if apiKey == nil || apiKey?.isEmpty == true {
+            transcriptionFeatureLogger.warning("LLM enabled but no API key found in keychain (preset: \(llmPreset))")
+          }
           if let apiKey, !apiKey.isEmpty {
             let context = PostProcessingContext(
               text: finalText,
@@ -958,10 +933,7 @@ private extension TranscriptionFeature {
             do {
               let result = try await llmPostProcessing.process(context, llmConfig, apiKey)
               finalText = result.text
-              // Only store metadata when LLM actually changed the text
-              if result.text != modifiedResult {
-                llmMetadata = result.metadata
-              }
+              llmMetadata = result.metadata
               transcriptionFeatureLogger.info("LLM post-processing took \(result.metadata.latencyMs ?? 0)ms")
             } catch {
               transcriptionFeatureLogger.error("LLM post-processing failed, using original: \(error.localizedDescription)")

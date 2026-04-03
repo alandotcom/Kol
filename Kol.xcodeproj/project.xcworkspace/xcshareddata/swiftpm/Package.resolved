@@ -1,5 +1,5 @@
 {
-  "originHash" : "c685730cef39afe851ac703b986dd0dd120140bd1bb56af777a82d7e306fa251",
+  "originHash" : "2c69e011f8dfebb63d57cb0c39e2dd4d3922a826f6002143fc3ea9d244e9d700",
   "pins" : [
     {
       "identity" : "axorcist",
@@ -31,10 +31,10 @@
     {
       "identity" : "fluidaudio",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/alandotcom/FluidAudio",
+      "location" : "https://github.com/FluidInference/FluidAudio",
       "state" : {
-        "branch" : "caspi-1.7b-compat",
-        "revision" : "80e768ee40b441dd34dcece0e5fe0114349247d2"
+        "branch" : "main",
+        "revision" : "6c40eca4310efffe80e723f1e628f6cf76d3feaf"
       }
     },
     {
@@ -70,15 +70,6 @@
       "state" : {
         "branch" : "master",
         "revision" : "9c0de6c233f29d892e86dda68c2dd791aa10670c"
-      }
-    },
-    {
-      "identity" : "swift-argument-parser",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-argument-parser",
-      "state" : {
-        "revision" : "c5d11a805e765f52ba34ec7284bd4fcd6ba68615",
-        "version" : "1.7.0"
       }
     },
     {
@@ -162,15 +153,6 @@
       }
     },
     {
-      "identity" : "swift-jinja",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/huggingface/swift-jinja.git",
-      "state" : {
-        "revision" : "ba2364165002abe8f4f3992d74a7b547c635638e",
-        "version" : "2.2.1"
-      }
-    },
-    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
@@ -222,24 +204,6 @@
       "state" : {
         "revision" : "4799286537280063c85a32f09884cfbca301b1a1",
         "version" : "602.0.0"
-      }
-    },
-    {
-      "identity" : "swift-transformers",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/huggingface/swift-transformers.git",
-      "state" : {
-        "revision" : "573e5c9036c2f136b3a8a071da8e8907322403d0",
-        "version" : "1.1.6"
-      }
-    },
-    {
-      "identity" : "whisperkit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/argmaxinc/WhisperKit",
-      "state" : {
-        "revision" : "664e1b5a65296cd957dfdf262cd120ca88f3b24b",
-        "version" : "0.15.0"
       }
     },
     {
