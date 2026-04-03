@@ -19,7 +19,10 @@ struct CuratedList: View {
 	}
 
 	private func isSelected(_ model: CuratedModelInfo) -> Bool {
-		model.isSelected(forSetting: store.kolSettings.selectedModel)
+		if model.isQwen {
+			return model.isSelected(forSetting: store.kolSettings.selectedHebrewModel)
+		}
+		return model.isSelected(forSetting: store.kolSettings.selectedModel)
 	}
 
 	/// Returns the model to display as "selected" in a dropdown group.
@@ -57,10 +60,10 @@ struct CuratedList: View {
 				downloadProgress: store.downloadProgress,
 				isSelected: isSelected,
 				onSelect: { name in
-					store.send(.selectModel(name))
+					store.send(.selectHebrewModel(name))
 				},
 				onDownload: {
-					store.send(.downloadSelectedModel)
+					store.send(.downloadSelectedHebrewModel)
 				}
 			)
 

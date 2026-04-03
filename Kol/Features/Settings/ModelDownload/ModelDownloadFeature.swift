@@ -177,8 +177,10 @@ public struct ModelDownloadFeature {
 		// Requests
 		case fetchModels
 		case selectModel(String)
+		case selectHebrewModel(String)
 		case toggleModelDisplay
 		case downloadSelectedModel
+		case downloadSelectedHebrewModel
 		// Effects
 		case modelsLoaded(recommended: String, available: [ModelInfo])
 		case downloadProgress(Double)
@@ -249,6 +251,12 @@ public struct ModelDownloadFeature {
 			// resolve it to a concrete available model so both tabs stay in sync
 			let resolved = resolvePattern(model, from: Array(state.availableModels)) ?? model
 			state.$kolSettings.withLock { $0.selectedModel = resolved }
+			updateBootstrapState(&state)
+			return .none
+
+		case let .selectHebrewModel(model):
+			let resolved = resolvePattern(model, from: Array(state.availableModels)) ?? model
+			state.$kolSettings.withLock { $0.selectedHebrewModel = resolved }
 			updateBootstrapState(&state)
 			return .none
 
@@ -339,33 +347,10 @@ public struct ModelDownloadFeature {
 		// MARK: – Download
 
 		case .downloadSelectedModel:
-			guard !state.kolSettings.selectedModel.isEmpty else { return .none }
-			state.downloadError = nil
-			state.isDownloading = true
-			let selected = state.kolSettings.selectedModel
-			state.downloadingModelName = selected
-			state.activeDownloadID = UUID()
-			let downloadID = state.activeDownloadID!
-			let displayName = curatedDisplayName(for: selected, curated: state.curatedModels)
-			state.$modelBootstrapState.withLock {
-				$0.modelIdentifier = selected
-				$0.modelDisplayName = displayName
-				$0.isModelReady = false
-				$0.progress = 0
-				$0.lastError = nil
-			}
-			return .run { [state] send in
-				do {
-					// Assume downloadModel returns AsyncThrowingStream<Double, Error>
-					try await transcription.downloadModel(state.selectedModel) { progress in
-						Task { await send(.downloadProgress(progress.fractionCompleted)) }
-					}
-					await send(.downloadCompleted(.success(state.selectedModel)))
-				} catch {
-					await send(.downloadCompleted(.failure(error)))
-				}
-			}
-			.cancellable(id: downloadID)
+			return startDownload(modelName: state.kolSettings.selectedModel, state: &state)
+
+		case .downloadSelectedHebrewModel:
+			return startDownload(modelName: state.kolSettings.selectedHebrewModel, state: &state)
 
 		case let .downloadProgress(progress):
 			state.downloadProgress = progress
@@ -448,6 +433,35 @@ public struct ModelDownloadFeature {
 	}
 
 	// MARK: Helpers
+
+	private func startDownload(modelName: String, state: inout State) -> Effect<Action> {
+		guard !modelName.isEmpty else { return .none }
+		state.downloadError = nil
+		state.isDownloading = true
+		let selected = modelName
+		state.downloadingModelName = selected
+		state.activeDownloadID = UUID()
+		let downloadID = state.activeDownloadID!
+		let displayName = curatedDisplayName(for: selected, curated: state.curatedModels)
+		state.$modelBootstrapState.withLock {
+			$0.modelIdentifier = selected
+			$0.modelDisplayName = displayName
+			$0.isModelReady = false
+			$0.progress = 0
+			$0.lastError = nil
+		}
+		return .run { send in
+			do {
+				try await transcription.downloadModel(selected) { progress in
+					Task { await send(.downloadProgress(progress.fractionCompleted)) }
+				}
+				await send(.downloadCompleted(.success(selected)))
+			} catch {
+				await send(.downloadCompleted(.failure(error)))
+			}
+		}
+		.cancellable(id: downloadID)
+	}
 
 	private func openModelLocationEffect() -> Effect<Action> {
 		.run { _ in

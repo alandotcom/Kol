@@ -206,6 +206,90 @@
       value: "output.includes('נזרום') || output.includes('לזרום')"
 
 # =============================================================================
+# No-Transliterate (Hebrew names must stay in Hebrew script)
+# =============================================================================
+
+- description: "Hebrew name must not be transliterated to Latin"
+  vars:
+    input: "פנינה"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-general.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "פנינה"
+    - type: not-contains
+      value: "Pnina"
+    - type: not-contains
+      value: "pnina"
+
+- description: "Hebrew name in sentence must not be transliterated"
+  vars:
+    input: "דיברתי עם פנינה על הפרויקט"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-messaging.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "פנינה"
+    - type: not-contains
+      value: "Pnina"
+    - type: contains
+      value: "פרויקט"
+
+- description: "Multiple Hebrew names stay in Hebrew"
+  vars:
+    input: "משה ודינה הגיעו לפגישה"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-general.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "משה"
+    - type: contains
+      value: "דינה"
+    - type: not-contains
+      value: "Moshe"
+    - type: not-contains
+      value: "Dina"
+
+- description: "Hebrew greeting stays Hebrew"
+  vars:
+    input: "שלום רבקה מה נשמע"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-messaging.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "רבקה"
+    - type: not-contains
+      value: "Rivka"
+    - type: not-contains
+      value: "Rebecca"
+
+- description: "Hebrew city names stay Hebrew"
+  vars:
+    input: "אני נוסע לירושלים מחר"
+  options:
+    prompt:
+      raw: file://prompts/hebrew-general.txt
+  assert:
+    - type: javascript
+      value: "/[\u0590-\u05FF]/.test(output)"
+    - type: contains
+      value: "ירושלים"
+    - type: not-contains
+      value: "Jerusalem"
+
+# =============================================================================
 # Code-Switching (Hebrew + English)
 # =============================================================================
 

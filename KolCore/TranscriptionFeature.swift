@@ -12,6 +12,25 @@ private let transcriptionFeatureLogger = KolLog.transcription
 
 private let maxVocabularyHints = 30
 private let ocrQualityThreshold = 50
+private let axTimeoutSeconds: Double = 2.0
+
+/// Runs a closure on MainActor with a timeout. Returns nil if the deadline expires,
+/// preventing hung Accessibility API calls from blocking the main thread indefinitely.
+private func withMainActorTimeout<T: Sendable>(
+  seconds: Double = axTimeoutSeconds,
+  body: @escaping @MainActor @Sendable () -> T
+) async -> T? {
+  await withTaskGroup(of: T?.self) { group in
+    group.addTask { await MainActor.run { body() } }
+    group.addTask {
+      try? await Task.sleep(for: .seconds(seconds))
+      return nil
+    }
+    let first = await group.next()!
+    group.cancelAll()
+    return first
+  }
+}
 
 @Reducer
 public struct TranscriptionFeature {
@@ -279,16 +298,16 @@ public struct TranscriptionFeature {
         let shouldOCR = state.ocrTriggered && ticksSinceLastOCR >= ocrCooldownTicks
 
         return .run { [screenContext, vocabularyCache, ocrClient] send in
-          let cursor = await MainActor.run {
+          let cursor = await withMainActorTimeout {
             screenContext.captureCursorContext(bundleID)
-          }
+          } ?? nil
           let flatText: String?
           if let cursorText = cursor?.flatText {
             flatText = cursorText
           } else if !PromptLayers.isTerminal(bundleID) {
-            flatText = await MainActor.run {
+            flatText = await withMainActorTimeout {
               screenContext.captureVisibleText(bundleID)
-            }
+            } ?? nil
           } else {
             flatText = nil
           }
@@ -593,12 +612,12 @@ private extension TranscriptionFeature {
     let initialContextEffect: Effect<Action> = llmEnabled && screenContextEnabled
       ? .run { [screenContext, vocabularyCache, ideContext, windowContext, keychain, llmVocabulary] send in
           // Screen context: cursor context preferred, flat text fallback
-          let cursor: CursorContext? = await MainActor.run { screenContext.captureCursorContext(bundleID) }
+          let cursor: CursorContext? = await withMainActorTimeout { screenContext.captureCursorContext(bundleID) } ?? nil
           let flatText: String?
           if let cursorText = cursor?.flatText {
             flatText = cursorText
           } else if !PromptLayers.isTerminal(bundleID) {
-            flatText = await MainActor.run { screenContext.captureVisibleText(bundleID) }
+            flatText = await withMainActorTimeout { screenContext.captureVisibleText(bundleID) } ?? nil
           } else {
             flatText = nil
           }
@@ -615,7 +634,7 @@ private extension TranscriptionFeature {
           var ide: IDEContext?
           if PromptLayers.appContextCategory(for: bundleID) == .code,
              let p = pid {
-            let tabTitles = await MainActor.run { ideContext.extractTabTitles(p) }
+            let tabTitles = await withMainActorTimeout { ideContext.extractTabTitles(p) } ?? []
             if !tabTitles.isEmpty {
               ide = IDEContext(openFileNames: tabTitles)
               let fileVocab = VocabularyExtractor.Result(properNouns: [], identifiers: [], fileNames: tabTitles)
@@ -632,7 +651,7 @@ private extension TranscriptionFeature {
              let p = pid,
              let category = resolvedCategory,
              category == .messaging || category == .email {
-            let windowTitle = await MainActor.run { windowContext.windowTitle(p) }
+            let windowTitle = await withMainActorTimeout { windowContext.windowTitle(p) } ?? nil
             let conversationName = ConversationContext.conversationName(fromWindowTitle: windowTitle)
             conversation = ConversationContext(conversationName: conversationName)
           }
@@ -749,6 +768,7 @@ private extension TranscriptionFeature {
     // Hebrew keyboard → Caspi (Hebrew ASR), otherwise → selected model (Parakeet/Whisper)
     let (model, language) = resolveModelAndLanguage(
       selectedModel: state.kolSettings.selectedModel,
+      selectedHebrewModel: state.kolSettings.selectedHebrewModel,
       selectedLanguage: state.kolSettings.outputLanguage
     )
     state.resolvedLanguage = language
@@ -796,13 +816,17 @@ private extension TranscriptionFeature {
   /// Hebrew keyboard → Caspi + Hebrew language; otherwise → user's selected model + language.
   private func resolveModelAndLanguage(
     selectedModel: String,
+    selectedHebrewModel: String,
     selectedLanguage: String?
   ) -> (model: String, language: String?) {
     if inputSource.isHebrewKeyboardActive() {
-      transcriptionFeatureLogger.notice("Hebrew keyboard detected — using Caspi")
-      return (QwenModel.caspiHebrew.identifier, "he")
+      let hebrewModel = QwenModel(rawValue: selectedHebrewModel) != nil
+        ? selectedHebrewModel
+        : QwenModel.caspiHebrew.identifier
+      transcriptionFeatureLogger.notice("Hebrew keyboard detected — using \(hebrewModel)")
+      return (hebrewModel, "he")
     }
-    // If Caspi is selected but keyboard is not Hebrew, use Parakeet for speed
+    // Guard against stale settings where selectedModel is a Qwen model
     if QwenModel(rawValue: selectedModel) != nil {
       transcriptionFeatureLogger.notice("Non-Hebrew keyboard with Caspi selected — falling back to Parakeet")
       return (ParakeetModel.multilingualV3.identifier, selectedLanguage)
@@ -970,7 +994,7 @@ private extension TranscriptionFeature {
 
         // Start edit tracking after paste if enabled
         if editTrackingEnabled, let transcriptID {
-          if let snapshot = await MainActor.run(body: { editTrackingClient.captureSnapshot() }) {
+          if let snapshot = await withMainActorTimeout { editTrackingClient.captureSnapshot() } ?? nil {
             transcriptionFeatureLogger.info("Starting edit tracking for transcript \(transcriptID)")
             await send(.editTrackingStarted(baselineText: snapshot.text, elementHash: snapshot.hash, transcriptID: transcriptID))
           }

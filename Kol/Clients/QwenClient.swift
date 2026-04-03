@@ -15,6 +15,14 @@ actor QwenClient {
 		return findModelDirectory(model) != nil
 	}
 
+	/// Maps a QwenModel variant to its on-disk directory name (matches Repo.folderName).
+	private func diskDirectoryName(_ model: QwenModel) -> String {
+		switch model {
+		case .caspiHebrew: return "caspi-1.7b/int8"
+		case .caspiHebrewF32: return "caspi-1.7b/f32"
+		}
+	}
+
 	func ensureLoaded(modelName: String, progress: @escaping (Progress) -> Void) async throws {
 		guard let model = QwenModel(rawValue: modelName) else {
 			throw NSError(
@@ -37,12 +45,13 @@ actor QwenClient {
 		var modelDir = findModelDirectory(model)
 		if modelDir == nil {
 			// Download from HuggingFace
-			logger.notice("Caspi model not found locally, downloading from HuggingFace...")
+			let repo: Repo = (model == .caspiHebrewF32) ? .caspiAsrF32 : .caspiAsr
+			logger.notice("Caspi model not found locally, downloading \(repo.rawValue) from HuggingFace...")
 			let fm = FileManager.default
 			let support = try fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
 			let modelsRoot = support.appendingPathComponent("FluidAudio/Models", isDirectory: true)
 			try fm.createDirectory(at: modelsRoot, withIntermediateDirectories: true)
-			try await DownloadUtils.downloadRepo(.caspiAsr, to: modelsRoot)
+			try await DownloadUtils.downloadRepo(repo, to: modelsRoot)
 			modelDir = findModelDirectory(model)
 			guard modelDir != nil else {
 				throw NSError(
@@ -128,28 +137,38 @@ actor QwenClient {
 	private func modelDirectories(_ model: QwenModel) -> [URL] {
 		let fm = FileManager.default
 		var result: [URL] = []
+		let dirName = diskDirectoryName(model)
+
+		// Helper: add both the variant-specific path and the legacy base path (for backwards compat)
+		func addPaths(base: URL) {
+			result.append(base.appendingPathComponent(dirName, isDirectory: true))
+			// Backwards compatibility: old installs may have files at the base identifier path
+			if dirName != model.identifier {
+				result.append(base.appendingPathComponent(model.identifier, isDirectory: true))
+			}
+		}
 
 		// FluidAudio standard model cache (resolves to sandbox container when sandboxed)
 		if let support = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: false) {
-			result.append(support.appendingPathComponent("FluidAudio/Models/\(model.identifier)", isDirectory: true))
+			addPaths(base: support.appendingPathComponent("FluidAudio/Models", isDirectory: true))
 		}
 
 		// App-specific support directory
 		if let appSupport = try? URL.kolApplicationSupport {
-			result.append(appSupport.appendingPathComponent("cache/FluidAudio/Models/\(model.identifier)", isDirectory: true))
+			addPaths(base: appSupport.appendingPathComponent("cache/FluidAudio/Models", isDirectory: true))
 		}
 
 		// XDG cache (Kol sets XDG_CACHE_HOME on launch for Parakeet)
 		if let xdg = ProcessInfo.processInfo.environment["XDG_CACHE_HOME"] {
 			let xdgURL = URL(fileURLWithPath: xdg, isDirectory: true)
-			result.append(xdgURL.appendingPathComponent("fluidaudio/Models/\(model.identifier)", isDirectory: true))
-			result.append(xdgURL.appendingPathComponent("FluidAudio/Models/\(model.identifier)", isDirectory: true))
+			addPaths(base: xdgURL.appendingPathComponent("fluidaudio/Models", isDirectory: true))
+			addPaths(base: xdgURL.appendingPathComponent("FluidAudio/Models", isDirectory: true))
 		}
 
 		// Home directory fallback
 		let home = fm.homeDirectoryForCurrentUser
-		result.append(home.appendingPathComponent("Library/Application Support/FluidAudio/Models/\(model.identifier)", isDirectory: true))
-		result.append(home.appendingPathComponent(".cache/FluidAudio/Models/\(model.identifier)", isDirectory: true))
+		addPaths(base: home.appendingPathComponent("Library/Application Support/FluidAudio/Models", isDirectory: true))
+		addPaths(base: home.appendingPathComponent(".cache/FluidAudio/Models", isDirectory: true))
 
 		for dir in result {
 			logger.debug("Qwen3 search path: \(dir.path) exists=\(fm.fileExists(atPath: dir.path))")

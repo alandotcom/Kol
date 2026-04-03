@@ -21,6 +21,14 @@ struct PromptAssemblerTests {
 		#expect(prompt.contains("NOT ASR errors"))
 	}
 
+	@Test("Hebrew layer includes no-transliterate rule")
+	func hebrewNoTransliterate() {
+		let prompt = PromptAssembler.systemPrompt(language: "he", sourceApp: nil, customRules: nil)
+		#expect(prompt.contains("output MUST be in Hebrew script"))
+		#expect(prompt.contains("Do NOT transliterate Hebrew to Latin characters"))
+		#expect(prompt.contains("vocabulary hints or screen context"))
+	}
+
 	@Test("English layer added for English language")
 	func englishLayer() {
 		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: nil, customRules: nil)

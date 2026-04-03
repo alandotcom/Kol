@@ -170,6 +170,7 @@ public enum PromptLayers {
 
 	public static let hebrew = """
 	Hebrew-specific rules: \
+	The input is Hebrew — output MUST be in Hebrew script. Do NOT transliterate Hebrew to Latin characters, even if Latin-script names appear in vocabulary hints or screen context. \
 	Use maqaf (־) for Hebrew compound words. \
 	Preserve natural Hebrew-English code-switching. When English words appear in Hebrew speech, keep them in English/Latin script — do NOT transliterate to Hebrew characters (e.g., keep "deploy" not "דיפלוי", keep "commit" not "קומיט"). \
 	Fix ambiguous short words based on context (על/אל, אם/עם, לא/לו). \

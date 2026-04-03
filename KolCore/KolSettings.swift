@@ -35,6 +35,7 @@ public struct KolSettings: Codable, Equatable, Sendable {
 	public var openOnLogin: Bool
 	public var showDockIcon: Bool
 	public var selectedModel: String
+	public var selectedHebrewModel: String
 	public var useClipboardPaste: Bool
 	public var preventSystemSleep: Bool
 	public var recordingAudioBehavior: RecordingAudioBehavior
@@ -91,6 +92,7 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		openOnLogin: Bool = false,
 		showDockIcon: Bool = true,
 		selectedModel: String = ParakeetModel.multilingualV3.identifier,
+		selectedHebrewModel: String = QwenModel.caspiHebrew.identifier,
 		useClipboardPaste: Bool = true,
 		preventSystemSleep: Bool = true,
 		recordingAudioBehavior: RecordingAudioBehavior = .doNothing,
@@ -133,6 +135,7 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		self.openOnLogin = openOnLogin
 		self.showDockIcon = showDockIcon
 		self.selectedModel = selectedModel
+		self.selectedHebrewModel = selectedHebrewModel
 		self.useClipboardPaste = useClipboardPaste
 		self.preventSystemSleep = preventSystemSleep
 		self.recordingAudioBehavior = recordingAudioBehavior
@@ -199,6 +202,7 @@ private enum KolSettingKey: String, CodingKey, CaseIterable {
 	case openOnLogin
 	case showDockIcon
 	case selectedModel
+	case selectedHebrewModel
 	case useClipboardPaste
 	case preventSystemSleep
 	case recordingAudioBehavior
@@ -301,6 +305,7 @@ private enum KolSettingsSchema {
 		SettingsField(.openOnLogin, keyPath: \.openOnLogin, default: defaults.openOnLogin).eraseToAny(),
 		SettingsField(.showDockIcon, keyPath: \.showDockIcon, default: defaults.showDockIcon).eraseToAny(),
 		SettingsField(.selectedModel, keyPath: \.selectedModel, default: defaults.selectedModel).eraseToAny(),
+		SettingsField(.selectedHebrewModel, keyPath: \.selectedHebrewModel, default: defaults.selectedHebrewModel).eraseToAny(),
 		SettingsField(.useClipboardPaste, keyPath: \.useClipboardPaste, default: defaults.useClipboardPaste).eraseToAny(),
 		SettingsField(.preventSystemSleep, keyPath: \.preventSystemSleep, default: defaults.preventSystemSleep).eraseToAny(),
 		SettingsField(

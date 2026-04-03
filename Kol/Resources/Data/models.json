@@ -24,6 +24,14 @@
     "storageSize": "2.8GB"
   },
   {
+    "displayName": "Caspi 1.7B HQ (Hebrew)",
+    "internalName": "caspi-1.7b-coreml-f32",
+    "size": "Hebrew",
+    "accuracyStars": 5,
+    "speedStars": 2,
+    "storageSize": "5.6GB"
+  },
+  {
     "displayName": "Whisper Small (Tiny)",
     "internalName": "openai_whisper-tiny",
     "size": "Multilingual",
