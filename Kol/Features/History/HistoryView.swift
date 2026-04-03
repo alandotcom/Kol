@@ -197,27 +197,24 @@ struct TranscriptView: View {
 // MARK: - Stats View
 
 struct HistoryStatsView: View {
-	let history: [Transcript]
+	let count: Int
+	let totalWords: Int
+	let totalDuration: TimeInterval
 
 	var body: some View {
 		HStack(spacing: 12) {
-			StatCard(value: "\(history.count)", label: "Transcriptions")
+			StatCard(value: "\(count)", label: "Transcriptions")
 			StatCard(value: "\(totalWords)", label: "Total words")
 			StatCard(value: formattedDuration, label: "Audio time")
 		}
 	}
 
-	private var totalWords: Int {
-		history.reduce(0) { $0 + $1.wordCount }
-	}
-
 	private var formattedDuration: String {
-		let total = history.reduce(0.0) { $0 + $1.duration }
-		if total < 60 {
-			return String(format: "%.0fs", total)
+		if totalDuration < 60 {
+			return String(format: "%.0fs", totalDuration)
 		} else {
-			let minutes = Int(total) / 60
-			let seconds = Int(total) % 60
+			let minutes = Int(totalDuration) / 60
+			let seconds = Int(totalDuration) % 60
 			return seconds > 0 ? "\(minutes)m \(seconds)s" : "\(minutes)m"
 		}
 	}
@@ -293,7 +290,11 @@ struct HistoryView: View {
 					.controlSize(.small)
 				}
 
-				HistoryStatsView(history: store.transcriptionHistory.history)
+				HistoryStatsView(
+					count: store.transcriptionHistory.history.count,
+					totalWords: store.transcriptionHistory.history.reduce(0) { $0 + $1.wordCount },
+					totalDuration: store.transcriptionHistory.history.reduce(0.0) { $0 + $1.duration }
+				)
 
 				LazyVStack(spacing: 12) {
 					ForEach(store.transcriptionHistory.history) { transcript in

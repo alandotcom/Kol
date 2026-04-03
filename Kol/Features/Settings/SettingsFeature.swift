@@ -50,6 +50,17 @@ struct SettingsFeature {
 
     // Suggested remappings from edit tracking
     var suggestedRemappings: [SuggestedRemapping] = []
+
+    /// Preview of scratchpad text after applying word removals and remappings.
+    /// Lives here (not in the view) so the pipeline logic is testable.
+    var scratchpadPreviewText: String {
+      var output = remappingScratchpadText
+      if kolSettings.wordRemovalsEnabled {
+        output = WordRemovalApplier.apply(output, removals: kolSettings.wordRemovals)
+      }
+      output = WordRemappingApplier.apply(output, remappings: kolSettings.wordRemappings)
+      return output
+    }
   }
 
   enum Action: BindableAction {

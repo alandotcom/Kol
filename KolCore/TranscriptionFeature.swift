@@ -333,6 +333,12 @@ public struct TranscriptionFeature {
 
       case let .contextRefreshed(cursor, flatText, vocabulary):
         guard state.isRecording else { return .none }
+        // Skip state mutation if content hasn't changed — avoids triggering
+        // TCA observation / view re-renders when nothing is new.
+        let newScreenText = cursor?.flatText ?? flatText
+        let contextChanged = newScreenText != state.capturedScreenContext
+        let vocabChanged = vocabulary != nil && vocabulary != state.capturedVocabulary
+        guard contextChanged || vocabChanged else { return .none }
         if let cursor {
           state.capturedCursorContext = cursor
           state.capturedScreenContext = cursor.flatText

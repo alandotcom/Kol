@@ -111,7 +111,7 @@ struct WordRemappingsView: View {
 						Text("Preview")
 							.font(.system(size: 13, weight: .semibold))
 							.foregroundStyle(.secondary)
-						Text(previewText.isEmpty ? "—" : previewText)
+						Text(store.scratchpadPreviewText.isEmpty ? "—" : store.scratchpadPreviewText)
 							.font(.body)
 							.frame(maxWidth: .infinity, alignment: .leading)
 							.padding(.horizontal, 8)
@@ -274,14 +274,6 @@ struct WordRemappingsView: View {
 		)
 	}
 
-	private var previewText: String {
-		var output = store.remappingScratchpadText
-		if store.kolSettings.wordRemovalsEnabled {
-			output = WordRemovalApplier.apply(output, removals: store.kolSettings.wordRemovals)
-		}
-		output = WordRemappingApplier.apply(output, remappings: store.kolSettings.wordRemappings)
-		return output
-	}
 }
 
 /// A transform card with icon, content, and toggle. Delete appears on hover only.
