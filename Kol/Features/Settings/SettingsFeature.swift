@@ -7,7 +7,7 @@ import IdentifiedCollections
 import KolCore
 import Sauce
 import ServiceManagement
-import SwiftUI
+import AppKit
 
 private let settingsLogger = KolLog.settings
 private typealias SettingsAudioPropertyListenerBlock = @convention(block) (UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void
@@ -267,17 +267,6 @@ struct SettingsFeature {
           await send(.loadAvailableInputDevices)
           await send(.loadLLMApiKey)
 
-          // Set up periodic refresh of available devices (every 120 seconds)
-          // Using a longer interval to reduce resource usage
-          let deviceRefreshTask = Task { @MainActor in
-            for await _ in clock.timer(interval: .seconds(120)) {
-              // Only refresh when the app is active to save resources
-              if NSApplication.shared.isActive {
-                await send(.loadAvailableInputDevices)
-              }
-            }
-          }
-
           // Listen for device connection/disconnection notifications
           // Using a simpler debounced approach with a single task
           var deviceUpdateTask: Task<Void, Never>?
@@ -373,8 +362,6 @@ struct SettingsFeature {
           for try await keyEvent in await keyEventMonitor.listenForKeyPress() {
             await send(.keyEvent(keyEvent))
           }
-          
-          deviceRefreshTask.cancel()
         }
 
       case .startSettingHotKey:
