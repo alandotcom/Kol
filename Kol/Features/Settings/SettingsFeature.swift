@@ -1,5 +1,5 @@
-import AVFoundation
 import AppKit
+import AVFoundation
 import ComposableArchitecture
 import CoreAudio
 import Dependencies
@@ -7,7 +7,6 @@ import IdentifiedCollections
 import KolCore
 import Sauce
 import ServiceManagement
-import AppKit
 
 private let settingsLogger = KolLog.settings
 private typealias SettingsAudioPropertyListenerBlock = @convention(block) (UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void

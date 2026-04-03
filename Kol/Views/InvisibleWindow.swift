@@ -18,7 +18,11 @@ class InvisibleWindow: NSPanel {
   override var canBecomeKey: Bool { true }
   override var canBecomeMain: Bool { true }
 
-  private var currentScreen: NSScreen?
+  /// Post this notification to reposition the window to whichever screen
+  /// currently contains the mouse cursor. Used by TranscriptionView when
+  /// the indicator becomes visible, replacing the old continuous mouseMoved
+  /// global monitor (which was always-on and energy-expensive).
+  static let repositionNotification = Notification.Name("InvisibleWindowReposition")
 
   init() {
     let screen = NSScreen.main ?? NSScreen.screens[0]
@@ -56,6 +60,13 @@ class InvisibleWindow: NSPanel {
       object: nil
     )
 
+    // Reposition on demand (e.g. when transcription indicator becomes visible)
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(screenDidChange),
+      name: Self.repositionNotification,
+      object: nil
+    )
   }
 
   deinit {
@@ -65,7 +76,6 @@ class InvisibleWindow: NSPanel {
   private func updateToScreenWithMouse() {
     let mouseLocation = NSEvent.mouseLocation
     guard let screenWithMouse = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) else { return }
-    currentScreen = screenWithMouse
     setFrame(screenWithMouse.frame, display: true)
   }
 

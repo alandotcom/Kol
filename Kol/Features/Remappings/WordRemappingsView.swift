@@ -255,25 +255,32 @@ struct WordRemappingsView: View {
 	}
 
 	private func removalBinding(for id: UUID) -> Binding<WordRemoval>? {
-		guard let idx = store.kolSettings.wordRemovals.firstIndex(where: { $0.id == id }) else {
-			return nil
-		}
+		guard store.kolSettings.wordRemovals.contains(where: { $0.id == id }) else { return nil }
 		return Binding(
-			get: { store.kolSettings.wordRemovals[idx] },
+			get: {
+				// Look up by id each time — index-based capture would go stale after deletions.
+				guard let idx = store.kolSettings.wordRemovals.firstIndex(where: { $0.id == id }) else {
+					return WordRemoval(pattern: "")
+				}
+				return store.kolSettings.wordRemovals[idx]
+			},
 			set: { store.send(.updateWordRemoval($0)) }
 		)
 	}
 
 	private func remappingBinding(for id: UUID) -> Binding<WordRemapping>? {
-		guard let idx = store.kolSettings.wordRemappings.firstIndex(where: { $0.id == id }) else {
-			return nil
-		}
+		guard store.kolSettings.wordRemappings.contains(where: { $0.id == id }) else { return nil }
 		return Binding(
-			get: { store.kolSettings.wordRemappings[idx] },
+			get: {
+				// Look up by id each time — index-based capture would go stale after deletions.
+				guard let idx = store.kolSettings.wordRemappings.firstIndex(where: { $0.id == id }) else {
+					return WordRemapping(match: "", replacement: "")
+				}
+				return store.kolSettings.wordRemappings[idx]
+			},
 			set: { store.send(.updateWordRemapping($0)) }
 		)
 	}
-
 }
 
 /// A transform card with icon, content, and toggle. Delete appears on hover only.

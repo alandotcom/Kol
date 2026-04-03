@@ -41,6 +41,12 @@ struct TranscriptionView: View {
       } else if newStatus == .recording {
         showCompleted = false
       }
+      // When the indicator becomes visible, reposition the host window to the
+      // screen containing the mouse. Replaces the old continuous mouseMoved
+      // global monitor that InvisibleWindow used to maintain.
+      if oldStatus == .hidden && newStatus != .hidden {
+        NotificationCenter.default.post(name: InvisibleWindow.repositionNotification, object: nil)
+      }
     }
     .task(id: completionFlashID) {
       guard completionFlashID > 0 else { return }
