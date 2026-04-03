@@ -64,22 +64,13 @@ public struct KolSettings: Codable, Equatable, Sendable {
 	public var llmPromptEmail: String?
 	public var llmScreenContextEnabled: Bool
 	public var conversationContextEnabled: Bool
-	public var editTrackingEnabled: Bool
 	public var atMentionInsertionEnabled: Bool
 	public var vadSilenceDetectionEnabled: Bool
 	public var ocrContextEnabled: Bool
-	public var dismissedSuggestionKeys: [String]
 
 	private mutating func normalizeDoubleTapSettings() {
 		if !doubleTapLockEnabled {
 			useDoubleTapOnly = false
-		}
-	}
-
-	/// Prevents unbounded growth of dismissed suggestion keys.
-	private mutating func capDismissedSuggestions() {
-		if dismissedSuggestionKeys.count > 500 {
-			dismissedSuggestionKeys = Array(dismissedSuggestionKeys.suffix(500))
 		}
 	}
 
@@ -120,11 +111,9 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		llmPromptEmail: String? = nil,
 		llmScreenContextEnabled: Bool = false,
 		conversationContextEnabled: Bool = false,
-		editTrackingEnabled: Bool = false,
 		atMentionInsertionEnabled: Bool = false,
 		vadSilenceDetectionEnabled: Bool = true,
-		ocrContextEnabled: Bool = false,
-		dismissedSuggestionKeys: [String] = []
+		ocrContextEnabled: Bool = false
 	) {
 		self.soundEffectsEnabled = soundEffectsEnabled
 		self.soundEffectsVolume = soundEffectsVolume
@@ -162,13 +151,10 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		self.llmPromptEmail = llmPromptEmail
 		self.llmScreenContextEnabled = llmScreenContextEnabled
 		self.conversationContextEnabled = conversationContextEnabled
-		self.editTrackingEnabled = editTrackingEnabled
 		self.atMentionInsertionEnabled = atMentionInsertionEnabled
 		self.vadSilenceDetectionEnabled = vadSilenceDetectionEnabled
 		self.ocrContextEnabled = ocrContextEnabled
-		self.dismissedSuggestionKeys = dismissedSuggestionKeys
 		normalizeDoubleTapSettings()
-		capDismissedSuggestions()
 	}
 
 	public init(from decoder: Decoder) throws {
@@ -178,7 +164,6 @@ public struct KolSettings: Codable, Equatable, Sendable {
 			try field.decode(into: &self, from: container)
 		}
 		normalizeDoubleTapSettings()
-		capDismissedSuggestions()
 	}
 
 	public func encode(to encoder: Encoder) throws {
@@ -229,11 +214,9 @@ private enum KolSettingKey: String, CodingKey, CaseIterable {
 	case llmPromptEmail
 	case llmScreenContextEnabled
 	case conversationContextEnabled
-	case editTrackingEnabled
 	case atMentionInsertionEnabled
 	case vadSilenceDetectionEnabled
 	case ocrContextEnabled
-	case dismissedSuggestionKeys
 }
 
 private struct SettingsField<Value: Codable & Sendable> {
@@ -432,10 +415,8 @@ private enum KolSettingsSchema {
 		).eraseToAny(),
 		SettingsField(.llmScreenContextEnabled, keyPath: \.llmScreenContextEnabled, default: defaults.llmScreenContextEnabled).eraseToAny(),
 		SettingsField(.conversationContextEnabled, keyPath: \.conversationContextEnabled, default: defaults.conversationContextEnabled).eraseToAny(),
-		SettingsField(.editTrackingEnabled, keyPath: \.editTrackingEnabled, default: defaults.editTrackingEnabled).eraseToAny(),
 		SettingsField(.atMentionInsertionEnabled, keyPath: \.atMentionInsertionEnabled, default: defaults.atMentionInsertionEnabled).eraseToAny(),
 		SettingsField(.vadSilenceDetectionEnabled, keyPath: \.vadSilenceDetectionEnabled, default: defaults.vadSilenceDetectionEnabled).eraseToAny(),
 		SettingsField(.ocrContextEnabled, keyPath: \.ocrContextEnabled, default: defaults.ocrContextEnabled).eraseToAny(),
-		SettingsField(.dismissedSuggestionKeys, keyPath: \.dismissedSuggestionKeys, default: defaults.dismissedSuggestionKeys).eraseToAny(),
 	]
 }

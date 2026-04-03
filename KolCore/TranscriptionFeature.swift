@@ -58,11 +58,6 @@ public struct TranscriptionFeature {
     public var capturedConversationContext: ConversationContext?
     public var resolvedAppCategory: AppContextCategory?
     public var contextUpdateCount: Int = 0
-    public var editTrackingActive: Bool = false
-    public var editTrackingBaselineText: String?
-    public var editTrackingElementHash: Int?
-    public var editTrackingTranscriptID: UUID?
-    public var editTrackingPollCount: Int = 0
     public var ocrTriggered: Bool = false
     public var lastOCRTickNumber: Int = 0
     @Shared(.kolSettings) public var kolSettings: KolSettings
@@ -112,12 +107,6 @@ public struct TranscriptionFeature {
     // OCR fallback for Electron/Chromium apps
     case ocrCaptured(String, [String]?)
 
-    // Edit tracking
-    case editTrackingStarted(baselineText: String, elementHash: Int, transcriptID: UUID)
-    case editTrackingTick
-    case editTrackingResult(String?)
-    case editTrackingStop
-
     // Model availability
     case modelMissing
   }
@@ -129,7 +118,6 @@ public struct TranscriptionFeature {
     case contextRefresh
     case initialContextCapture
     case ocrCapture
-    case editTracking
   }
 
   @Dependency(\.transcription) var transcription
@@ -147,7 +135,6 @@ public struct TranscriptionFeature {
   @Dependency(\.ideContext) var ideContext
   @Dependency(\.windowContext) var windowContext
   @Dependency(\.llmVocabulary) var llmVocabulary
-  @Dependency(\.editTracking) var editTrackingClient
   @Dependency(\.ocrClient) var ocrClient
   @Dependency(\.workspace) var workspace
   @Dependency(\.continuousClock) var clock
@@ -207,80 +194,6 @@ public struct TranscriptionFeature {
 
       case .modelMissing:
         return .none
-
-      // MARK: - Edit Tracking
-
-      case let .editTrackingStarted(baselineText, elementHash, transcriptID):
-        state.editTrackingActive = true
-        state.editTrackingBaselineText = baselineText
-        state.editTrackingElementHash = elementHash
-        state.editTrackingTranscriptID = transcriptID
-        state.editTrackingPollCount = 0
-        // Start 500ms polling timer
-        return .run { send in
-          while !Task.isCancelled {
-            try await Task.sleep(for: .milliseconds(500))
-            await send(.editTrackingTick)
-          }
-        }
-        .cancellable(id: CancelID.editTracking, cancelInFlight: true)
-
-      case .editTrackingTick:
-        guard state.editTrackingActive, let hash = state.editTrackingElementHash else { return .none }
-        state.editTrackingPollCount += 1
-        // Max 20 polls (10 seconds at 500ms)
-        if state.editTrackingPollCount >= 20 {
-          return .send(.editTrackingStop)
-        }
-        return .run { [editTrackingClient] send in
-          let text = await MainActor.run {
-            editTrackingClient.readText(hash)
-          }
-          await send(.editTrackingResult(text))
-        }
-
-      case let .editTrackingResult(text):
-        guard state.editTrackingActive else { return .none }
-        if text == nil {
-          // Element changed or can't be read — stop tracking
-          return .send(.editTrackingStop)
-        }
-        return .none
-
-      case .editTrackingStop:
-        guard state.editTrackingActive,
-              let baselineText = state.editTrackingBaselineText,
-              let transcriptID = state.editTrackingTranscriptID,
-              let hash = state.editTrackingElementHash
-        else {
-          state.editTrackingActive = false
-          return .cancel(id: CancelID.editTracking)
-        }
-        state.editTrackingActive = false
-        let transcriptionHistory = state.$transcriptionHistory
-        return .merge(
-          .cancel(id: CancelID.editTracking),
-          .run { [editTrackingClient] _ in
-            // Read final text
-            let finalText = await MainActor.run {
-              editTrackingClient.readText(hash)
-            }
-            guard let finalText, finalText != baselineText else { return }
-
-            let (vector, edits) = EditVectorComputer.compute(original: baselineText, edited: finalText)
-            guard !vector.isEmpty, vector.contains(where: { $0 != "M" }) else { return }
-
-            transcriptionFeatureLogger.info("Edit vector: \(vector) (\(edits.filter { $0.operation != .match }.count) change(s))")
-
-            // Update transcript in history
-            transcriptionHistory.withLock { history in
-              if let idx = history.history.firstIndex(where: { $0.id == transcriptID }) {
-                history.history[idx].editVector = vector
-                history.history[idx].wordEdits = edits
-              }
-            }
-          }
-        )
 
       // MARK: - Context Refresh During Recording
 
@@ -583,11 +496,6 @@ private extension TranscriptionFeature {
       )
     } else {
       state.resolvedAppCategory = nil
-    }
-
-    // Stop any in-progress edit tracking from a previous recording
-    if state.editTrackingActive {
-      state.editTrackingActive = false
     }
 
     state.contextUpdateCount = 0
@@ -912,9 +820,7 @@ private extension TranscriptionFeature {
     let resolvedAppCategory = state.resolvedAppCategory
     let atMentionEnabled = state.kolSettings.atMentionInsertionEnabled
       && state.kolSettings.conversationContextEnabled
-    let editTrackingEnabled = state.kolSettings.editTrackingEnabled
-
-    return .run { [llmPostProcessing, keychain, editTrackingClient] send in
+    return .run { [llmPostProcessing, keychain] send in
       do {
         var finalText = modifiedResult
         var llmMetadata: LLMMetadata?
@@ -976,13 +882,6 @@ private extension TranscriptionFeature {
           transcriptionHistory: transcriptionHistory
         )
 
-        // Start edit tracking after paste if enabled
-        if editTrackingEnabled, let transcriptID {
-          if let snapshot = await withMainActorTimeout { editTrackingClient.captureSnapshot() } ?? nil {
-            transcriptionFeatureLogger.info("Starting edit tracking for transcript \(transcriptID)")
-            await send(.editTrackingStarted(baselineText: snapshot.text, elementHash: snapshot.hash, transcriptID: transcriptID))
-          }
-        }
       } catch {
         await send(.transcriptionError(error, audioURL))
       }

@@ -31,8 +31,6 @@ public struct Transcript: Codable, Equatable, Identifiable, Sendable {
     public var sourceAppBundleID: String?
     public var sourceAppName: String?
     public var llmMetadata: LLMMetadata?
-    public var editVector: String?
-    public var wordEdits: [WordEdit]?
 
     public var wordCount: Int { text.split(separator: " ").count }
 
@@ -44,9 +42,7 @@ public struct Transcript: Codable, Equatable, Identifiable, Sendable {
         duration: TimeInterval,
         sourceAppBundleID: String? = nil,
         sourceAppName: String? = nil,
-        llmMetadata: LLMMetadata? = nil,
-        editVector: String? = nil,
-        wordEdits: [WordEdit]? = nil
+        llmMetadata: LLMMetadata? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -56,8 +52,6 @@ public struct Transcript: Codable, Equatable, Identifiable, Sendable {
         self.sourceAppBundleID = sourceAppBundleID
         self.sourceAppName = sourceAppName
         self.llmMetadata = llmMetadata
-        self.editVector = editVector
-        self.wordEdits = wordEdits
     }
 }
 

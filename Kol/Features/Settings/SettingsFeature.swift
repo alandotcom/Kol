@@ -47,9 +47,6 @@ struct SettingsFeature {
     var isLLMApiKeyLoaded: Bool = false
     var showingPromptCustomization: Bool = false
 
-    // Suggested remappings from edit tracking
-    var suggestedRemappings: [SuggestedRemapping] = []
-
     /// Preview of scratchpad text after applying word removals and remappings.
     /// Lives here (not in the view) so the pipeline logic is testable.
     var scratchpadPreviewText: String {
@@ -117,11 +114,6 @@ struct SettingsFeature {
     case removeWordRemapping(UUID)
     case setRemappingScratchpadFocused(Bool)
 
-    // Suggested remappings
-    case computeSuggestions
-    case acceptSuggestion(SuggestedRemapping)
-    case dismissSuggestion(SuggestedRemapping)
-
     // LLM Post-Processing
     case setLLMEnabled(Bool)
     case setLLMPreset(String)
@@ -134,7 +126,6 @@ struct SettingsFeature {
     case setLLMScreenContextEnabled(Bool)
     case setConversationContextEnabled(Bool)
     case setAtMentionInsertionEnabled(Bool)
-    case setEditTrackingEnabled(Bool)
     case setOCRContextEnabled(Bool)
     case openScreenRecordingSettings
     case setLLMPromptCode(String?)
@@ -420,30 +411,6 @@ struct SettingsFeature {
         state.$isRemappingScratchpadFocused.withLock { $0 = isFocused }
         return .none
 
-      case .computeSuggestions:
-        state.suggestedRemappings = SuggestionExtractor.extract(
-          from: state.transcriptionHistory,
-          existingRemappings: state.kolSettings.wordRemappings,
-          dismissedKeys: state.kolSettings.dismissedSuggestionKeys
-        )
-        return .none
-
-      case let .acceptSuggestion(suggestion):
-        state.$kolSettings.withLock {
-          $0.wordRemappings.append(
-            WordRemapping(match: suggestion.original, replacement: suggestion.corrected)
-          )
-        }
-        state.suggestedRemappings.removeAll { $0.key == suggestion.key }
-        return .none
-
-      case let .dismissSuggestion(suggestion):
-        state.$kolSettings.withLock {
-          $0.dismissedSuggestionKeys.append(suggestion.key)
-        }
-        state.suggestedRemappings.removeAll { $0.key == suggestion.key }
-        return .none
-
       case .startSettingPasteLastTranscriptHotkey:
         beginCapture(.pasteLastTranscript, state: &state)
         return .none
@@ -709,10 +676,6 @@ struct SettingsFeature {
 
       case let .setAtMentionInsertionEnabled(enabled):
         state.$kolSettings.withLock { $0.atMentionInsertionEnabled = enabled }
-        return .none
-
-      case let .setEditTrackingEnabled(enabled):
-        state.$kolSettings.withLock { $0.editTrackingEnabled = enabled }
         return .none
 
       case let .setOCRContextEnabled(enabled):

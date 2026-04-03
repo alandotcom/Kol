@@ -84,30 +84,11 @@ final class KolSettingsMigrationTests: XCTestCase {
 
 		// Context engineering fields
 		XCTAssertFalse(decoded.conversationContextEnabled)
-		XCTAssertFalse(decoded.editTrackingEnabled)
 		XCTAssertFalse(decoded.atMentionInsertionEnabled)
 		XCTAssertFalse(decoded.ocrContextEnabled)
 
-		// Suggestion keys
-		XCTAssertEqual(decoded.dismissedSuggestionKeys, [])
-
 		// VAD
 		XCTAssertTrue(decoded.vadSilenceDetectionEnabled)
-	}
-
-	func testDismissedSuggestionKeysCappedAt500OnDecode() throws {
-		// Build JSON with 600 keys directly — decoding triggers capDismissedSuggestions()
-		let keys = (0..<600).map { "\"key_\($0)\"" }.joined(separator: ",")
-		let json = "{\"dismissedSuggestionKeys\":[\(keys)]}"
-		let data = json.data(using: .utf8)!
-		let decoded = try JSONDecoder().decode(KolSettings.self, from: data)
-		XCTAssertLessThanOrEqual(decoded.dismissedSuggestionKeys.count, 500)
-	}
-
-	func testDismissedSuggestionKeysCappedAt500OnInit() {
-		let keys = (0..<600).map { "key_\($0)" }
-		let settings = KolSettings(dismissedSuggestionKeys: keys)
-		XCTAssertLessThanOrEqual(settings.dismissedSuggestionKeys.count, 500)
 	}
 
 	private func loadFixture(named name: String) throws -> Data {

@@ -27,7 +27,6 @@ public enum KolLog {
     case screenContext = "ScreenContext"
     case vocabulary = "Vocabulary"
     case conversation = "Conversation"
-    case editTracking = "EditTracking"
   }
 
   public static func logger(_ category: Category) -> os.Logger {
@@ -52,5 +51,4 @@ public enum KolLog {
   public static let screenContext = logger(.screenContext)
   public static let vocabulary = logger(.vocabulary)
   public static let conversation = logger(.conversation)
-  public static let editTracking = logger(.editTracking)
 }
