@@ -60,10 +60,11 @@ public enum VocabularyExtractor {
 		pattern: #"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b"#
 	)
 
-	/// Sequences of capitalized words (2+ words)
-	/// e.g., "Alan Cohen", "Claude Code", "Fountain Bio"
+	/// Sequences of capitalized words (2+ words, same line only).
+	/// Uses `[ \t]+` instead of `\s+` to avoid matching across OCR line breaks,
+	/// which would stitch unrelated sidebar words into garbage "proper nouns".
 	private static let properNounRegex = try! NSRegularExpression(
-		pattern: #"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b"#
+		pattern: #"\b[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)+\b"#
 	)
 
 
@@ -123,6 +124,27 @@ public enum VocabularyExtractor {
 
 	// MARK: - Proper Noun Extraction
 
+	/// Common UI/navigation phrases that OCR picks up from sidebars and chrome across apps.
+	/// These are never useful as vocabulary hints for transcription correction.
+	private static let uiStopwords: Set<String> = [
+		// Messaging sidebars
+		"all chats", "archived chats", "direct messages", "all dms", "group chats",
+		"all channels", "all messages", "pinned messages", "saved messages",
+		"starred messages", "unread messages", "new message", "new chat",
+		// Slack-specific
+		"all unreads", "mention reactions", "slack connect",
+		// Email
+		"sent mail", "all mail", "important messages", "junk mail",
+		// Navigation / buttons
+		"read more", "read less", "see more", "see all", "show more", "show less",
+		"learn more", "view all", "load more", "go back", "get started",
+		"sign in", "sign up", "log in", "log out", "read only",
+		// macOS
+		"system settings", "system preferences",
+		// Time
+		"last week", "last month", "this week", "this month",
+	]
+
 	/// Matches sequences of capitalized words (2+ words).
 	/// e.g., "Alan Cohen", "Claude Code", "Fountain Bio"
 	private static func extractProperNouns(from text: String) -> [String] {
@@ -134,6 +156,8 @@ public enum VocabularyExtractor {
 			if let matchRange = Range(match.range, in: text) {
 				let term = String(text[matchRange])
 				let key = term.lowercased()
+				// Filter: skip common UI/navigation phrases
+				if uiStopwords.contains(key) { continue }
 				// Filter: skip if it looks like a sentence start (preceded by ". " or start of line)
 				let startIdx = matchRange.lowerBound
 				if startIdx > text.startIndex {

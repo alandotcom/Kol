@@ -1,0 +1,56 @@
+# Vocabulary hints: phonetic proper noun correction
+# Run with: bun run eval:vocab
+
+- description: "Vocab hints: phonetic match for uncommon name (car loss → Carlos)"
+  vars:
+    input: "tell car loss I'll be there in five"
+    vocabularyHints: "Carlos Mendes, Yuki Tanaka, WisprFlow, Telegram"
+  assert:
+    - type: contains
+      value: "Carlos"
+    - type: not-contains
+      value: "car loss"
+    - type: not-contains
+      value: "Car loss"
+
+- description: "Vocab hints: phonetic match with minimal context"
+  vars:
+    input: "ask share lock about the meeting"
+    vocabularyHints: "Sharlok Vaidya, Yuki Tanaka, Telegram"
+  assert:
+    - type: icontains
+      value: "Sharlok"
+    - type: not-icontains
+      value: "share lock"
+
+- description: "Vocab hints: group name preserved over common words"
+  vars:
+    input: "send it to dev folk"
+    vocabularyHints: "Dev Folk, Carlos Mendes, Telegram"
+  assert:
+    - type: contains
+      value: "Dev Folk"
+
+- description: "Vocab hints: phonetic match works with noisy production-like vocab list"
+  vars:
+    input: "tell car loss I'll be there in five"
+    vocabularyHints: "Carlos Mendes, Yuki Tanaka, WisprFlow, Telegram, Open Source Weekly, Tech Radar Digest, The Morning Brew, macOS, Mikhail Volkov, Claude Code, GitHub, Sofia Reyes, Linear, Notion"
+  assert:
+    - type: contains
+      value: "Carlos"
+    - type: not-contains
+      value: "car loss"
+    - type: not-contains
+      value: "Car loss"
+
+- description: "Vocab hints: no false positive when transcription doesn't sound like any hint"
+  vars:
+    input: "I'll grab coffee and head over"
+    vocabularyHints: "Carlos Mendes, Yuki Tanaka, WisprFlow"
+  assert:
+    - type: contains
+      value: "coffee"
+    - type: not-icontains
+      value: "Carlos"
+    - type: not-icontains
+      value: "WisprFlow"

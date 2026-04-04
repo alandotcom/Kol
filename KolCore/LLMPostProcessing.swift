@@ -270,7 +270,9 @@ public enum PromptLayers {
 	public static func vocabularyHints(_ terms: [String]) -> String {
 		let joined = terms.joined(separator: ", ")
 		return """
-		Names and identifiers visible on screen (use their exact spelling and casing when they appear in the transcription): \
+		Names and identifiers visible on screen. If any word or phrase in the transcription \
+		sounds like one of these terms — even if the ASR spelled it differently or split it \
+		across multiple words — replace it with the correct form from this list: \
 		\(joined)
 		"""
 	}

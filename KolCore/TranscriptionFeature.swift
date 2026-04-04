@@ -755,7 +755,11 @@ private extension TranscriptionFeature {
 
     let duration = state.recordingStartTime.map { Date().timeIntervalSince($0) } ?? 0
 
+    #if DEBUG
+    transcriptionFeatureLogger.info("Raw transcription: '\(result, privacy: .public)'")
+    #else
     transcriptionFeatureLogger.info("Raw transcription: '\(result)'")
+    #endif
     let remappings = state.kolSettings.wordRemappings
     let removalsEnabled = state.kolSettings.wordRemovalsEnabled
     let removals = state.kolSettings.wordRemovals
@@ -852,7 +856,11 @@ private extension TranscriptionFeature {
               let result = try await llmPostProcessing.process(context, llmConfig, apiKey)
               finalText = result.text
               llmMetadata = result.metadata
-              transcriptionFeatureLogger.info("LLM post-processing took \(result.metadata.latencyMs ?? 0)ms")
+              #if DEBUG
+              transcriptionFeatureLogger.info("LLM output: '\(result.text, privacy: .public)' (\(result.metadata.latencyMs ?? 0)ms)")
+              #else
+              transcriptionFeatureLogger.info("LLM output: '\(result.text, privacy: .private)' (\(result.metadata.latencyMs ?? 0)ms)")
+              #endif
             } catch {
               transcriptionFeatureLogger.error("LLM post-processing failed, using original: \(error.localizedDescription)")
             }
