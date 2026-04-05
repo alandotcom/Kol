@@ -7,6 +7,12 @@
     "  ·  " : {
 
     },
+    " + " : {
+
+    },
+    " = " : {
+
+    },
     "·" : {
 
     },
@@ -30,6 +36,9 @@
 
     },
     "%lldms" : {
+
+    },
+    "%lldms total" : {
 
     },
     "50" : {
@@ -100,6 +109,9 @@
         }
       }
     },
+    "ASR %lldms" : {
+
+    },
     "Assign a shortcut (modifier + key) to instantly paste your last transcription." : {
 
     },
@@ -129,7 +141,7 @@
     "Cancel Download" : {
 
     },
-    "Captures text near the cursor to help recognize technical terms on screen." : {
+    "Captures text near the cursor to improve name recognition via vocabulary boosting." : {
 
     },
     "Changelog" : {
@@ -221,9 +233,6 @@
       }
     },
     "Copy transcription text to clipboard in addition to pasting it" : {
-
-    },
-    "corrected %lld times" : {
 
     },
     "Custom Context" : {
@@ -456,9 +465,6 @@
     "Input Monitoring is required so Kol can listen for your hotkey." : {
 
     },
-    "Keep dictating — Kol learns from corrections you make after paste. Suggestions appear when the same correction recurs." : {
-
-    },
     "Keep the microphone warm for near-instant capture. macOS will keep showing the microphone indicator." : {
 
     },
@@ -479,6 +485,9 @@
           }
         }
       }
+    },
+    "LLM %lldms" : {
+
     },
     "Match" : {
 
@@ -521,9 +530,6 @@
           }
         }
       }
-    },
-    "No suggestions yet" : {
-
     },
     "No Transcriptions" : {
       "comment" : "Empty history headline.",
