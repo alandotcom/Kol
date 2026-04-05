@@ -2,6 +2,10 @@
 
 This file provides guidance for coding agents working in this repo.
 
+## Privacy — No Personal Information in Code
+
+**NEVER put real personal information into any committed code.** This includes names of real people, group/channel names, or any identifiable information shared during debugging sessions. This applies to: code comments, eval datasets, test cases, prompt examples, log messages, and any other file that gets committed. The repo is open source. Use fictional names (e.g., "Carlos Mendes", "Yuki Tanaka") and generic group names (e.g., "Open Source Weekly"). Only use real names if explicitly told to.
+
 ## Project Overview
 
 Kol (קול, Hebrew for "voice") is a macOS menu bar application for on‑device voice‑to‑text. This is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) with LLM post-processing. It uses Parakeet TDT (Core ML via FluidAudio) for transcription. Users activate transcription with hotkeys; text can be auto‑pasted into the active app.

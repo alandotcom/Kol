@@ -544,7 +544,7 @@ private extension TranscriptionFeature {
     let llmBaseURL = state.kolSettings.llmProviderBaseURL
     let llmModelName = state.kolSettings.llmModelName
 
-    let initialContextEffect: Effect<Action> = llmEnabled && screenContextEnabled
+    let initialContextEffect: Effect<Action> = screenContextEnabled
       ? .run { [screenContext, vocabularyCache, ideContext, windowContext, keychain, llmVocabulary] send in
           // Screen context: cursor context preferred, flat text fallback
           let cursor: CursorContext? = await withMainActorTimeout { screenContext.captureCursorContext(bundleID) } ?? nil
@@ -640,7 +640,7 @@ private extension TranscriptionFeature {
       : .none
 
     // Start periodic context refresh during recording (1s interval)
-    let shouldRefreshContext = llmEnabled && screenContextEnabled
+    let shouldRefreshContext = screenContextEnabled
     let contextRefreshEffect: Effect<Action> = shouldRefreshContext
       ? .run { [clock] send in
           for await _ in clock.timer(interval: .seconds(1)) {

@@ -23,7 +23,7 @@ extension TranscriptionClient: DependencyKey {
     let live = TranscriptionClientLive.shared
     return Self(
       transcribe: { url, model, options, skipSilence, vocab, progress in
-        return try await live.transcribe(url: url, model: model, skipSilence: skipSilence, vocabularyHints: vocab, progressCallback: progress)
+        return try await live.transcribe(url: url, model: model, skipSilence: skipSilence, progressCallback: progress)
       },
       downloadModel: { try await live.downloadAndLoadModel(variant: $0, progressCallback: $1) },
       deleteModel: { try await live.deleteModel(variant: $0) },
@@ -63,7 +63,6 @@ actor TranscriptionClientLive {
     url: URL,
     model: String,
     skipSilence: Bool,
-    vocabularyHints: [String]?,
     progressCallback: @escaping (Progress) -> Void
   ) async throws -> String {
     let startAll = Date()
@@ -80,16 +79,6 @@ actor TranscriptionClientLive {
       progressCallback(p)
     }
     transcriptionLogger.info("Parakeet ensureLoaded took \(String(format: "%.2f", Date().timeIntervalSince(startLoad)))s")
-
-    // Configure vocabulary boosting if hints are available
-    if let hints = vocabularyHints, !hints.isEmpty {
-      do {
-        try await parakeet.configureVocabularyBoosting(terms: hints)
-      } catch {
-        transcriptionLogger.error("Vocabulary boosting setup failed: \(error.localizedDescription)")
-      }
-    }
-
     let preparedClip = try ParakeetClipPreparer.ensureMinimumDuration(url: url, logger: parakeetLogger)
     defer { preparedClip.cleanup() }
     let startTx = Date()

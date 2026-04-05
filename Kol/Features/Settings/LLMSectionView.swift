@@ -115,84 +115,6 @@ struct LLMSectionContent: View {
 					)
 				}
 
-				Toggle(
-					"Include visible text as context",
-					isOn: Binding(
-						get: { store.kolSettings.llmScreenContextEnabled },
-						set: { store.send(.setLLMScreenContextEnabled($0)) }
-					)
-				)
-				Text("Captures text near the cursor to help recognize technical terms on screen.")
-					.font(.system(size: 13))
-					.foregroundColor(.secondary)
-
-				if store.kolSettings.llmScreenContextEnabled {
-					Toggle(
-						"OCR for Electron apps",
-						isOn: Binding(
-							get: { store.kolSettings.ocrContextEnabled },
-							set: { store.send(.setOCRContextEnabled($0)) }
-						)
-					)
-					.padding(.leading, 16)
-					Text("Reads screen content via OCR when accessibility text is sparse (Slack, Discord, browser apps).")
-						.font(.system(size: 13))
-						.foregroundColor(.secondary)
-						.padding(.leading, 16)
-
-					if store.kolSettings.ocrContextEnabled {
-						HStack(spacing: 6) {
-							if screenRecordingPermission == .granted {
-								Image(systemName: "checkmark.circle.fill")
-									.foregroundStyle(.green)
-									.font(.system(size: 13))
-								Text("Screen Recording permission granted")
-									.font(.system(size: 13))
-									.foregroundColor(.secondary)
-							} else {
-								Image(systemName: "exclamationmark.triangle.fill")
-									.foregroundStyle(.yellow)
-									.font(.system(size: 13))
-								Text("Screen Recording permission required")
-									.font(.system(size: 13))
-									.foregroundColor(.secondary)
-								Button("Grant") {
-									store.send(.openScreenRecordingSettings)
-								}
-								.buttonStyle(.bordered)
-								.controlSize(.mini)
-							}
-						}
-						.padding(.leading, 16)
-					}
-				}
-
-				Toggle(
-					"Conversation awareness",
-					isOn: Binding(
-						get: { store.kolSettings.conversationContextEnabled },
-						set: { store.send(.setConversationContextEnabled($0)) }
-					)
-				)
-				Text("Adds channel and conversation context in messaging and email apps.")
-					.font(.system(size: 13))
-					.foregroundColor(.secondary)
-
-				if store.kolSettings.conversationContextEnabled {
-					Toggle(
-						"Auto @-mentions",
-						isOn: Binding(
-							get: { store.kolSettings.atMentionInsertionEnabled },
-							set: { store.send(.setAtMentionInsertionEnabled($0)) }
-						)
-					)
-					.padding(.leading, 16)
-					Text("Converts \"at Name\" to \"@Name\" for names visible on screen.")
-						.font(.system(size: 13))
-						.foregroundColor(.secondary)
-						.padding(.leading, 16)
-				}
-
 				Button("Customize App Context Prompts...") {
 					store.send(.showPromptCustomization)
 				}
@@ -205,6 +127,85 @@ struct LLMSectionContent: View {
 				)
 			) {
 				PromptCustomizationView(store: store)
+			}
+		}
+
+		// Screen context — independent of LLM, feeds both CTC rescoring and LLM
+		Toggle(
+			"Include visible text as context",
+			isOn: Binding(
+				get: { store.kolSettings.llmScreenContextEnabled },
+				set: { store.send(.setLLMScreenContextEnabled($0)) }
+			)
+		)
+		Text("Captures text near the cursor to improve name recognition via vocabulary boosting.")
+			.font(.system(size: 13))
+			.foregroundColor(.secondary)
+
+		if store.kolSettings.llmScreenContextEnabled {
+			Toggle(
+				"OCR for Electron apps",
+				isOn: Binding(
+					get: { store.kolSettings.ocrContextEnabled },
+					set: { store.send(.setOCRContextEnabled($0)) }
+				)
+			)
+			.padding(.leading, 16)
+			Text("Reads screen content via OCR when accessibility text is sparse (Slack, Discord, browser apps).")
+				.font(.system(size: 13))
+				.foregroundColor(.secondary)
+				.padding(.leading, 16)
+
+			if store.kolSettings.ocrContextEnabled {
+				HStack(spacing: 6) {
+					if screenRecordingPermission == .granted {
+						Image(systemName: "checkmark.circle.fill")
+							.foregroundStyle(.green)
+							.font(.system(size: 13))
+						Text("Screen Recording permission granted")
+							.font(.system(size: 13))
+							.foregroundColor(.secondary)
+					} else {
+						Image(systemName: "exclamationmark.triangle.fill")
+							.foregroundStyle(.yellow)
+							.font(.system(size: 13))
+						Text("Screen Recording permission required")
+							.font(.system(size: 13))
+							.foregroundColor(.secondary)
+						Button("Grant") {
+							store.send(.openScreenRecordingSettings)
+						}
+						.buttonStyle(.bordered)
+						.controlSize(.mini)
+					}
+				}
+				.padding(.leading, 16)
+			}
+
+			Toggle(
+				"Conversation awareness",
+				isOn: Binding(
+					get: { store.kolSettings.conversationContextEnabled },
+					set: { store.send(.setConversationContextEnabled($0)) }
+				)
+			)
+			Text("Adds channel and conversation context in messaging and email apps.")
+				.font(.system(size: 13))
+				.foregroundColor(.secondary)
+
+			if store.kolSettings.conversationContextEnabled {
+				Toggle(
+					"Auto @-mentions",
+					isOn: Binding(
+						get: { store.kolSettings.atMentionInsertionEnabled },
+						set: { store.send(.setAtMentionInsertionEnabled($0)) }
+					)
+				)
+				.padding(.leading, 16)
+				Text("Converts \"at Name\" to \"@Name\" for names visible on screen.")
+					.font(.system(size: 13))
+					.foregroundColor(.secondary)
+					.padding(.leading, 16)
 			}
 		}
 
