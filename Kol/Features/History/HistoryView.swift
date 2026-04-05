@@ -60,10 +60,10 @@ struct TranscriptView: View {
 				.lineLimit(nil)
 				.fixedSize(horizontal: false, vertical: true)
 				.padding(.horizontal, 14)
-				.padding(.bottom, transcript.llmMetadata != nil ? 4 : 12)
+				.padding(.bottom, (transcript.llmMetadata != nil || transcript.pipelineTiming != nil) ? 4 : 12)
 
-			// LLM post-processing details (collapsible)
-			if let meta = transcript.llmMetadata {
+			// Pipeline details (collapsible)
+			if transcript.llmMetadata != nil || transcript.pipelineTiming != nil {
 				Button {
 					withAnimation(.easeInOut(duration: 0.2)) {
 						showDetails.toggle()
@@ -83,32 +83,49 @@ struct TranscriptView: View {
 
 				if showDetails {
 					VStack(alignment: .leading, spacing: 6) {
-						Text("Original:")
-							.font(.system(size: 13, weight: .medium))
-							.foregroundStyle(.tertiary)
-						Text(meta.originalText)
-							.font(.callout)
-							.foregroundStyle(.secondary)
-							.lineLimit(nil)
-							.fixedSize(horizontal: false, vertical: true)
+						if let meta = transcript.llmMetadata {
+							Text("Original:")
+								.font(.system(size: 13, weight: .medium))
+								.foregroundStyle(.tertiary)
+							Text(meta.originalText)
+								.font(.callout)
+								.foregroundStyle(.secondary)
+								.lineLimit(nil)
+								.fixedSize(horizontal: false, vertical: true)
 
-						HStack(spacing: 0) {
-							if let model = meta.model {
-								Text(model)
-								Text("  \u{00B7}  ").foregroundStyle(.quaternary)
-							}
-							if let ms = meta.latencyMs {
-								Text("\(ms)ms")
-								if meta.promptTokens != nil || meta.completionTokens != nil {
+							HStack(spacing: 0) {
+								if let model = meta.model {
+									Text(model)
 									Text("  \u{00B7}  ").foregroundStyle(.quaternary)
 								}
+								if let ms = meta.latencyMs {
+									Text("\(ms)ms")
+									if meta.promptTokens != nil || meta.completionTokens != nil {
+										Text("  \u{00B7}  ").foregroundStyle(.quaternary)
+									}
+								}
+								if let pt = meta.promptTokens, let ct = meta.completionTokens {
+									Text("\(pt) \u{2192} \(ct) tokens")
+								}
 							}
-							if let pt = meta.promptTokens, let ct = meta.completionTokens {
-								Text("\(pt) \u{2192} \(ct) tokens")
-							}
+							.font(.system(size: 13))
+							.foregroundStyle(.tertiary)
 						}
-						.font(.system(size: 13))
-						.foregroundStyle(.tertiary)
+
+						// Pipeline timing breakdown
+						if let timing = transcript.pipelineTiming {
+							HStack(spacing: 0) {
+								Text("ASR \(timing.asrMs)ms")
+								if let llmMs = timing.llmMs {
+									Text(" + ").foregroundStyle(.quaternary)
+									Text("LLM \(llmMs)ms")
+								}
+								Text(" = ").foregroundStyle(.quaternary)
+								Text("\(timing.totalMs)ms total")
+							}
+							.font(.system(size: 13))
+							.foregroundStyle(.tertiary)
+						}
 					}
 					.padding(10)
 					.frame(maxWidth: .infinity, alignment: .leading)

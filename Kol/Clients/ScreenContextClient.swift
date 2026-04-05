@@ -130,14 +130,8 @@ extension ScreenContextClient: DependencyKey {
             focusedText = text.count > maxContextLength ? String(text.prefix(maxContextLength)) : text
         }
 
-        // 3. If focused element gave enough text, return it
-        if let focusedText, focusedText.count >= windowWalkThreshold {
-            return focusedText
-        }
-
-        // 4. Window-rooted walk — for Electron apps (Slack, Discord) where the focused element
-        //    is an empty compose box with no useful children. The message content lives in sibling
-        //    subtrees of the window. Walk the window's visible children collecting AXStaticText content.
+        // 3. Window-rooted walk — always run to capture sidebar/peripheral text (contact names,
+        //    channel lists, etc.) that the focused element neighborhood misses.
         if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
            let app = Element.application(for: pid),
            let window = app.focusedWindow() {
@@ -150,7 +144,7 @@ extension ScreenContextClient: DependencyKey {
             }
         }
 
-        // 5. Return whatever the focused element gave us (even if short), or nil
+        // 4. Return whatever the focused element gave us (even if short), or nil
         if let focusedText {
             return focusedText
         }

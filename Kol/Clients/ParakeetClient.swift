@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 #if canImport(FluidAudio)
@@ -13,6 +14,12 @@ actor ParakeetClient {
     "fluidaudio/Models",
     "FluidAudio/Models"
   ]
+
+  // Vocabulary boosting (CTC rescoring)
+  private var ctcModels: CtcModels?
+  private var ctcSpotter: CtcKeywordSpotter?
+  private var vocabularyRescorer: VocabularyRescorer?
+  private var currentVocabulary: CustomVocabularyContext?
 
   func isModelAvailable(_ modelName: String) async -> Bool {
     guard let variant = ParakeetModel(rawValue: modelName) else {
@@ -90,6 +97,17 @@ actor ParakeetClient {
     p.completedUnitCount = 100
     progress(p)
     logger.notice("Parakeet ensureLoaded completed in \(String(format: "%.2f", Date().timeIntervalSince(t0)))s")
+
+    // Eagerly load CTC-110M model for vocabulary boosting (downloads ~110MB on first use)
+    if ctcModels == nil {
+      do {
+        logger.notice("Loading CTC-110M model for vocabulary boosting...")
+        ctcModels = try await CtcModels.downloadAndLoad()
+        logger.notice("CTC-110M model loaded")
+      } catch {
+        logger.error("CTC-110M model loading failed (vocabulary boosting unavailable): \(error.localizedDescription)")
+      }
+    }
   }
 
   private func directorySize(_ dir: URL) -> UInt64? {
@@ -104,13 +122,98 @@ actor ParakeetClient {
     return total
   }
 
+  /// Configure vocabulary boosting with extracted terms.
+  /// CTC models must already be loaded via ensureLoaded().
+  func configureVocabularyBoosting(terms: [String]) async throws {
+    guard !terms.isEmpty, let ctcModels else {
+      currentVocabulary = nil
+      vocabularyRescorer = nil
+      ctcSpotter = nil
+      return
+    }
+
+    let vocabTerms = terms.map { CustomVocabularyTerm(text: $0) }
+    let vocab = CustomVocabularyContext(terms: vocabTerms)
+    currentVocabulary = vocab
+
+    let blankId = ctcModels.vocabulary.count
+    ctcSpotter = CtcKeywordSpotter(models: ctcModels, blankId: blankId)
+
+    let ctcModelDir = CtcModels.defaultCacheDirectory(for: ctcModels.variant)
+    vocabularyRescorer = try await VocabularyRescorer.create(
+      spotter: ctcSpotter!,
+      vocabulary: vocab,
+      ctcModelDirectory: ctcModelDir
+    )
+
+    logger.notice("Vocabulary boosting configured with \(terms.count, privacy: .public) terms")
+  }
+
   func transcribe(_ url: URL) async throws -> String {
     guard let asr else { throw NSError(domain: "Parakeet", code: -1, userInfo: [NSLocalizedDescriptionKey: "Parakeet not initialized"]) }
     let t0 = Date()
     logger.notice("Transcribing with Parakeet file=\(url.lastPathComponent)")
     let result = try await asr.transcribe(url)
     logger.info("Parakeet transcription finished in \(String(format: "%.2f", Date().timeIntervalSince(t0)))s")
+
+    // Apply vocabulary boosting if configured
+    if let rescorer = vocabularyRescorer,
+       let spotter = ctcSpotter,
+       let vocab = currentVocabulary,
+       let timings = result.tokenTimings, !timings.isEmpty {
+      let ctcStart = Date()
+      do {
+        let samples = try Self.loadAudioSamples(from: url)
+        let spotResult = try await spotter.spotKeywordsWithLogProbs(
+          audioSamples: samples,
+          customVocabulary: vocab
+        )
+        guard !spotResult.logProbs.isEmpty else {
+          logger.notice("CTC rescoring: no log probs, skipped")
+          return result.text
+        }
+
+        let vocabConfig = ContextBiasingConstants.rescorerConfig(forVocabSize: vocab.terms.count)
+        let rescoreOutput = rescorer.ctcTokenRescore(
+          transcript: result.text,
+          tokenTimings: timings,
+          logProbs: spotResult.logProbs,
+          frameDuration: spotResult.frameDuration,
+          cbw: vocabConfig.cbw,
+          minSimilarity: max(vocabConfig.minSimilarity, vocab.minSimilarity)
+        )
+
+        let ctcMs = Int(Date().timeIntervalSince(ctcStart) * 1000)
+        if rescoreOutput.wasModified {
+          for replacement in rescoreOutput.replacements where replacement.shouldReplace {
+            logger.notice("CTC rescoring (\(ctcMs, privacy: .public)ms): '\(replacement.originalWord, privacy: .public)' → '\(replacement.replacementWord ?? "", privacy: .public)'")
+          }
+          return rescoreOutput.text
+        } else {
+          logger.notice("CTC rescoring (\(ctcMs, privacy: .public)ms): no corrections for '\(result.text, privacy: .public)' against \(vocab.terms.count, privacy: .public) terms")
+        }
+      } catch {
+        logger.error("CTC rescoring failed, using original: \(error.localizedDescription)")
+      }
+    } else if vocabularyRescorer == nil {
+      logger.debug("CTC rescoring: not configured (no vocabulary hints)")
+    }
+
     return result.text
+  }
+
+  /// Load 16kHz mono Float samples from an audio file for CTC inference.
+  private static func loadAudioSamples(from url: URL) throws -> [Float] {
+    let file = try AVAudioFile(forReading: url)
+    let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
+    guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(file.length)) else {
+      throw NSError(domain: "Parakeet", code: -5, userInfo: [NSLocalizedDescriptionKey: "Failed to create audio buffer"])
+    }
+    try file.read(into: buffer)
+    guard let channelData = buffer.floatChannelData else {
+      throw NSError(domain: "Parakeet", code: -6, userInfo: [NSLocalizedDescriptionKey: "No audio channel data"])
+    }
+    return Array(UnsafeBufferPointer(start: channelData[0], count: Int(buffer.frameLength)))
   }
 
   // Delete cached Parakeet models from known locations and reset state

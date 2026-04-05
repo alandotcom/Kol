@@ -8,13 +8,14 @@ public struct TranscriptPersistenceClient: Sendable {
         _ audioURL: URL,
         _ duration: TimeInterval,
         _ sourceAppBundleID: String?,
-        _ sourceAppName: String?
+        _ sourceAppName: String?,
+        _ pipelineTiming: PipelineTiming?
     ) async throws -> Transcript
 
     public var deleteAudio: @Sendable (_ transcript: Transcript) async throws -> Void
 
     public init(
-        save: @escaping @Sendable (String, LLMMetadata?, URL, TimeInterval, String?, String?) async throws -> Transcript,
+        save: @escaping @Sendable (String, LLMMetadata?, URL, TimeInterval, String?, String?, PipelineTiming?) async throws -> Transcript,
         deleteAudio: @escaping @Sendable (Transcript) async throws -> Void
     ) {
         self.save = save
@@ -33,7 +34,7 @@ public extension TranscriptPersistenceClient {
 
 extension TranscriptPersistenceClient: TestDependencyKey {
     public static let testValue = TranscriptPersistenceClient(
-        save: { _, _, _, _, _, _ in
+        save: { _, _, _, _, _, _, _ in
             Transcript(timestamp: Date(), text: "", audioPath: URL(fileURLWithPath: "/"), duration: 0)
         },
         deleteAudio: { _ in }

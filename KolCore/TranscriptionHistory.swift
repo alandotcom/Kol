@@ -22,6 +22,22 @@ public struct LLMMetadata: Codable, Equatable, Sendable {
     }
 }
 
+/// Pipeline timing breakdown for a single transcription.
+public struct PipelineTiming: Codable, Equatable, Sendable {
+    /// ASR transcription (Parakeet inference + CTC rescoring).
+    public var asrMs: Int
+    /// LLM post-processing (nil when LLM is disabled).
+    public var llmMs: Int?
+    /// Total wall time from recording stop to text ready.
+    public var totalMs: Int
+
+    public init(asrMs: Int, llmMs: Int? = nil, totalMs: Int) {
+        self.asrMs = asrMs
+        self.llmMs = llmMs
+        self.totalMs = totalMs
+    }
+}
+
 public struct Transcript: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID
     public var timestamp: Date
@@ -31,6 +47,7 @@ public struct Transcript: Codable, Equatable, Identifiable, Sendable {
     public var sourceAppBundleID: String?
     public var sourceAppName: String?
     public var llmMetadata: LLMMetadata?
+    public var pipelineTiming: PipelineTiming?
 
     public var wordCount: Int { text.split(separator: " ").count }
 
@@ -42,7 +59,8 @@ public struct Transcript: Codable, Equatable, Identifiable, Sendable {
         duration: TimeInterval,
         sourceAppBundleID: String? = nil,
         sourceAppName: String? = nil,
-        llmMetadata: LLMMetadata? = nil
+        llmMetadata: LLMMetadata? = nil,
+        pipelineTiming: PipelineTiming? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -52,12 +70,13 @@ public struct Transcript: Codable, Equatable, Identifiable, Sendable {
         self.sourceAppBundleID = sourceAppBundleID
         self.sourceAppName = sourceAppName
         self.llmMetadata = llmMetadata
+        self.pipelineTiming = pipelineTiming
     }
 }
 
 public struct TranscriptionHistory: Codable, Equatable, Sendable {
     public var history: [Transcript] = []
-    
+
     public init(history: [Transcript] = []) {
         self.history = history
     }

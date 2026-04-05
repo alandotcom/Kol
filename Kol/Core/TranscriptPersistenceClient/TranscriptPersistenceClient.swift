@@ -5,7 +5,7 @@ import KolCore
 extension TranscriptPersistenceClient: DependencyKey {
     public static let liveValue: TranscriptPersistenceClient = {
         return TranscriptPersistenceClient(
-            save: { result, llmMetadata, audioURL, duration, sourceAppBundleID, sourceAppName in
+            save: { result, llmMetadata, audioURL, duration, sourceAppBundleID, sourceAppName, pipelineTiming in
                 let fm = FileManager.default
                 var recordingsFolder = try URL.kolApplicationSupport.appendingPathComponent("Recordings", isDirectory: true)
                 try fm.createDirectory(at: recordingsFolder, withIntermediateDirectories: true)
@@ -27,7 +27,8 @@ extension TranscriptPersistenceClient: DependencyKey {
                     duration: duration,
                     sourceAppBundleID: sourceAppBundleID,
                     sourceAppName: sourceAppName,
-                    llmMetadata: llmMetadata
+                    llmMetadata: llmMetadata,
+                    pipelineTiming: pipelineTiming
                 )
             },
             deleteAudio: { transcript in

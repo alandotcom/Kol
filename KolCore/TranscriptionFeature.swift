@@ -83,7 +83,7 @@ public struct TranscriptionFeature {
     case discard  // Silent discard (too short/accidental)
 
     // Transcription result flow
-    case transcriptionResult(String, URL)
+    case transcriptionResult(String, URL, asrMs: Int)
     case transcriptionError(Error, URL?)
 
     // Context refresh during recording
@@ -148,14 +148,17 @@ public struct TranscriptionFeature {
         // Guard against double-fire (.task can arrive from both AppFeature and SwiftUI .task modifier)
         guard !state.didStartTask else { return .none }
         state.didStartTask = true
-        // Starts three concurrent effects:
+        let selectedModel = state.kolSettings.selectedModel
+        // Starts four concurrent effects:
         // 1) Observing audio meter (long-lived, runs for app lifetime)
         // 2) Monitoring hot key events
         // 3) Priming the recorder for instant startup
+        // 4) Preloading ASR model (Parakeet + CTC vocabulary boosting)
         return .merge(
           startMeteringEffect(),
           startHotKeyMonitoringEffect(),
-          warmUpRecorderEffect()
+          warmUpRecorderEffect(),
+          preloadModelEffect(model: selectedModel)
         )
 
       // MARK: - Metering
@@ -186,8 +189,8 @@ public struct TranscriptionFeature {
 
       // MARK: - Transcription Results
 
-      case let .transcriptionResult(result, audioURL):
-        return handleTranscriptionResult(&state, result: result, audioURL: audioURL)
+      case let .transcriptionResult(result, audioURL, asrMs):
+        return handleTranscriptionResult(&state, result: result, audioURL: audioURL, asrMs: asrMs)
 
       case let .transcriptionError(error, audioURL):
         return handleTranscriptionError(&state, error: error, audioURL: audioURL)
@@ -213,16 +216,16 @@ public struct TranscriptionFeature {
           let cursor = await withMainActorTimeout {
             screenContext.captureCursorContext(bundleID)
           } ?? nil
-          let flatText: String?
-          if let cursorText = cursor?.flatText {
-            flatText = cursorText
-          } else if !PromptLayers.isTerminal(bundleID) {
-            flatText = await withMainActorTimeout {
-              screenContext.captureVisibleText(bundleID)
-            } ?? nil
-          } else {
-            flatText = nil
-          }
+
+          // Always capture full visible text for vocabulary — the window walk
+          // reaches sidebar content (contact names, channel lists) that
+          // cursor-focused extraction misses.
+          let visibleText: String? = PromptLayers.isTerminal(bundleID)
+            ? nil
+            : await withMainActorTimeout { screenContext.captureVisibleText(bundleID) } ?? nil
+
+          // Screen context for LLM prompt: prefer cursor's focused text
+          let flatText = cursor?.flatText ?? visibleText
 
           // If OCR was triggered and AX text is still sparse, re-run OCR
           if shouldOCR, (flatText?.count ?? 0) < ocrQualityThreshold, let pid = sourceAppPID {
@@ -235,8 +238,10 @@ public struct TranscriptionFeature {
             }
           }
 
+          // Vocabulary: prefer broader visible text (window walk includes sidebar)
+          let vocabText = visibleText ?? flatText
           var vocabulary: [String]?
-          if let text = flatText, !text.isEmpty {
+          if let text = vocabText, !text.isEmpty {
             let vocab = VocabularyExtractor.extract(from: text)
             vocabularyCache.merge(vocab)
             vocabulary = vocabularyCache.topTerms(maxVocabularyHints)
@@ -442,6 +447,17 @@ private extension TranscriptionFeature {
       await recording.warmUpRecorder()
     }
   }
+
+  func preloadModelEffect(model: String) -> Effect<Action> {
+    .run { _ in
+      do {
+        try await transcription.downloadModel(model) { _ in }
+        transcriptionFeatureLogger.info("ASR model preloaded at launch: \(model)")
+      } catch {
+        transcriptionFeatureLogger.error("ASR model preload failed: \(error.localizedDescription)")
+      }
+    }
+  }
 }
 
 // MARK: - HotKey Press/Release Handlers
@@ -532,18 +548,21 @@ private extension TranscriptionFeature {
       ? .run { [screenContext, vocabularyCache, ideContext, windowContext, keychain, llmVocabulary] send in
           // Screen context: cursor context preferred, flat text fallback
           let cursor: CursorContext? = await withMainActorTimeout { screenContext.captureCursorContext(bundleID) } ?? nil
-          let flatText: String?
-          if let cursorText = cursor?.flatText {
-            flatText = cursorText
-          } else if !PromptLayers.isTerminal(bundleID) {
-            flatText = await withMainActorTimeout { screenContext.captureVisibleText(bundleID) } ?? nil
-          } else {
-            flatText = nil
-          }
 
-          // Vocabulary extraction
+          // Always capture full visible text for vocabulary — the window walk
+          // reaches sidebar content (contact names, channel lists) that
+          // cursor-focused extraction misses.
+          let visibleText: String? = PromptLayers.isTerminal(bundleID)
+            ? nil
+            : await withMainActorTimeout { screenContext.captureVisibleText(bundleID) } ?? nil
+
+          // Screen context for LLM prompt: prefer cursor's focused text
+          let flatText = cursor?.flatText ?? visibleText
+
+          // Vocabulary: prefer broader visible text (window walk includes sidebar)
+          let vocabText = visibleText ?? flatText
           var vocabulary: [String]?
-          if let text = flatText, !text.isEmpty {
+          if let text = vocabText, !text.isEmpty {
             let vocab = VocabularyExtractor.extract(from: text)
             vocabularyCache.merge(vocab)
             vocabulary = vocabularyCache.topTerms(maxVocabularyHints)
@@ -599,7 +618,7 @@ private extension TranscriptionFeature {
 
           // LLM vocabulary extraction — extract single-word names that regex misses.
           // Races with transcription; if it finishes in time, names appear in vocabulary hints.
-          if let text = flatText, !text.isEmpty {
+          if let text = vocabText, !text.isEmpty {
             var apiKey = await keychain.load("llmApiKey_\(llmPreset)")
             if apiKey == nil { apiKey = await keychain.load("llmApiKey") }
             if let apiKey, !apiKey.isEmpty {
@@ -713,10 +732,12 @@ private extension TranscriptionFeature {
             useVADChunking: true
           )
 
+          let asrStart = Date()
           let result = try await transcription.transcribe(capturedURL, model, options, vadEnabled, capturedVocabulary) { _ in }
+          let asrMs = Int(Date().timeIntervalSince(asrStart) * 1000)
 
           transcriptionFeatureLogger.notice("Transcribed audio from \(capturedURL.lastPathComponent) to text length \(result.count)")
-          await send(.transcriptionResult(result, capturedURL))
+          await send(.transcriptionResult(result, capturedURL, asrMs: asrMs))
         } catch {
           transcriptionFeatureLogger.error("Transcription failed: \(error.localizedDescription)")
           await send(.transcriptionError(error, audioURL))
@@ -734,7 +755,8 @@ private extension TranscriptionFeature {
   func handleTranscriptionResult(
     _ state: inout State,
     result: String,
-    audioURL: URL
+    audioURL: URL,
+    asrMs: Int
   ) -> Effect<Action> {
     state.isTranscribing = false
     state.isPrewarming = false
@@ -880,6 +902,13 @@ private extension TranscriptionFeature {
           }
         }
 
+        let llmMs = llmMetadata?.latencyMs
+        let totalMs = asrMs + (llmMs ?? 0)
+        let timing = PipelineTiming(
+          asrMs: asrMs,
+          llmMs: llmMs,
+          totalMs: totalMs
+        )
         let transcriptID = try await finalizeRecordingAndStoreTranscript(
           result: finalText,
           llmMetadata: llmMetadata,
@@ -887,7 +916,8 @@ private extension TranscriptionFeature {
           sourceAppBundleID: sourceAppBundleID,
           sourceAppName: sourceAppName,
           audioURL: audioURL,
-          transcriptionHistory: transcriptionHistory
+          transcriptionHistory: transcriptionHistory,
+          pipelineTiming: timing
         )
 
       } catch {
@@ -924,7 +954,8 @@ private extension TranscriptionFeature {
     sourceAppBundleID: String?,
     sourceAppName: String?,
     audioURL: URL,
-    transcriptionHistory: Shared<TranscriptionHistory>
+    transcriptionHistory: Shared<TranscriptionHistory>,
+    pipelineTiming: PipelineTiming? = nil
   ) async throws -> UUID? {
     @Shared(.kolSettings) var kolSettings: KolSettings
     var transcriptID: UUID?
@@ -936,7 +967,8 @@ private extension TranscriptionFeature {
         audioURL,
         duration,
         sourceAppBundleID,
-        sourceAppName
+        sourceAppName,
+        pipelineTiming
       )
       transcriptID = transcript.id
 
