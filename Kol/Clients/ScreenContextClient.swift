@@ -18,11 +18,11 @@ extension ScreenContextClient: DependencyKey {
     private static func getFocusedElement(caller: String, bundleID: String) -> Element? {
         let systemWide = Element.systemWide()
         guard let focused = systemWide.focusedUIElement() else {
-            logger.warning("\(caller): failed to get focused element for \(bundleID, privacy: .public)")
+            logger.warning("\(caller): failed to get focused element for \(bundleID)")
             return nil
         }
         let role = focused.role() ?? "unknown"
-        logger.debug("\(caller): focused element role: \(role, privacy: .public)")
+        logger.debug("\(caller): focused element role: \(role)")
         return focused
     }
 
@@ -136,7 +136,7 @@ extension ScreenContextClient: DependencyKey {
            let app = Element.application(for: pid),
            let window = app.focusedWindow() {
             let windowText = collectVisibleText(from: window, maxDepth: 6, maxNodes: 500)
-            logger.debug("Window walk: \(windowText.count, privacy: .private) chars (focused was \(focusedText?.count ?? 0, privacy: .private))")
+            logger.debug("Window walk: \(windowText.count) chars (focused was \(focusedText?.count ?? 0))")
             if windowText.count > (focusedText?.count ?? 0) {
                 let windowed = windowText.count > maxContextLength ? String(windowText.prefix(maxContextLength)) : windowText
                 logger.info("Got text via window walk: \(windowed.count) chars (focused was \(focusedText?.count ?? 0))")
@@ -148,7 +148,7 @@ extension ScreenContextClient: DependencyKey {
         if let focusedText {
             return focusedText
         }
-        logger.notice("No text found for \(bundleID, privacy: .public)")
+        logger.notice("No text found for \(bundleID)")
         return nil
     }
 
@@ -350,7 +350,7 @@ extension ScreenContextClient: DependencyKey {
 
                 if let text = extractValue(from: child, sourceAppBundleID: sourceAppBundleID) {
                     let childRole = child.role() ?? "unknown"
-                    logger.debug("Found text on child role=\(childRole, privacy: .public) depth=\(depth + 1)")
+                    logger.debug("Found text on child role=\(childRole) depth=\(depth + 1)")
                     return text
                 }
 

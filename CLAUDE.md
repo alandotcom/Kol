@@ -60,6 +60,9 @@ xcodebuildmcp macos test --scheme Kol --project-path Kol.xcodeproj
 # Open in Xcode (recommended for development)
 open Kol.xcodeproj
 
+# Reveal <private> in unified logs (one-time setup, requires sudo)
+./scripts/enable-debug-logging.sh
+
 # Trigger a transcription and capture logs (no Xcode needed)
 ./scripts/test-transcribe.sh              # 3s silence, current focused app
 ./scripts/test-transcribe.sh 5            # 5s silence

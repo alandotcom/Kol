@@ -69,7 +69,7 @@ actor TranscriptionClientLive {
 
     // VAD silence gate
     if skipSilence, !(await containsSpeech(url)) {
-      transcriptionLogger.notice("VAD detected no speech in \(url.lastPathComponent, privacy: .public) — skipping transcription")
+      transcriptionLogger.notice("VAD detected no speech in \(url.lastPathComponent) — skipping transcription")
       return ""
     }
 
@@ -97,7 +97,7 @@ actor TranscriptionClientLive {
         let t0 = Date()
         vad = try await VadManager(config: VadConfig(defaultThreshold: 0.90))
         let elapsed = String(format: "%.2f", Date().timeIntervalSince(t0))
-        transcriptionLogger.notice("VAD initialized in \(elapsed, privacy: .public)s")
+        transcriptionLogger.notice("VAD initialized in \(elapsed)s")
       }
       guard let vad else { return true }
       let t0 = Date()
@@ -108,7 +108,7 @@ actor TranscriptionClientLive {
       let hasSpeech = !segments.isEmpty
       let totalDuration = segments.reduce(0.0) { $0 + $1.duration }
       let elapsed = String(format: "%.3f", Date().timeIntervalSince(t0))
-      transcriptionLogger.notice("VAD check took \(elapsed, privacy: .public)s — segments=\(segments.count, privacy: .public) totalSpeech=\(String(format: "%.2f", totalDuration), privacy: .public)s chunks=\(results.count, privacy: .public) speech=\(hasSpeech, privacy: .public)")
+      transcriptionLogger.notice("VAD check took \(elapsed)s — segments=\(segments.count) totalSpeech=\(String(format: "%.2f", totalDuration))s chunks=\(results.count) speech=\(hasSpeech)")
       return hasSpeech
     } catch {
       transcriptionLogger.error("VAD check failed, proceeding with transcription: \(error.localizedDescription)")

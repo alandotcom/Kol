@@ -96,7 +96,7 @@ public enum VocabularyExtractor {
 			fileNames: fileNames
 		)
 		let termsPreview = result.allTerms.joined(separator: ", ")
-		logger.info("Extracted \(result.allTerms.count, privacy: .public) terms [\(termsPreview, privacy: .public)]: \(identifiers.count, privacy: .public) identifiers, \(properNouns.count, privacy: .public) nouns, \(fileNames.count, privacy: .public) files")
+		logger.info("Extracted \(result.allTerms.count) terms [\(termsPreview)]: \(identifiers.count) identifiers, \(properNouns.count) nouns, \(fileNames.count) files")
 		return result
 	}
 

@@ -90,7 +90,7 @@ extension LLMVocabularyClient: DependencyKey {
 
 				let names = parseResponse(content)
 				let latencyMs = Int(elapsed * 1000)
-				logger.info("LLM vocabulary extraction took \(latencyMs)ms, extracted \(names.count) names: \(names.joined(separator: ", "), privacy: .private)")
+				logger.info("LLM vocabulary extraction took \(latencyMs)ms, extracted \(names.count) names: \(names.joined(separator: ", "))")
 				return names
 			}
 		)

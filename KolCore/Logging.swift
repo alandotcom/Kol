@@ -2,10 +2,10 @@ import os.log
 
 /// Shared helper for creating consistent os.Logger instances across the Kol app and KolCore.
 ///
-/// Privacy: `os_log` redacts dynamic strings with `privacy: .private` by default.
-/// Key diagnostic lines (raw transcription, LLM output, vocabulary hints, prompt preview)
-/// use `privacy: .public` in DEBUG builds so they are visible via `log stream` without Xcode.
-/// Release builds keep `.private` for all sensitive content.
+/// Privacy: `os_log` redacts dynamic strings as `<private>` by default. To reveal them
+/// during development, install the subsystem plist once: `scripts/enable-debug-logging.sh`.
+/// This uses Apple's `/Library/Preferences/Logging/Subsystems/` mechanism (see `man 5 os_log`).
+/// No per-call `privacy: .public` annotations are needed — the plist reveals all private data.
 public enum KolLog {
   public static let subsystem = "com.alandotcom.Kol"
 
