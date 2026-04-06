@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+### Minor Changes
+
+- 5896b2e: Add terminal screen context capture, text continuation across dictations, and post-LLM word remappings
+
 ## 0.7.3
 
 ### Patch Changes
