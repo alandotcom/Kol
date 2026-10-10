@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.2
+
+### Patch Changes
+
+- Recover visible product-and-version labels when speech recognition mishears a name or version, and format spoken dotted numbers in prose.
+
 ## 1.3.1
 
 ### Patch Changes
