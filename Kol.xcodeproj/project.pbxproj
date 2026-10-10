@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A76B0A5E2FE1000300000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A76B0A5E2FE1000300000002 /* Sparkle */; };
 		A76B0A5E2FE1000200000001 /* OrderedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = A76B0A5E2FE1000200000002 /* OrderedCollections */; };
 		16847F9110C1C667D621AC45 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E23613B199896A5DD0FC2BB /* Cocoa.framework */; };
 		37798B7E2F7A4B2000FAAFD1 /* AXorcist in Frameworks */ = {isa = PBXBuildFile; productRef = 026BEE407424C5C195DE8F03 /* AXorcist */; };
@@ -181,6 +182,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A76B0A5E2FE1000300000001 /* Sparkle in Frameworks */,
 				A76B0A5E2FE1000200000001 /* OrderedCollections in Frameworks */,
 				37798B872F7A4B2000FAAFD1 /* SwiftNavigation in Frameworks */,
 				37798B862F7A4B2000FAAFD1 /* CustomDump in Frameworks */,
@@ -302,6 +304,7 @@
 				47E05DEB2D444EC600D26DA6 /* Frameworks */,
 				47E05DEC2D444EC600D26DA6 /* Resources */,
 				E1A2B3C4D5E6F70800000001 /* Embed Frameworks */,
+				A76B0A5E2FE1000300000004 /* Sign Sparkle helpers */,
 			);
 			buildRules = (
 			);
@@ -313,6 +316,7 @@
 			);
 			name = Kol;
 			packageProductDependencies = (
+				A76B0A5E2FE1000300000002 /* Sparkle */,
 				A76B0A5E2FE1000200000002 /* OrderedCollections */,
 				47E05E012D444EE900D26DA6 /* ComposableArchitecture */,
 				47E05E042D444EF800D26DA6 /* Sauce */,
@@ -403,6 +407,7 @@
 			mainGroup = 47E05DE52D444EC600D26DA6;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A76B0A5E2FE1000300000003 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				A76B0A5E2FE1000200000003 /* XCRemoteSwiftPackageReference "swift-collections" */,
 				A76B0A5E2FE1000100000008 /* XCRemoteSwiftPackageReference "swift-issue-reporting" */,
 				A76B0A5E2FE1000100000007 /* XCRemoteSwiftPackageReference "swift-navigation" */,
@@ -457,6 +462,21 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A76B0A5E2FE1000300000004 /* Sign Sparkle helpers */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ();
+			outputPaths = ();
+			name = "Sign Sparkle helpers";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "bash \"$SRCROOT/scripts/sign-sparkle.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		40B74093F7BAFC8B2B5DFD4C /* Sources */ = {
@@ -726,7 +746,7 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Kol/Info.plist;
@@ -771,6 +791,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
 				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
 				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
@@ -877,6 +898,11 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A76B0A5E2FE1000300000003 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = { kind = exactVersion; version = 2.10.0; };
+		};
 		A76B0A5E2FE1000200000003 /* XCRemoteSwiftPackageReference "swift-collections" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/swift-collections.git";
@@ -1023,6 +1049,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A76B0A5E2FE1000300000002 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000300000003 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		A76B0A5E2FE1000200000002 /* OrderedCollections */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A76B0A5E2FE1000200000003 /* XCRemoteSwiftPackageReference "swift-collections" */;

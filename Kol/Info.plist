@@ -21,5 +21,19 @@
 	</dict>
 	<key>NSInputMonitoringUsageDescription</key>
 	<string>Kol needs Input Monitoring permission so your global hotkey works in every app.</string>
+	<key>SUFeedURL</key>
+	<string>https://github.com/alandotcom/Kol/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>W75KGGMOw/hSm5ZTB0181Kcv+TmxtRm8Ymlx6LDxwn8=</string>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
+	<key>SURequireSignedFeed</key>
+	<true/>
 </dict>
 </plist>

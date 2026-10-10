@@ -9,6 +9,7 @@ extension Notification.Name {
 @main
 struct KolApp: App {
     static let appStore = Store(initialState: AppFeature.State()) { AppFeature() }
+    private let updates = UpdateController.shared
     @NSApplicationDelegateAdaptor(KolAppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -35,6 +36,7 @@ struct KolApp: App {
                     NSApp.orderFrontStandardAboutPanel(nil)
                     NSApp.activate(ignoringOtherApps: true)
                 }
+                CheckForUpdatesButton()
             }
         }
     }
@@ -60,6 +62,7 @@ private struct KolMenuContents: View {
             NSApp.orderFrontStandardAboutPanel(nil)
             NSApp.activate(ignoringOtherApps: true)
         }
+        CheckForUpdatesButton()
         Divider()
         Button("Quit Kol") { NSApp.terminate(nil) }
             .keyboardShortcut("q")

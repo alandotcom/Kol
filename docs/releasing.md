@@ -26,6 +26,27 @@ Create the app-specific password at <https://account.apple.com>. The command
 validates the credentials before saving them. Keep credentials out of repository
 files and shell command arguments.
 
+Generate the Sparkle update-signing key once on your release Mac:
+
+```bash
+SPARKLE_TOOLS=$(./scripts/sparkle-tools.sh)
+"$SPARKLE_TOOLS/generate_keys" --account kol-updates
+```
+
+The command saves the private key in the login Keychain and prints the public
+key. Put that public key in `SUPublicEDKey` in `Kol/Info.plist`. When macOS asks
+for `generate_appcast` or `sign_update` to access the Sparkle private key, approve
+that system dialog. Enter your Mac password only in the system dialog. Keep the original
+private key for every future release. On a Mac with the existing key, the command
+reuses that key. The release script rejects a missing key or a public-key mismatch
+before changing version metadata.
+
+To back up the private key, use `generate_keys --account kol-updates -x` with a
+file path in secure storage outside the repository. Import the backup on another
+release Mac with `generate_keys --account kol-updates -f` and the backup path.
+Never commit the backup. Notarization credentials and the Sparkle signing key
+are separate Keychain entries.
+
 ## Run a release
 
 Commit the changes and their changeset fragments, then run from `main`:
@@ -45,7 +66,23 @@ submission, the script staples and validates the ticket, verifies the signature,
 and checks Gatekeeper. It creates a fresh ZIP containing the stapled app and
 extracts the ZIP to verify that the ticket and signature survived packaging.
 The script then commits and tags the version, pushes, uploads a draft release,
-verifies the upload's SHA-256 digest, and publishes it.
+verifies both uploaded artifacts' SHA-256 digests, and publishes the release.
+Before the version commit, Sparkle signs the final ZIP and generates a signed
+`appcast.xml` with embedded release notes. The script verifies both signatures
+and confirms that the feed names the exact version, build, download URL, and ZIP
+size. Every release includes its feed alongside the ZIP.
+
+Kol checks `https://github.com/alandotcom/Kol/releases/latest/download/appcast.xml`.
+The feed links to the ZIP on that specific version's release. Users install the
+first release containing Sparkle manually. Later releases update in place.
+Kol enables automatic checks and downloads by default and installs downloaded
+updates when the app quits. Users can change both preferences under
+**Settings → General → Updates** or use **Check for Updates** in Kol's menu.
+An update restart waits for active dictation and text insertion to finish.
+Debug builds do not run the updater.
+
+Keep the app's bundle identifier, sandbox setting, and signing team unchanged
+across releases so existing settings and models remain in the same container.
 
 These environment variables override the defaults:
 
@@ -57,6 +94,10 @@ These environment variables override the defaults:
   project. Xcode applies this team to package dependencies as well as app targets.
 - `KOL_NOTARY_TIMEOUT`: notarization wait limit, default `1h`.
 - `KOL_DERIVED_DATA_PATH`: Xcode build directory, default `build/DerivedData`.
+- `KOL_SPARKLE_ACCOUNT`: update-signing Keychain account, default `kol-updates`.
+- `KOL_SPARKLE_TOOLS`: directory containing `generate_keys`, `generate_appcast`,
+  and `sign_update`. By default, `sparkle-tools.sh` downloads Sparkle 2.10.0 tools
+  and verifies the archive's pinned SHA-256 digest.
 
 Local testing still uses `./scripts/build-install.sh --debug`. Notarization runs
 only through the release script.
@@ -87,8 +128,8 @@ Apple documents the prerequisites in
 ## Verify script changes
 
 ```bash
-bash -n scripts/build-install.sh scripts/release.sh
-shellcheck scripts/build-install.sh scripts/release.sh
+bash -n scripts/build-install.sh scripts/release.sh scripts/sparkle-tools.sh scripts/sign-sparkle.sh
+shellcheck scripts/build-install.sh scripts/release.sh scripts/sparkle-tools.sh scripts/sign-sparkle.sh
 python3 -m unittest discover -s scripts/tests
 ```
 

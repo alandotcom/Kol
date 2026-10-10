@@ -155,6 +155,18 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 		false
 	}
 
+	func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+		guard UpdateController.shared.isInstallingUpdate,
+			KolApp.appStore.transcription.phase != nil else { return .terminateNow }
+		Task { @MainActor in
+			while KolApp.appStore.transcription.phase != nil {
+				try? await Task.sleep(for: .milliseconds(250))
+			}
+			sender.reply(toApplicationShouldTerminate: true)
+		}
+		return .terminateLater
+	}
+
 	func applicationWillTerminate(_: Notification) {
 		#if DEBUG
 		if recordingPanelPreview != nil { return }

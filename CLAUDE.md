@@ -134,7 +134,7 @@ Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no
 ### Key Dependencies
 - **FluidAudio**: Core ML ASR — Parakeet (multilingual). Uses [FluidInference/FluidAudio](https://github.com/FluidInference/FluidAudio) (upstream, `main` branch)
 - **Sauce**: Keyboard event monitoring
-- **Sparkle**: Auto-updates (feed: https://hex-updates.s3.amazonaws.com/appcast.xml)
+- **Sparkle 2.10**: Signed auto-updates (feed: https://github.com/alandotcom/Kol/releases/latest/download/appcast.xml). `UpdateController` owns updater preferences and menu controls. Debug builds disable updates. `sign-sparkle.sh` signs nested helpers during the Xcode build, before the app is signed.
 - **Swift Composable Architecture**: State management
 - **Inject**: Hot Reloading for SwiftUI
 
@@ -278,12 +278,13 @@ credential setup and failure diagnostics.
 
 ### What the Release Script Does
 
-1. Validates the version, working tree, branch, GitHub access, and notarization credentials
+1. Validates the version, working tree, branch, GitHub access, notarization credentials, and Sparkle Keychain key against `SUPublicEDKey`
 2. Collects changesets, synchronizes version metadata, and increments the build number
 3. Runs tests through `xcodebuildmcp`
 4. Builds through `build-install.sh --release`, using Xcode's Developer ID signing with hardened runtime and secure timestamps, without installing the app
 5. Submits a ZIP with `notarytool` and requires an `Accepted` result
 6. Staples and validates the ticket, verifies the signature, and checks Gatekeeper
 7. Creates the distribution ZIP and verifies its extracted ticket and signature
-8. Commits the version bump, tags, and atomically pushes to `origin`
-9. Creates a draft GitHub release, verifies the uploaded digest, and publishes it
+8. Generates a signed `appcast.xml`, verifies feed and ZIP signatures, and checks update metadata
+9. Commits the version bump, tags, and atomically pushes to `origin`
+10. Creates a draft GitHub release with the ZIP and feed, verifies both uploaded digests, and publishes it

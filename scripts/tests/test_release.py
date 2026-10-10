@@ -26,6 +26,32 @@ if command == 'git':
         print('main')
     elif args[:2] == ['rev-parse', '--verify']:
         sys.exit(1)
+elif command == 'generate_keys':
+    if scenario == 'sparkle-key-missing':
+        sys.exit(1)
+    print('wrong-key' if scenario == 'sparkle-key-mismatch' else 'fixture-public-key')
+elif command == 'generate_appcast':
+    if scenario == 'appcast-generation':
+        sys.exit(1)
+    import xml.etree.ElementTree as ET
+    folder = Path(args[-1])
+    archive = next(folder.glob('*.zip'))
+    info = plistlib.loads(Path('Kol/Info.plist').read_bytes())
+    ns = 'http://www.andymatuschak.org/xml-namespaces/sparkle'
+    root = ET.Element('rss')
+    item = ET.SubElement(ET.SubElement(root, 'channel'), 'item')
+    ET.SubElement(item, '{' + ns + '}version').text = info['CFBundleVersion']
+    ET.SubElement(item, '{' + ns + '}shortVersionString').text = info['CFBundleShortVersionString']
+    prefix = args[args.index('--download-url-prefix') + 1]
+    ET.SubElement(item, 'enclosure', {
+        'url': prefix + archive.name,
+        'length': '0' if scenario == 'appcast-metadata' else str(archive.stat().st_size),
+        '{' + ns + '}edSignature': 'fixture-signature'
+    })
+    ET.ElementTree(root).write(folder / 'appcast.xml')
+elif command == 'sign_update':
+    if scenario == 'appcast-signature':
+        sys.exit(1)
 elif command == 'sysctl':
     print(2)
 elif command == 'xcodebuildmcp':
@@ -73,11 +99,13 @@ elif command == 'codesign' and '--verify' in args:
 elif command == 'spctl' and scenario == 'gatekeeper':
     sys.exit(1)
 elif command == 'gh' and args[:2] == ['release', 'view']:
-    archive = next(Path('build').glob('Kol-v*.zip'))
+    artifacts = [next(Path('build').glob('Kol-v*.zip')),
+                 next(Path('build/verification').glob('*/feed/appcast.xml'))]
     print(json.dumps({'assets': [{
-        'name': archive.name, 'state': 'uploaded', 'size': archive.stat().st_size,
-        'digest': 'sha256:' + hashlib.sha256(archive.read_bytes()).hexdigest()
-    }]}))
+        'name': artifact.name, 'state': 'uploaded', 'size': artifact.stat().st_size,
+        'digest': 'bad-digest' if scenario == 'upload-digest' else
+                  'sha256:' + hashlib.sha256(artifact.read_bytes()).hexdigest()
+    } for artifact in artifacts]}))
 '''
 
 
@@ -87,7 +115,7 @@ class ReleaseTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(self.temp.name)
         (self.repo / 'scripts').mkdir()
-        for name in ('release.sh', 'build-install.sh', 'prepare-release.py'):
+        for name in ('release.sh', 'build-install.sh', 'prepare-release.py', 'sparkle-tools.sh', 'verify-appcast.py'):
             shutil.copy2(ROOT / 'scripts' / name, self.repo / 'scripts' / name)
         (self.repo / 'Kol/Resources').mkdir(parents=True)
         (self.repo / 'Kol.xcodeproj').mkdir()
@@ -101,11 +129,13 @@ class ReleaseTests(unittest.TestCase):
         (self.repo / 'Kol/Info.plist').write_bytes(plistlib.dumps({
             'CFBundleIdentifier': 'com.alandotcom.Kol',
             'CFBundleShortVersionString': '2.0.0', 'CFBundleVersion': '1',
+            'SUPublicEDKey': 'fixture-public-key',
         }))
         self.bin = self.repo / 'bin'
         self.bin.mkdir()
         for command in ('git', 'gh', 'xcrun', 'xcodebuildmcp', 'xcodebuild',
-                        'codesign', 'spctl', 'pkill', 'rsync', 'sysctl'):
+                        'codesign', 'spctl', 'pkill', 'rsync', 'sysctl',
+                        'generate_keys', 'generate_appcast', 'sign_update'):
             path = self.bin / command
             path.write_text(STUB)
             path.chmod(0o755)
@@ -115,7 +145,7 @@ class ReleaseTests(unittest.TestCase):
                     'KOL_NOTARY_PROFILE': 'fixture-profile',
                     'KOL_SIGNING_IDENTITY': 'Developer ID Application: Example Identity',
                     'KOL_SIGNING_TEAM': 'ABCDE12345',
-                    'KOL_NOTARY_TIMEOUT': '2m'}
+                    'KOL_NOTARY_TIMEOUT': '2m', 'KOL_SPARKLE_TOOLS': str(self.bin)}
 
     def calls(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()]
@@ -159,7 +189,8 @@ class ReleaseTests(unittest.TestCase):
     def test_notarization_and_verification_failures_block_publication(self):
         for scenario in ('rejected', 'rejected-exit', 'timeout', 'malformed',
                          'staple', 'ticket', 'gatekeeper', 'archive-ticket',
-                         'signature', 'archive-signature', 'build-failure'):
+                         'signature', 'archive-signature', 'build-failure',
+                         'appcast-generation', 'appcast-metadata', 'appcast-signature'):
             with self.subTest(scenario=scenario):
                 # Use a fresh fixture for each destructive release preparation.
                 case = ReleaseTests()
@@ -172,6 +203,20 @@ class ReleaseTests(unittest.TestCase):
                         self.assertTrue(any(c[:3] == ['xcrun', 'notarytool', 'log'] for c in case.calls()))
                 finally:
                     case.doCleanups()
+
+    def test_sparkle_key_failures_do_not_change_metadata(self):
+        for scenario in ('sparkle-key-missing', 'sparkle-key-mismatch'):
+            with self.subTest(scenario=scenario):
+                result = self.run_script(scenario=scenario)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(json.loads((self.repo / 'package.json').read_text())['version'], '2.0.0')
+                self.assert_unpublished()
+
+    def test_upload_verification_keeps_release_a_draft(self):
+        result = self.run_script(scenario='upload-digest')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Release remains a draft', result.stderr)
+        self.assertFalse(any(c[:3] == ['gh', 'release', 'edit'] for c in self.calls()))
 
     def test_distribution_build_uses_xcode_signing_without_installing(self):
         result = self.run_script('build-install.sh', ('--release',))

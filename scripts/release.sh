@@ -38,6 +38,21 @@ if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --output-form
   exit 1
 fi
 
+SPARKLE_TOOLS=$(./scripts/sparkle-tools.sh)
+SPARKLE_ACCOUNT="${KOL_SPARKLE_ACCOUNT:-kol-updates}"
+echo "Checking Sparkle signing key in Keychain account ${SPARKLE_ACCOUNT}..."
+if ! PUBLIC_KEY=$("$SPARKLE_TOOLS/generate_keys" --account "$SPARKLE_ACCOUNT" -p); then
+  echo "ERROR: Sparkle key is unavailable. Run: \"$SPARKLE_TOOLS/generate_keys\" --account \"$SPARKLE_ACCOUNT\"" >&2
+  exit 1
+fi
+python3 - "$PUBLIC_KEY" <<'PY'
+import plistlib, sys
+from pathlib import Path
+info = plistlib.loads(Path('Kol/Info.plist').read_bytes())
+if sys.argv[1].strip() != info.get('SUPublicEDKey'):
+    raise SystemExit('ERROR: Keychain signing key does not match SUPublicEDKey. Restore the original Sparkle key before releasing.')
+PY
+
 ARTIFACT_DIR="$PWD/build"
 VERIFY_DIR="${ARTIFACT_DIR}/verification/release-${VERSION}"
 DERIVED_DATA_PATH="${KOL_DERIVED_DATA_PATH:-$PWD/build/DerivedData}"
@@ -115,6 +130,21 @@ xcrun stapler validate "$EXTRACT_DIR/Kol.app" > "$VERIFY_DIR/archive-staple-vali
 codesign --verify --deep --strict "$EXTRACT_DIR/Kol.app" > "$VERIFY_DIR/archive-signature.log" 2>&1
 shasum -a 256 "$ZIP_PATH" > "$VERIFY_DIR/sha256.txt"
 
+echo "Generating and verifying the signed update feed..."
+FEED_DIR="$VERIFY_DIR/feed"
+rm -rf "$FEED_DIR"
+mkdir -p "$FEED_DIR"
+cp "$ZIP_PATH" "$FEED_DIR/"
+cp "$VERIFY_DIR/notes.md" "$FEED_DIR/Kol-v${VERSION}.md"
+"$SPARKLE_TOOLS/generate_appcast" --account "$SPARKLE_ACCOUNT" \
+  --download-url-prefix "https://github.com/${REPO}/releases/download/v${VERSION}/" \
+  --embed-release-notes --maximum-deltas 0 "$FEED_DIR" > "$VERIFY_DIR/appcast.log" 2>&1
+FEED_PATH="$FEED_DIR/appcast.xml"
+python3 scripts/verify-appcast.py "$FEED_PATH" "$ZIP_PATH" "$APP_PATH" \
+  "$SPARKLE_TOOLS" "$SPARKLE_ACCOUNT" \
+  "https://github.com/${REPO}/releases/download/v${VERSION}/Kol-v${VERSION}.zip" \
+  > "$VERIFY_DIR/appcast-verification.log" 2>&1
+
 git diff --check
 git add Kol/Info.plist Kol.xcodeproj/project.pbxproj package.json \
   CHANGELOG.md Kol/Resources/changelog.md .changeset
@@ -122,18 +152,19 @@ git commit -m "Release v${VERSION}" -m "Collect pending changesets and synchroni
 git tag "v${VERSION}"
 git push --atomic "$REMOTE" "$BRANCH" "v${VERSION}"
 
-gh release create "v${VERSION}" "$ZIP_PATH" --repo "$REPO" \
+gh release create "v${VERSION}" "$ZIP_PATH" "$FEED_PATH" --repo "$REPO" \
   --title "Kol v${VERSION}" --notes-file "$VERIFY_DIR/notes.md" --draft --verify-tag
 gh release view "v${VERSION}" --repo "$REPO" --json assets > "$VERIFY_DIR/upload.json"
-python3 - "$VERIFY_DIR/upload.json" "$ZIP_PATH" <<'PY'
+python3 - "$VERIFY_DIR/upload.json" "$ZIP_PATH" "$FEED_PATH" <<'PY'
 import hashlib, json, sys
 from pathlib import Path
-archive = Path(sys.argv[2])
 assets = json.loads(Path(sys.argv[1]).read_text())['assets']
-asset = next((a for a in assets if a['name'] == archive.name), None)
-digest = 'sha256:' + hashlib.sha256(archive.read_bytes()).hexdigest()
-if not asset or asset['state'] != 'uploaded' or asset['size'] != archive.stat().st_size or asset.get('digest') != digest:
-    raise SystemExit('ERROR: Uploaded release archive failed verification. Release remains a draft.')
+for filename in sys.argv[2:]:
+    artifact = Path(filename)
+    asset = next((a for a in assets if a['name'] == artifact.name), None)
+    digest = 'sha256:' + hashlib.sha256(artifact.read_bytes()).hexdigest()
+    if not asset or asset['state'] != 'uploaded' or asset['size'] != artifact.stat().st_size or asset.get('digest') != digest:
+        raise SystemExit(f'ERROR: Uploaded {artifact.name} failed verification. Release remains a draft.')
 PY
 gh release edit "v${VERSION}" --repo "$REPO" --draft=false --latest
 echo "Released https://github.com/${REPO}/releases/tag/v${VERSION}"
