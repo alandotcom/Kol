@@ -120,8 +120,8 @@ public struct TranscriptionFeature {
     case insertionReady(generation: UUID, String)
 
     // Cancel/discard flow
-    case cancel   // Explicit cancellation with sound
-    case discard  // Silent discard (too short/accidental)
+    case cancel
+    case discard  // Too short or accidental recording
 
     // Transcription result flow
     case transcriptionResult(generation: UUID, String, URL, asrMs: Int)
@@ -164,7 +164,6 @@ public struct TranscriptionFeature {
   @Dependency(\.recording) var recording
   @Dependency(\.pasteboard) var pasteboard
   @Dependency(\.keyEventMonitor) var keyEventMonitor
-  @Dependency(\.soundEffects) var soundEffect
   @Dependency(\.date.now) var now
   @Dependency(\.transcriptPersistence) var transcriptPersistence
   @Dependency(\.llmPostProcessing) var llmPostProcessing
@@ -236,10 +235,7 @@ public struct TranscriptionFeature {
           retireContext(&state)
           return cancelCaptures(generation)
         case let .failed(error):
-          return .merge(
-            handleTranscriptionError(&state, error: error, audioURL: nil),
-            .run { _ in soundEffect.play(.cancel) }
-          )
+          return handleTranscriptionError(&state, error: error, audioURL: nil)
         }
 
       case let .recordingStopped(generation, outcome):
@@ -249,7 +245,6 @@ public struct TranscriptionFeature {
         }
         switch outcome {
         case let .audio(url):
-          soundEffect.play(.stopRecording)
           state.phase = .transcribing
           return transcribeAudio(&state, generation: generation, url: url)
         case .stale:
@@ -370,14 +365,14 @@ public struct TranscriptionFeature {
         guard state.phase != nil else {
           return .none
         }
-        return handleCancel(&state)
+        return endSession(&state)
 
       case .discard:
         // Silent discard for quick/accidental recordings
         guard state.isRecording else {
           return .none
         }
-        return handleDiscard(&state)
+        return endSession(&state)
       }
     }
   }
@@ -578,10 +573,7 @@ private extension TranscriptionFeature {
 private extension TranscriptionFeature {
   func handleStartRecording(_ state: inout State) -> Effect<Action> {
     guard state.modelBootstrapState.isModelReady else {
-      return .merge(
-        .send(.modelMissing),
-        .run { _ in soundEffect.play(.cancel) }
-      )
+      return .send(.modelMissing)
     }
     let previous = state.contextSession?.id
     retireContext(&state)
@@ -627,7 +619,6 @@ private extension TranscriptionFeature {
       } ?? .none,
       .run { @MainActor send in
         guard session.wrappedValue?.id == contextSession.id, !Task.isCancelled else { return }
-        soundEffect.play(.startRecording)
         let outcome = await recording.startRecording(contextSession.id)
         guard session.wrappedValue?.id == contextSession.id, !Task.isCancelled else {
           await recording.discardRecording(contextSession.id)
@@ -749,7 +740,7 @@ private extension TranscriptionFeature {
         currentTime: now
       )
     )
-    guard decision == .proceedToTranscription else { return handleDiscard(&state) }
+    guard decision == .proceedToTranscription else { return endSession(&state) }
     if case .acquiring = state.phase {
       state.phase = .acquiring(stopRequested: true)
       return cancelCaptures(generation)
@@ -1063,15 +1054,7 @@ private extension TranscriptionFeature {
 // MARK: - Cancel/Discard Handlers
 
 private extension TranscriptionFeature {
-  func handleCancel(_ state: inout State) -> Effect<Action> {
-    endSession(&state, playSound: true)
-  }
-
-  func handleDiscard(_ state: inout State) -> Effect<Action> {
-    endSession(&state, playSound: false)
-  }
-
-  func endSession(_ state: inout State, playSound: Bool) -> Effect<Action> {
+  func endSession(_ state: inout State) -> Effect<Action> {
     let generation = state.contextSession?.id
     retireContext(&state)
     return .merge(
@@ -1081,7 +1064,6 @@ private extension TranscriptionFeature {
           .cancel(id: CancelID.session(id)),
           .run { _ in
             await recording.discardRecording(id)
-            if playSound { soundEffect.play(.cancel) }
           }
         )
       } ?? .none

@@ -18,7 +18,6 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 	private var pendingSettingsPresentation = false
 	private var launchedAtLogin = false
 
-	@Dependency(\.soundEffects) var soundEffect
 	@Dependency(\.recording) var recording
 	@Shared(.kolSettings) var kolSettings: KolSettings
 
@@ -43,10 +42,6 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 		if isTesting {
 			appLogger.debug("Running in testing mode")
 			return
-		}
-
-		Task {
-			await soundEffect.preloadSounds()
 		}
 		launchedAtLogin = wasLaunchedAtLogin()
 		appLogger.info("Application did finish launching")

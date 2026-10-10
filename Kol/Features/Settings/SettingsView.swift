@@ -16,7 +16,6 @@ struct SettingsView: View {
             Tab("General", systemImage: "gearshape", value: .general) {
                 Form {
                     Section("Application") { GeneralSectionContent(store: store) }
-                    Section("Feedback") { SoundSectionContent(store: store) }
                     Section("Kol") {
                         LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown")
                         Button("About Kol") { NSApp.orderFrontStandardAboutPanel(nil) }

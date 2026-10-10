@@ -7,8 +7,6 @@ final class KolSettingsMigrationTests: XCTestCase {
 		let decoded = try JSONDecoder().decode(KolSettings.self, from: data)
 
 		XCTAssertEqual(decoded.recordingAudioBehavior, .pauseMedia, "Legacy pauseMediaOnRecord bool should map to pauseMedia behavior")
-		XCTAssertEqual(decoded.soundEffectsEnabled, false)
-		XCTAssertEqual(decoded.soundEffectsVolume, KolSettings.baseSoundEffectsVolume)
 		XCTAssertEqual(decoded.openOnLogin, true)
 		XCTAssertEqual(decoded.showDockIcon, false)
 		XCTAssertEqual(decoded.selectedModel, "whisper-large-v3")
@@ -64,6 +62,19 @@ final class KolSettingsMigrationTests: XCTestCase {
 		let data = try JSONEncoder().encode(settings)
 		let decoded = try JSONDecoder().decode(KolSettings.self, from: data)
 		XCTAssertEqual(decoded, settings)
+	}
+
+	func testLegacySoundSettingsAreIgnoredWithoutResettingOtherPreferences() throws {
+		let payload = Data(#"{"soundEffectsEnabled":true,"soundEffectsVolume":0.8,"soundTheme":"soft","showDockIcon":false,"selectedModel":"parakeet-tdt-0.6b-v2-coreml","llmCustomRules":"Use concise punctuation."}"#.utf8)
+		let decoded = try JSONDecoder().decode(KolSettings.self, from: payload)
+
+		XCTAssertFalse(decoded.showDockIcon)
+		XCTAssertEqual(decoded.selectedModel, "parakeet-tdt-0.6b-v2-coreml")
+		XCTAssertEqual(decoded.llmCustomRules, "Use concise punctuation.")
+		let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(decoded)) as? [String: Any])
+		XCTAssertNil(encoded["soundEffectsEnabled"])
+		XCTAssertNil(encoded["soundEffectsVolume"])
+		XCTAssertNil(encoded["soundTheme"])
 	}
 
 	func testInitNormalizesDoubleTapOnlyWhenLockDisabled() {

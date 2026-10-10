@@ -17,7 +17,6 @@ public enum KolLog {
     case recording = "Recording"
     case media = "Media"
     case pasteboard = "Pasteboard"
-    case sound = "SoundEffect"
     case hotKey = "HotKey"
     case keyEvent = "KeyEvent"
     case parakeet = "Parakeet"
@@ -41,7 +40,6 @@ public enum KolLog {
   public static let recording = logger(.recording)
   public static let media = logger(.media)
   public static let pasteboard = logger(.pasteboard)
-  public static let sound = logger(.sound)
   public static let hotKey = logger(.hotKey)
   public static let keyEvent = logger(.keyEvent)
   public static let parakeet = logger(.parakeet)

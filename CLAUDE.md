@@ -148,7 +148,7 @@ Client struct definitions (`@DependencyClient`) live in **KolCore/Clients/** (no
 
 2. **Model Management**: Models are managed by `ModelDownloadFeature`. Curated defaults live in `Kol/Resources/Data/models.json`. The Settings UI shows Parakeet models only (TDT v2 for English, TDT v3 for multilingual).
 
-3. **Sound Effects**: Audio feedback is provided via `SoundEffect.swift` using files in `Resources/Audio/`
+3. **Recording feedback**: The transcription indicator provides visual feedback. Recording, stopping, and cancellation do not play sound effects.
 
 4. **Window Management**: Uses an `InvisibleWindow` for the transcription indicator overlay. On multi-monitor setups, the window repositions to the screen containing the mouse via a demand-driven notification posted by `TranscriptionView` when the indicator becomes visible (once per recording, not continuously).
 

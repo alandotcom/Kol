@@ -87,9 +87,6 @@ struct SettingsFeature {
     case setMinimumKeyTime(Double)
     case setOutputLanguage(String?)
     case setSelectedMicrophoneID(String?)
-    case setSoundEffectsEnabled(Bool)
-    case setSoundEffectsVolume(Double)
-    case setSoundTheme(SoundTheme)
     case setVADSilenceDetection(Bool)
 
     // Permission delegation (forwarded to AppFeature)
@@ -155,7 +152,6 @@ struct SettingsFeature {
   @Dependency(\.permissions) var permissions
   @Dependency(\.transcriptPersistence) var transcriptPersistence
   @Dependency(\.keychain) var keychain
-  @Dependency(\.soundEffects) var soundEffects
 
   private func beginCapture(_ target: HotKeyCaptureTarget, state: inout State) {
     endCapture(.recording, state: &state)
@@ -510,18 +506,6 @@ struct SettingsFeature {
       case let .setSelectedMicrophoneID(deviceID):
         state.$kolSettings.withLock { $0.selectedMicrophoneID = deviceID }
         return .none
-
-      case let .setSoundEffectsEnabled(enabled):
-        state.$kolSettings.withLock { $0.soundEffectsEnabled = enabled }
-        return .none
-
-      case let .setSoundEffectsVolume(volume):
-        state.$kolSettings.withLock { $0.soundEffectsVolume = volume }
-        return .none
-
-      case let .setSoundTheme(theme):
-        state.$kolSettings.withLock { $0.soundTheme = theme }
-        return .run { _ in soundEffects.reloadSounds() }
 
       case let .setVADSilenceDetection(enabled):
         state.$kolSettings.withLock { $0.vadSilenceDetectionEnabled = enabled }

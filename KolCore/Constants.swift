@@ -68,18 +68,6 @@ public enum KolCoreConstants {
     /// - `HotKeyProcessor`: Validation for printable-key hotkeys
     public static let defaultMinimumKeyTime: TimeInterval = 0.2
     
-    /// Base volume for sound effects (before user multiplier applied).
-    ///
-    /// **Value:** 0.2 (20%)
-    ///
-    /// **Rationale:** Quiet enough to not be jarring, loud enough to provide clear feedback.
-    /// User can adjust via soundEffectsVolume multiplier.
-    ///
-    /// **Used in:**
-    /// - `KolSettings`: Default sound effects volume
-    /// - Sound effect playback: Base volume before scaling
-    public static let baseSoundEffectsVolume: Double = 0.2
-
     // MARK: - Terminal Bundle IDs
 
     /// Canonical bundle IDs for terminal emulators.
