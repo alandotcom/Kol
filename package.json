@@ -22,7 +22,8 @@
     "eval:names": "cd evals && npx promptfoo@latest eval --tests datasets/english.yaml --filter-pattern 'Screen context.*name|Screen context.*person|Screen context.*company|Screen context.*capitalize|Screen context.*spelling|Screen context.*mixed|Screen context.*hallucinate'",
     "eval:vocab": "cd evals && npx promptfoo@latest eval --prompts prompts/english-messaging-vocab.txt --tests datasets/vocab-hints.yaml",
     "eval:mentions": "cd evals && npx promptfoo@latest eval --prompts prompts/english-messaging-screen-mentions.txt --tests datasets/mentions.yaml",
-    "eval:view": "cd evals && npx promptfoo@latest view"
+    "eval:view": "cd evals && npx promptfoo@latest view",
+    "eval:versions": "cd evals && bun x promptfoo@latest eval --prompts prompts/english-general-vocab.txt --tests datasets/versioned-product.yaml"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8"

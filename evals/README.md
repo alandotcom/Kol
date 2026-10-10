@@ -34,6 +34,9 @@ npx promptfoo@latest eval --tests datasets/edge-cases.yaml
 # Folder-path vocabulary in a general compose field
 bun run --cwd .. eval:paths
 
+# Product-name spelling beside release numbers
+bun run --cwd .. eval:versions
+
 # Explicit separators and hyphenated identifiers in messaging
 bun run --cwd .. eval:separators
 ```

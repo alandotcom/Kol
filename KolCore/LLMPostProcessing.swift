@@ -276,6 +276,7 @@ public enum PromptLayers {
 		Match only a contiguous spoken phrase. Preserve every intervening word; \
 		do not replace "send them for review" with "send-for-review".
 		Prefer a matching supplied spelling over a guessed technical correction.
+		A contiguous spoken product/version phrase can match a visible label despite ASR misspellings and misplaced periods. With "Mica 1.3.1" listed, replace only "me ka one dree. One" with "Mica 1.3.1"; retain all words outside that phrase, such as "This is". Use the listed version only when every spoken number matches it. Keep unrelated ordinary uses of the product homophone unchanged.
 		With vocabulary "Nox/Tools, Nox", "we should fix knocks" becomes "We should fix Nox.", while "three knocks on the door" stays "Three knocks on the door."
 		"""
 	}

@@ -27,6 +27,20 @@ struct DictationTextFormattingTests {
         #expect(FillerWordCleanup.apply(input) == expected)
     }
 
+    @Test(arguments: [
+        ("This is Nox one dot three dot one.", "This is Nox 1.3.1."),
+        ("Version 2 dot zero dot nine", "Version 2.0.9"),
+        ("one dot three", "1.3"),
+        ("🙂 one dot three and two dot four", "🙂 1.3 and 2.4"),
+        ("a dot separates words", "a dot separates words"),
+        ("one dot is enough", "one dot is enough"),
+        ("someone dot three", "someone dot three"),
+        ("three knocks on the door", "three knocks on the door")
+    ])
+    func formatsSpokenDottedNumbers(_ input: String, _ expected: String) {
+        #expect(SpokenDottedNumberFormatter.apply(input) == expected)
+    }
+
     @Test
     func settingsDefaultOffAndPersistIndependently() throws {
         let defaults = try JSONDecoder().decode(KolSettings.self, from: Data("{}".utf8))

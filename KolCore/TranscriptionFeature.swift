@@ -964,7 +964,7 @@ private extension TranscriptionFeature {
               if session.wrappedValue?.id == generation,
                  currentSettings.llmPostProcessingEnabled,
                  provider == ContextProvider(settings: currentSettings), consentStillValid {
-                finalText = result.text
+                finalText = SpokenDottedNumberFormatter.apply(result.text)
                 llmMetadata = result.metadata
                 transcriptionFeatureLogger.info("LLM output: '\(result.text, privacy: .private)' (\(result.metadata.latencyMs ?? 0)ms)")
               }

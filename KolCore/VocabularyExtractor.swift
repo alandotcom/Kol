@@ -66,6 +66,11 @@ public enum VocabularyExtractor {
 		pattern: #"\b[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)+\b"#
 	)
 
+	/// A single product name followed by a dotted release version.
+	private static let versionedNameRegex = try! NSRegularExpression(
+		pattern: #"\b([A-Z][a-zA-Z]{2,})[ \t]+v?\d+(?:\.\d+){2,}\b(?!\.\d)"#
+	)
+
 	/// Sequences of capitalized words (2+ words, same line only).
 	/// Uses `[ \t]+` instead of `\s+` to avoid matching across OCR line breaks,
 	/// which would stitch unrelated sidebar words into garbage "proper nouns".
@@ -132,6 +137,17 @@ public enum VocabularyExtractor {
 					}
 				}
 			}
+		}
+
+		for match in versionedNameRegex.matches(in: text, range: range) {
+			guard let nameRange = Range(match.range(at: 1), in: text) else { continue }
+			let name = String(text[nameRange])
+			guard !["version", "release", "build"].contains(name.lowercased()) else { continue }
+			if let labelRange = Range(match.range, in: text) {
+				let label = String(text[labelRange])
+				if seen.insert(label).inserted { results.append(label) }
+			}
+			if seen.insert(name).inserted { results.append(name) }
 		}
 
 		return results

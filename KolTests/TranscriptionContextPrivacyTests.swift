@@ -756,6 +756,24 @@ struct TranscriptionContextPrivacyTests {
     #expect(requests.value.first?.conversationContext == nil)
   }
 
+  @Test("Accepted cleanup inserts a product name with a numeric release version")
+  func versionedProductInsertion() async {
+    let inserted = LockIsolated<String?>(nil)
+    let store = TestStore(initialState: completedCapture(settings())) { TranscriptionFeature() } withDependencies: {
+      Self.testDependencies(&$0)
+      $0.keychain.load = { _ in "synthetic-key" }
+      $0.llmPostProcessing.process = { context, _, _ in
+        LLMProcessingResult(text: "This is Nox one dot three dot one.", metadata: LLMMetadata(originalText: context.text, model: "synthetic"))
+      }
+      $0.pasteboard.paste = { text, _ in inserted.setValue(text) }
+    }
+    store.exhaustivity = .off
+    await store.send(.transcriptionResult(generation: store.state.contextSession!.id, "This is knocks one dot three dot one", audioURL, asrMs: 1))
+    await store.receive(\.contextSessionFinished)
+    await store.finish()
+    #expect(inserted.value == "This is Nox 1.3.1.")
+  }
+
   @Test("Authorized current-session context reaches cleanup")
   func authorizedContext() async {
     var settings = settings()

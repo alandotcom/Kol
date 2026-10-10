@@ -54,6 +54,24 @@ struct VocabularyExtractorTests {
 		#expect(result.properNouns.contains("Example Labs"))
 	}
 
+	@Test("Retains single-word product names next to version numbers")
+	func versionedProductNames() {
+		let result = VocabularyExtractor.extract(from: "Nox 1.3.1 (build 4) is installed.")
+		#expect(result.allTerms == ["Nox 1.3.1", "Nox"])
+	}
+
+	@Test("Product labels retain every component of a four-part version")
+	func completeProductVersion() {
+		let result = VocabularyExtractor.extract(from: "Nox 1.3.1.4")
+		#expect(result.allTerms == ["Nox 1.3.1.4", "Nox"])
+	}
+
+	@Test("Version labels and ordinary numbers do not add single-word hints")
+	func excludesVersionLabels() {
+		let result = VocabularyExtractor.extract(from: "Version 1.3.1\nRelease 1.3.1\nBuild 1.3.1\nThere are 3 items\nHello world")
+		#expect(result.allTerms.isEmpty)
+	}
+
 	@Test("Does not extract single capitalized words as proper nouns")
 	func singleCapitalizedWord() {
 		let result = VocabularyExtractor.extract(from: "Hello world Welcome back")

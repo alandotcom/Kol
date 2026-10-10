@@ -223,3 +223,30 @@ Live dictation retained `OCR retries` as prose and resolved `KolCore` and
 were 516 ms for the prose sample and 781 ms for the combined identifier sample.
 Native alignment on partially offscreen windows and mixed display scales remains
 a verification limit.
+
+
+### Product-version follow-up
+
+A live release test exposed a gap in local extraction: `KolCore` and
+`Kol/Clients` became hints, while the single-word label `Kol 1.3.1` was dropped.
+The extractor now retains a capitalized product name next to a dotted release
+version, both as the full label and as the name. Ordinary sentence-start words
+remain excluded, as do generic Version, Release, and Build labels.
+
+The full label provides evidence for resolving a contiguous product/version
+phrase when ASR damages number words or punctuation. The prompt requires every
+spoken number to match the visible version and preserves words outside the
+matched phrase. Eval cases preserve ordinary coal and phone-call prose and
+prevent copying a different visible version. Accepted cleanup responses also
+normalize explicitly spoken dotted numbers locally, before user remappings.
+Fallback and rejected cleanup responses retain their existing behavior.
+
+The actual raw phrase `This is call one dree. One` passed three uncached replay
+requests with the captured vocabulary. Live verification then converted
+`This is coal one dot three dot one.` to `This is Kol 1.3.1.` with 428 ms cleanup.
+The native suite passed 295 tests, including an insertion test for the numeric
+version and Unicode/multiple-match formatting cases.
+
+Independent review caught three-component truncation of longer version labels.
+The extractor now retains all dotted components, with a four-part regression
+test.

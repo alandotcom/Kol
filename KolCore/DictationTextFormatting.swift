@@ -17,3 +17,28 @@ public enum FillerWordCleanup {
         ])
     }
 }
+
+public enum SpokenDottedNumberFormatter {
+    private static let digits = [
+        "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+        "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9"
+    ]
+    private static let pattern = try! NSRegularExpression(
+        pattern: #"\b(?:[0-9]+|zero|one|two|three|four|five|six|seven|eight|nine)(?:[ \t]+dot[ \t]+(?:[0-9]+|zero|one|two|three|four|five|six|seven|eight|nine))+\b"#,
+        options: .caseInsensitive
+    )
+
+    public static func apply(_ text: String) -> String {
+        var result = text
+        let range = NSRange(text.startIndex..., in: text)
+        for match in pattern.matches(in: text, range: range).reversed() {
+            guard let sourceRange = Range(match.range, in: text),
+                  let resultRange = Range(match.range, in: result) else { continue }
+            let components = text[sourceRange].split(whereSeparator: \.isWhitespace)
+                .filter { $0.lowercased() != "dot" }
+                .map { digits[$0.lowercased()] ?? String($0) }
+            result.replaceSubrange(resultRange, with: components.joined(separator: "."))
+        }
+        return result
+    }
+}

@@ -1,0 +1,70 @@
+# Single-word product spelling recovered from a visible version label.
+- description: "Versioned product: spelling with spoken release number"
+  vars:
+    input: "This is knocks one dot three dot one"
+    vocabularyHints: "Nox"
+  assert:
+    - type: regex
+      value: '^This is Nox (?:one dot three dot one|1\.3\.1)\.$'
+
+- description: "Versioned product: installation question uses visible spelling"
+  vars:
+    input: "does this installation of knocks work"
+    vocabularyHints: "Nox"
+  assert:
+    - type: regex
+      value: '^Does this installation of Nox work\?$'
+
+- description: "Versioned product: ordinary homophone remains prose"
+  vars:
+    input: "three knocks on the door"
+    vocabularyHints: "Nox"
+  assert:
+    - type: equals
+      value: "Three knocks on the door."
+
+- description: "Versioned product: Kol release spelling regression"
+  vars:
+    input: "This is coal one dot three dot one"
+    vocabularyHints: "Kol 1.3.1, Kol"
+  assert:
+    - type: regex
+      value: '^This is Kol (?:one dot three dot one|1\.3\.1)\.$'
+    - type: not-icontains
+      value: "coal"
+
+- description: "Versioned product: visible release does not replace ordinary coal"
+  vars:
+    input: "we burn coal for heat"
+    vocabularyHints: "Kol 1.3.1, Kol"
+  assert:
+    - type: equals
+      value: "We burn coal for heat."
+
+- description: "Versioned product: ASR loses separators and mishears three"
+  vars:
+    input: "This is call one dree. One"
+    vocabularyHints: "files/folders, files, folders, Kol Debug, package.json, KolTests, KolCore, Kol 1.3.1, Kol, local-project, Project Planning"
+  assert:
+    - type: equals
+      value: "This is Kol 1.3.1."
+
+- description: "Versioned product: unrelated phone call remains prose"
+  vars:
+    input: "this is call one of three calls today"
+    vocabularyHints: "Kol 1.3.1, Kol"
+  assert:
+    - type: not-contains
+      value: "Kol"
+    - type: icontains
+      value: "three calls"
+
+- description: "Versioned product: spoken numbers override a different visible version"
+  vars:
+    input: "this is coal one dot four dot two"
+    vocabularyHints: "Kol 1.3.1, Kol"
+  assert:
+    - type: not-contains
+      value: "1.3.1"
+    - type: regex
+      value: '(?:one dot four dot two|1\.4\.2)'
