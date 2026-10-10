@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.4
+
+### Patch Changes
+
+- Remove recording sound effects and their settings controls.
+
 ## 1.3.3
 
 ### Patch Changes

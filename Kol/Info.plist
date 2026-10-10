@@ -9,9 +9,9 @@
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.3.3</string>
+	<string>1.3.4</string>
 	<key>CFBundleVersion</key>
-	<string>6</string>
+	<string>7</string>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>Kol needs accessibility access to monitor keyboard events for hotkey detection.</string>
 	<key>NSAppTransportSecurity</key>
