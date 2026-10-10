@@ -45,12 +45,18 @@ struct SettingsFeature {
     // LLM Post-Processing
     var llmApiKey: String = ""
     var isLLMApiKeyLoaded: Bool = false
+    var llmApiKeyLoadGeneration: UInt64 = 0
     var showingPromptCustomization: Bool = false
+    var openRouterModels = OpenRouterModelsFeature.State()
+    var showingOpenRouterModels = false
 
     /// Preview of scratchpad text after applying word removals and remappings.
     /// Lives here (not in the view) so the pipeline logic is testable.
     var scratchpadPreviewText: String {
       var output = remappingScratchpadText
+      if kolSettings.removeFillerWords {
+        output = FillerWordCleanup.apply(output)
+      }
       if kolSettings.wordRemovalsEnabled {
         output = WordRemovalApplier.apply(output, removals: kolSettings.wordRemovals)
       }
@@ -64,6 +70,7 @@ struct SettingsFeature {
 
     // Existing
     case task
+    case cancelShortcutCapture
     case startSettingHotKey
     case startSettingPasteLastTranscriptHotkey
     case clearPasteLastTranscriptHotkey
@@ -105,6 +112,8 @@ struct SettingsFeature {
     case setModifierSide(Modifier.Kind, Modifier.Side)
 
     // Word remappings
+    case setAppendSpaceAfterDictation(Bool)
+    case setRemoveFillerWords(Bool)
     case setWordRemovalsEnabled(Bool)
     case addWordRemoval
     case updateWordRemoval(WordRemoval)
@@ -117,12 +126,15 @@ struct SettingsFeature {
     // LLM Post-Processing
     case setLLMEnabled(Bool)
     case setLLMPreset(String)
+    case showOpenRouterModels
+    case dismissOpenRouterModels
+    case openRouterModels(OpenRouterModelsFeature.Action)
     case setLLMBaseURL(String)
     case setLLMModelName(String)
     case setLLMCustomRules(String)
     case setLLMApiKey(String)
     case loadLLMApiKey
-    case llmApiKeyLoaded(String?)
+    case llmApiKeyLoaded(preset: String, generation: UInt64, key: String?)
     case setLLMScreenContextEnabled(Bool)
     case setConversationContextEnabled(Bool)
     case setAtMentionInsertionEnabled(Bool)
@@ -145,13 +157,9 @@ struct SettingsFeature {
   @Dependency(\.keychain) var keychain
   @Dependency(\.soundEffects) var soundEffects
 
-  private func deleteAudioEffect(for transcripts: [Transcript]) -> Effect<Action> {
-    .run { [transcriptPersistence] _ in
-      await transcriptPersistence.deleteAudioFiles(for: transcripts)
-    }
-  }
-
   private func beginCapture(_ target: HotKeyCaptureTarget, state: inout State) {
+    endCapture(.recording, state: &state)
+    endCapture(.pasteLastTranscript, state: &state)
     switch target {
     case .recording:
       state.$isSettingHotKey.withLock { $0 = true }
@@ -238,6 +246,10 @@ struct SettingsFeature {
 
     Scope(state: \.modelDownload, action: \.modelDownload) {
       ModelDownloadFeature()
+    }
+
+    Scope(state: \.openRouterModels, action: \.openRouterModels) {
+      OpenRouterModelsFeature()
     }
 
     Reduce { state, action in
@@ -364,6 +376,11 @@ struct SettingsFeature {
             await send(.keyEvent(keyEvent))
           }
         }
+
+      case .cancelShortcutCapture:
+        endCapture(.recording, state: &state)
+        endCapture(.pasteLastTranscript, state: &state)
+        return .none
 
       case .startSettingHotKey:
         beginCapture(.recording, state: &state)
@@ -557,18 +574,6 @@ struct SettingsFeature {
       case let .toggleSaveTranscriptionHistory(enabled):
         state.$kolSettings.withLock { $0.saveTranscriptionHistory = enabled }
         
-        // If disabling history, delete all existing entries
-        if !enabled {
-          let transcripts = state.transcriptionHistory.history
-          
-          // Clear the history
-          state.$transcriptionHistory.withLock { history in
-            history.history.removeAll()
-          }
-
-          return deleteAudioEffect(for: transcripts)
-        }
-        
         return .none
 
       case let .setMaxHistoryEntries(maxHistoryEntries):
@@ -582,8 +587,9 @@ struct SettingsFeature {
             }
           }
           if !removed.isEmpty {
+            let transcriptsToDelete = removed
             return .run { [transcriptPersistence] _ in
-              for transcript in removed {
+              for transcript in transcriptsToDelete {
                 try? await transcriptPersistence.deleteAudio(transcript)
               }
             }
@@ -598,6 +604,14 @@ struct SettingsFeature {
         }
         return .none
 
+      case let .setAppendSpaceAfterDictation(enabled):
+        state.$kolSettings.withLock { $0.appendSpaceAfterDictation = enabled }
+        return .none
+
+      case let .setRemoveFillerWords(enabled):
+        state.$kolSettings.withLock { $0.removeFillerWords = enabled }
+        return .none
+
       case let .setWordRemovalsEnabled(enabled):
         state.$kolSettings.withLock { $0.wordRemovalsEnabled = enabled }
         return .none
@@ -610,7 +624,11 @@ struct SettingsFeature {
 
       case let .setLLMPreset(preset):
         let oldPreset = state.kolSettings.llmProviderPreset
-        let currentKey = state.llmApiKey
+        let currentKey = state.isLLMApiKeyLoaded ? state.llmApiKey : ""
+        state.llmApiKey = ""
+        state.isLLMApiKeyLoaded = false
+        state.llmApiKeyLoadGeneration += 1
+        let generation = state.llmApiKeyLoadGeneration
         state.$kolSettings.withLock { settings in
           settings.llmProviderPreset = preset
           if let p = LLMProviderPreset(rawValue: preset), p != .custom {
@@ -623,9 +641,31 @@ struct SettingsFeature {
           if !currentKey.isEmpty {
             try? await keychain.save("llmApiKey_\(oldPreset)", currentKey)
           }
-          let newKey = await keychain.load("llmApiKey_\(preset)")
-          await send(.llmApiKeyLoaded(newKey))
+          let newKey = await keychain.loadLLMAPIKey(for: preset)
+          await send(.llmApiKeyLoaded(preset: preset, generation: generation, key: newKey))
         }
+
+      case .showOpenRouterModels:
+        guard state.kolSettings.llmProviderPreset == LLMProviderPreset.openrouter.rawValue else { return .none }
+        state.openRouterModels.currentModelID = state.kolSettings.llmModelName
+        state.openRouterModels.highlightedModelID = state.kolSettings.llmModelName.isEmpty ? nil : state.kolSettings.llmModelName
+        state.openRouterModels.search = ""
+        state.showingOpenRouterModels = true
+        return .send(.openRouterModels(.appeared))
+
+      case .dismissOpenRouterModels:
+        state.showingOpenRouterModels = false
+        return .send(.openRouterModels(.dismissed))
+
+      case let .openRouterModels(.delegate(.modelSelected(id))):
+        guard state.showingOpenRouterModels,
+              state.kolSettings.llmProviderPreset == LLMProviderPreset.openrouter.rawValue else { return .none }
+        state.$kolSettings.withLock { $0.llmModelName = id }
+        state.showingOpenRouterModels = false
+        return .send(.openRouterModels(.dismissed))
+
+      case .openRouterModels:
+        return .none
 
       case let .setLLMBaseURL(url):
         state.$kolSettings.withLock { $0.llmProviderBaseURL = url }
@@ -640,6 +680,7 @@ struct SettingsFeature {
         return .none
 
       case let .setLLMApiKey(key):
+        guard state.isLLMApiKeyLoaded else { return .none }
         let preset = state.kolSettings.llmProviderPreset
         state.llmApiKey = key
         return .run { [keychain] _ in
@@ -652,16 +693,18 @@ struct SettingsFeature {
 
       case .loadLLMApiKey:
         let preset = state.kolSettings.llmProviderPreset
+        state.llmApiKey = ""
+        state.isLLMApiKeyLoaded = false
+        state.llmApiKeyLoadGeneration += 1
+        let generation = state.llmApiKeyLoadGeneration
         return .run { [keychain] send in
-          // Try provider-specific key first, fall back to legacy key
-          var key = await keychain.load("llmApiKey_\(preset)")
-          if key == nil {
-            key = await keychain.load("llmApiKey")
-          }
-          await send(.llmApiKeyLoaded(key))
+          let key = await keychain.loadLLMAPIKey(for: preset)
+          await send(.llmApiKeyLoaded(preset: preset, generation: generation, key: key))
         }
 
-      case let .llmApiKeyLoaded(key):
+      case let .llmApiKeyLoaded(preset, generation, key):
+        guard preset == state.kolSettings.llmProviderPreset,
+              generation == state.llmApiKeyLoadGeneration else { return .none }
         state.llmApiKey = key ?? ""
         state.isLLMApiKeyLoaded = true
         return .none

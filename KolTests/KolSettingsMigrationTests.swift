@@ -27,6 +27,38 @@ final class KolSettingsMigrationTests: XCTestCase {
 		XCTAssertEqual(decoded.hasCompletedStorageMigration, true)
 	}
 
+	func testOpenRouterCatalogModelIDsSurviveLegacyModelMigration() throws {
+		for model in ["meta-llama/llama-4-scout", "example/llama3.1-8b"] {
+			var settings = KolSettings()
+			settings.llmProviderPreset = LLMProviderPreset.openrouter.rawValue
+			settings.llmProviderBaseURL = LLMProviderPreset.openrouter.defaultConfig.baseURL
+			settings.llmModelName = model
+			let decoded = try JSONDecoder().decode(KolSettings.self, from: JSONEncoder().encode(settings))
+			XCTAssertEqual(decoded.llmModelName, model)
+			XCTAssertEqual(decoded.llmProviderPreset, "openrouter")
+		}
+	}
+
+	func testOpenRouterMissingModelRequiresSelection() throws {
+		let payload = Data(#"{"llmProviderPreset":"openrouter"}"#.utf8)
+		let decoded = try JSONDecoder().decode(KolSettings.self, from: payload)
+		XCTAssertEqual(decoded.llmModelName, "")
+	}
+
+	func testExistingProvidersKeepLegacyModelMigration() throws {
+		for preset in ["groq", "custom", "cerebras"] {
+			for model in ["llama-4-scout-17b-16e-instruct", "llama3.1-8b"] {
+				let data = try JSONSerialization.data(withJSONObject: [
+					"llmProviderPreset": preset,
+					"llmModelName": model,
+				])
+				let decoded = try JSONDecoder().decode(KolSettings.self, from: data)
+				XCTAssertEqual(decoded.llmModelName, LLMProviderPreset.groq.defaultConfig.modelName)
+				XCTAssertEqual(decoded.llmProviderPreset, preset == "cerebras" ? "groq" : preset)
+			}
+		}
+	}
+
 	func testEncodeDecodeRoundTripPreservesDefaults() throws {
 		let settings = KolSettings()
 		let data = try JSONEncoder().encode(settings)

@@ -66,7 +66,7 @@ struct PromptCustomizationView: View {
 			}
 		}
 		.padding(28)
-		.frame(width: 560, height: 720)
+		.frame(width: 560, height: 610)
 	}
 
 	@ViewBuilder
@@ -107,19 +107,12 @@ struct PromptCustomizationView: View {
 				)
 			)
 			.frame(height: 80)
-			.font(.system(size: 13, design: .monospaced))
-			.scrollContentBackground(.hidden)
-			.padding(10)
-			.background(GlassColors.dropdownBackground)
-			.clipShape(RoundedRectangle(cornerRadius: 10))
-			.overlay(
-				RoundedRectangle(cornerRadius: 10)
-					.strokeBorder(GlassColors.dropdownBorder, lineWidth: 0.5)
-			)
+			.font(.body)
+            .accessibilityLabel("\(title) prompt")
 
 			Text(caption)
 				.font(.system(size: 13))
-				.foregroundStyle(.tertiary)
+				.foregroundStyle(.secondary)
 		}
 	}
 }

@@ -19,8 +19,8 @@ extension PasteboardClient: DependencyKey {
     public static var liveValue: Self {
         let live = PasteboardClientLive()
         return .init(
-            paste: { text in
-                await live.paste(text: text)
+            paste: { text, isCurrent in
+                try await live.paste(text: text, isCurrent: isCurrent)
             },
             copy: { text in
                 await live.copy(text: text)
@@ -67,11 +67,14 @@ struct PasteboardClientLive {
     }
 
     @MainActor
-    func paste(text: String) async {
+    func paste(text: String, isCurrent: @escaping @MainActor @Sendable () -> Bool) async throws {
+        try checkOwnership(isCurrent)
+        let text = DictationInsertionFormatter.format(text, appendSpace: kolSettings.appendSpaceAfterDictation)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         if kolSettings.useClipboardPaste {
-            await pasteWithClipboard(text)
+            try await pasteWithClipboard(text, isCurrent: isCurrent)
         } else {
-            simulateTypingWithAppleScript(text)
+            try simulateTypingWithAppleScript(text, isCurrent: isCurrent)
         }
     }
     
@@ -187,12 +190,23 @@ struct PasteboardClientLive {
     }
 
     @MainActor
-    func pasteWithClipboard(_ text: String) async {
+    func pasteWithClipboard(_ text: String, isCurrent: @escaping @MainActor @Sendable () -> Bool) async throws {
+        try checkOwnership(isCurrent)
         let pasteboard = NSPasteboard.general
         let snapshot = PasteboardSnapshot(pasteboard: pasteboard)
         let targetChangeCount = writeAndTrackChangeCount(pasteboard: pasteboard, text: text)
-        _ = await waitForPasteboardCommit(targetChangeCount: targetChangeCount)
-        let pasteSucceeded = await performPaste(text)
+        let writtenChangeCount = pasteboard.changeCount
+        let pasteSucceeded: Bool
+        do {
+            _ = try await waitForPasteboardCommit(targetChangeCount: targetChangeCount, isCurrent: isCurrent)
+            try checkOwnership(isCurrent)
+            pasteSucceeded = try await performPaste(text, isCurrent: isCurrent)
+        } catch is CancellationError {
+            if !kolSettings.copyToClipboard, pasteboard.changeCount == writtenChangeCount {
+                snapshot.restore(to: pasteboard)
+            }
+            throw CancellationError()
+        }
         
         // Only restore original pasteboard contents if:
         // 1. Copying to clipboard is disabled AND
@@ -203,7 +217,7 @@ struct PasteboardClientLive {
                 // Give slower apps a short window to read the plain-text entry
                 // before we repopulate the clipboard with the user's previous rich data.
                 try? await Task.sleep(for: .milliseconds(500))
-                pasteboard.clearContents()
+                guard pasteboard.changeCount == writtenChangeCount else { return }
                 savedSnapshot.restore(to: pasteboard)
             }
         }
@@ -236,9 +250,11 @@ struct PasteboardClientLive {
     @MainActor
     private func waitForPasteboardCommit(
         targetChangeCount: Int,
+        isCurrent: @escaping @MainActor @Sendable () -> Bool,
         timeout: Duration = .milliseconds(150),
         pollInterval: Duration = .milliseconds(20)
-    ) async -> Bool {
+    ) async throws -> Bool {
+        try checkOwnership(isCurrent)
         guard targetChangeCount > NSPasteboard.general.changeCount else { return true }
 
         let deadline = ContinuousClock.now + timeout
@@ -246,7 +262,8 @@ struct PasteboardClientLive {
             if NSPasteboard.general.changeCount >= targetChangeCount {
                 return true
             }
-            try? await Task.sleep(for: pollInterval)
+            try await Task.sleep(for: pollInterval)
+            try checkOwnership(isCurrent)
         }
         return false
     }
@@ -261,9 +278,9 @@ struct PasteboardClientLive {
     }
 
     @MainActor
-    private func performPaste(_ text: String) async -> Bool {
+    private func performPaste(_ text: String, isCurrent: @escaping @MainActor @Sendable () -> Bool) async throws -> Bool {
         for strategy in PasteStrategy.allCases {
-            if await attemptPaste(text, using: strategy) {
+            if try await attemptPaste(text, using: strategy, isCurrent: isCurrent) {
                 return true
             }
         }
@@ -271,23 +288,27 @@ struct PasteboardClientLive {
     }
 
     @MainActor
-    private func attemptPaste(_ text: String, using strategy: PasteStrategy) async -> Bool {
+    private func attemptPaste(_ text: String, using strategy: PasteStrategy, isCurrent: @escaping @MainActor @Sendable () -> Bool) async throws -> Bool {
+        try checkOwnership(isCurrent)
         switch strategy {
         case .cmdV:
-            return await postCmdV(delayMs: 0)
+            return try await postCmdV(delayMs: 0, isCurrent: isCurrent)
         case .menuItem:
             return PasteboardClientLive.pasteToFrontmostApp()
         case .accessibility:
-            return (try? Self.insertTextAtCursor(text)) != nil
+            do { try Self.insertTextAtCursor(text, isCurrent: isCurrent); return true }
+            catch is CancellationError { throw CancellationError() }
+            catch { return false }
         }
     }
 
     // MARK: - Helpers
 
     @MainActor
-    private func postCmdV(delayMs: Int) async -> Bool {
+    private func postCmdV(delayMs: Int, isCurrent: @escaping @MainActor @Sendable () -> Bool) async throws -> Bool {
         // Optional tiny wait before keystrokes
-        try? await wait(milliseconds: delayMs)
+        try await wait(milliseconds: delayMs)
+        try checkOwnership(isCurrent)
         let source = CGEventSource(stateID: .combinedSessionState)
         let vKey = Sauce.shared.keyCode(for: .v)
         let cmdKey: CGKeyCode = 55
@@ -309,12 +330,21 @@ struct PasteboardClientLive {
     }
 
     @MainActor
+    private func checkOwnership(_ isCurrent: @MainActor @Sendable () -> Bool) throws {
+        try Task.checkCancellation()
+        guard isCurrent() else { throw CancellationError() }
+    }
+
+    @MainActor
     private func wait(milliseconds: Int) async throws {
         try Task.checkCancellation()
         try await Task.sleep(nanoseconds: UInt64(milliseconds) * 1_000_000)
+        try Task.checkCancellation()
     }
     
-    func simulateTypingWithAppleScript(_ text: String) {
+    @MainActor
+    func simulateTypingWithAppleScript(_ text: String, isCurrent: @MainActor @Sendable () -> Bool) throws {
+        try checkOwnership(isCurrent)
         let escapedText = text.replacingOccurrences(of: "\"", with: "\\\"")
         let script = NSAppleScript(source: "tell application \"System Events\" to keystroke \"\(escapedText)\"")
         var error: NSDictionary?
@@ -331,7 +361,10 @@ struct PasteboardClientLive {
         case failedToInsertText
     }
     
-    static func insertTextAtCursor(_ text: String) throws {
+    @MainActor
+    static func insertTextAtCursor(_ text: String, isCurrent: @MainActor @Sendable () -> Bool) throws {
+        try Task.checkCancellation()
+        guard isCurrent() else { throw CancellationError() }
         // Get the system-wide accessibility element
         let systemWideElement = AXUIElementCreateSystemWide()
         
@@ -355,6 +388,8 @@ struct PasteboardClientLive {
         }
 
         // Insert text at cursor position by replacing selected text (or empty selection)
+        try Task.checkCancellation()
+        guard isCurrent() else { throw CancellationError() }
         let insertResult = AXUIElementSetAttributeValue(focusedElement, kAXSelectedTextAttribute as CFString, text as CFTypeRef)
         
         if insertResult != .success {

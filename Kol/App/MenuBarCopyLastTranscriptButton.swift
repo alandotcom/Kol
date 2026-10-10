@@ -20,7 +20,7 @@ struct MenuBarCopyLastTranscriptButton: View {
   var body: some View {
     let button = Button(action: {
       if let text = lastText {
-        Task { await pasteboard.paste(text) }
+        Task { try? await pasteboard.paste(text) { true } }
       }
     }) {
       HStack(spacing: 6) {

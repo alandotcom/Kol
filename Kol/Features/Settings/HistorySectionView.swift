@@ -1,106 +1,47 @@
 import ComposableArchitecture
-import Inject
 import SwiftUI
 
 struct HistorySectionContent: View {
-	@ObserveInjection var inject
-	@Bindable var store: StoreOf<SettingsFeature>
+    @Bindable var store: StoreOf<SettingsFeature>
+    @Environment(\.openWindow) private var openWindow
 
-	var body: some View {
-		Toggle("Save Transcription History", isOn: Binding(
-			get: { store.kolSettings.saveTranscriptionHistory },
-			set: { store.send(.toggleSaveTranscriptionHistory($0)) }
-		))
-		Text("Save transcriptions and audio recordings for later access")
-			.settingsCaption()
-
-		if store.kolSettings.saveTranscriptionHistory {
-			HStack {
-				Text("Maximum History Entries")
-				Spacer()
-				Picker("", selection: Binding(
-					get: { store.kolSettings.maxHistoryEntries ?? 0 },
-					set: { newValue in
-						store.send(.setMaxHistoryEntries(newValue == 0 ? nil : newValue))
-					}
-				)) {
-					Text("Unlimited").tag(0)
-					Text("50").tag(50)
-					Text("100").tag(100)
-					Text("200").tag(200)
-					Text("500").tag(500)
-					Text("1000").tag(1000)
-				}
-				.pickerStyle(.menu)
-				.frame(width: 120)
-			}
-
-			if store.kolSettings.maxHistoryEntries != nil {
-				Text("Oldest entries will be automatically deleted when limit is reached")
-					.settingsCaption()
-			}
-
-			PasteLastTranscriptHotkeyRow(store: store)
-		} else {
-			Text("When disabled, transcriptions will not be saved and audio files will be deleted immediately after transcription.")
-				.font(.system(size: 13))
-				.foregroundColor(.secondary)
-		}
-
-		EmptyView()
-			.enableInjection()
-	}
-}
-
-private struct PasteLastTranscriptHotkeyRow: View {
-	@ObserveInjection var inject
-	@Bindable var store: StoreOf<SettingsFeature>
-
-	var body: some View {
-		let pasteHotkey = store.kolSettings.pasteLastTranscriptHotkey
-
-		VStack(alignment: .leading, spacing: 12) {
-			VStack(alignment: .leading, spacing: 2) {
-				Text("Paste Last Transcript")
-					.font(.body.weight(.semibold))
-				Text("Assign a shortcut (modifier + key) to instantly paste your last transcription.")
-					.settingsCaption()
-			}
-
-			let key = store.isSettingPasteLastTranscriptHotkey ? nil : pasteHotkey?.key
-			let modifiers = store.isSettingPasteLastTranscriptHotkey ? store.currentPasteLastModifiers : (pasteHotkey?.modifiers ?? .init(modifiers: []))
-
-			HStack {
-				Spacer()
-				ZStack {
-					HotKeyView(modifiers: modifiers, key: key, isActive: store.isSettingPasteLastTranscriptHotkey)
-
-					if !store.isSettingPasteLastTranscriptHotkey, pasteHotkey == nil {
-						Text("Not set")
-							.settingsCaption()
-					}
-				}
-				.contentShape(Rectangle())
-				.onTapGesture {
-					store.send(.startSettingPasteLastTranscriptHotkey)
-				}
-				Spacer()
-			}
-
-			if store.isSettingPasteLastTranscriptHotkey {
-				Text("Use at least one modifier plus a key.")
-					.settingsCaption()
-			} else if pasteHotkey != nil {
-				Button {
-					store.send(.clearPasteLastTranscriptHotkey)
-				} label: {
-					Label("Clear shortcut", systemImage: "xmark.circle")
-				}
-				.buttonStyle(.borderless)
-				.font(.system(size: 13))
-				.foregroundStyle(.secondary)
-			}
-		}
-		.enableInjection()
-	}
+    var body: some View {
+        Toggle("Save transcription history", isOn: Binding(
+            get: { store.kolSettings.saveTranscriptionHistory },
+            set: { store.send(.toggleSaveTranscriptionHistory($0)) }
+        ))
+        Text("Stores transcription text and audio on your Mac. Turning off history preserves existing entries and stops saving new recordings.")
+            .settingsCaption()
+        if store.kolSettings.saveTranscriptionHistory {
+            Picker("Maximum entries", selection: Binding(
+                get: { store.kolSettings.maxHistoryEntries ?? 0 },
+                set: { store.send(.setMaxHistoryEntries($0 == 0 ? nil : $0)) }
+            )) {
+                Text("Unlimited").tag(0)
+                ForEach([50, 100, 200, 500, 1000], id: \.self) { Text(String($0)).tag($0) }
+            }
+            Text("Reducing the limit deletes the oldest entries and their audio immediately.")
+                .settingsCaption()
+        }
+        LabeledContent("Paste last transcript") {
+            Button { store.send(.startSettingPasteLastTranscriptHotkey) } label: {
+                HotKeyView(
+                    modifiers: store.isSettingPasteLastTranscriptHotkey ? store.currentPasteLastModifiers : (store.kolSettings.pasteLastTranscriptHotkey?.modifiers ?? .init(modifiers: [])),
+                    key: store.isSettingPasteLastTranscriptHotkey ? nil : store.kolSettings.pasteLastTranscriptHotkey?.key,
+                    isActive: store.isSettingPasteLastTranscriptHotkey
+                )
+            }
+            .help("Click to set a shortcut with at least one modifier and a key.")
+        }
+        if store.isSettingPasteLastTranscriptHotkey {
+            HStack {
+                Text("Press a modifier and a key. Press Escape to cancel.").settingsCaption()
+                Spacer()
+                Button("Cancel") { store.send(.cancelShortcutCapture) }
+            }
+        } else if store.kolSettings.pasteLastTranscriptHotkey != nil {
+            Button("Clear paste shortcut") { store.send(.clearPasteLastTranscriptHotkey) }
+        }
+        Button("Open History") { openWindow(id: "history") }
+    }
 }

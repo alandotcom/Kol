@@ -62,6 +62,7 @@ struct MicrophoneSectionContent: View {
 			}
 			.buttonStyle(.borderless)
 			.help("Refresh available input devices")
+            .accessibilityLabel("Refresh input devices")
 		}
 
 		if missingSelectedDeviceID != nil {

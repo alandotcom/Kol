@@ -94,3 +94,15 @@ public extension DependencyValues {
 		set { self[KeychainClient.self] = newValue }
 	}
 }
+
+public extension KeychainClient {
+	func loadLLMAPIKey(for preset: String) async -> String? {
+		if let key = await load("llmApiKey_\(preset)") {
+			return key
+		}
+		// OpenRouter was added after provider-specific storage and has no legacy key.
+		guard preset == LLMProviderPreset.groq.rawValue
+			|| preset == LLMProviderPreset.custom.rawValue else { return nil }
+		return await load("llmApiKey")
+	}
+}

@@ -78,11 +78,13 @@ public struct LLMProviderConfig: Codable, Equatable, Sendable {
 /// Known fast inference providers.
 public enum LLMProviderPreset: String, CaseIterable, Codable, Sendable {
 	case groq
+	case openrouter
 	case custom
 
 	public var displayName: String {
 		switch self {
 		case .groq: return "Groq"
+		case .openrouter: return "OpenRouter"
 		case .custom: return "Custom"
 		}
 	}
@@ -92,7 +94,12 @@ public enum LLMProviderPreset: String, CaseIterable, Codable, Sendable {
 		case .groq:
 			return LLMProviderConfig(
 				baseURL: "https://api.groq.com/openai/v1",
-				modelName: "llama-3.3-70b-versatile"
+				modelName: "openai/gpt-oss-120b"
+			)
+		case .openrouter:
+			return LLMProviderConfig(
+				baseURL: "https://openrouter.ai/api/v1",
+				modelName: ""
 			)
 		case .custom:
 			return LLMProviderConfig(baseURL: "", modelName: "")

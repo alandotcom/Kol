@@ -50,6 +50,8 @@ public struct KolSettings: Codable, Equatable, Sendable {
 	public var pasteLastTranscriptHotkey: HotKey?
 	public var hasCompletedModelBootstrap: Bool
 	public var hasCompletedStorageMigration: Bool
+	public var appendSpaceAfterDictation: Bool
+	public var removeFillerWords: Bool
 	public var wordRemovalsEnabled: Bool
 	public var wordRemovals: [WordRemoval]
 	public var wordRemappings: [WordRemapping]
@@ -97,6 +99,8 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		pasteLastTranscriptHotkey: HotKey? = KolSettings.defaultPasteLastTranscriptHotkey,
 		hasCompletedModelBootstrap: Bool = false,
 		hasCompletedStorageMigration: Bool = false,
+		appendSpaceAfterDictation: Bool = false,
+		removeFillerWords: Bool = false,
 		wordRemovalsEnabled: Bool = false,
 		wordRemovals: [WordRemoval] = KolSettings.defaultWordRemovals,
 		wordRemappings: [WordRemapping] = [],
@@ -137,6 +141,8 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		self.pasteLastTranscriptHotkey = pasteLastTranscriptHotkey
 		self.hasCompletedModelBootstrap = hasCompletedModelBootstrap
 		self.hasCompletedStorageMigration = hasCompletedStorageMigration
+		self.appendSpaceAfterDictation = appendSpaceAfterDictation
+		self.removeFillerWords = removeFillerWords
 		self.wordRemovalsEnabled = wordRemovalsEnabled
 		self.wordRemovals = wordRemovals
 		self.wordRemappings = wordRemappings
@@ -200,6 +206,8 @@ private enum KolSettingKey: String, CodingKey, CaseIterable {
 	case pasteLastTranscriptHotkey
 	case hasCompletedModelBootstrap
 	case hasCompletedStorageMigration
+	case appendSpaceAfterDictation
+	case removeFillerWords
 	case wordRemovalsEnabled
 	case wordRemovals
 	case wordRemappings
@@ -340,6 +348,8 @@ private enum KolSettingsSchema {
 		).eraseToAny(),
 		SettingsField(.hasCompletedModelBootstrap, keyPath: \.hasCompletedModelBootstrap, default: defaults.hasCompletedModelBootstrap).eraseToAny(),
 		SettingsField(.hasCompletedStorageMigration, keyPath: \.hasCompletedStorageMigration, default: defaults.hasCompletedStorageMigration).eraseToAny(),
+		SettingsField(.appendSpaceAfterDictation, keyPath: \.appendSpaceAfterDictation, default: defaults.appendSpaceAfterDictation).eraseToAny(),
+		SettingsField(.removeFillerWords, keyPath: \.removeFillerWords, default: defaults.removeFillerWords).eraseToAny(),
 		SettingsField(.wordRemovalsEnabled, keyPath: \.wordRemovalsEnabled, default: defaults.wordRemovalsEnabled).eraseToAny(),
 		SettingsField(
 			.wordRemovals,
@@ -376,6 +386,10 @@ private enum KolSettingsSchema {
 			keyPath: \.llmModelName,
 			default: defaults.llmModelName,
 			decode: { container, key, defaultValue in
+				let preset = try container.decodeIfPresent(String.self, forKey: .llmProviderPreset)
+				if preset == LLMProviderPreset.openrouter.rawValue {
+					return try container.decodeIfPresent(String.self, forKey: key) ?? LLMProviderPreset.openrouter.defaultConfig.modelName
+				}
 				let model = try container.decodeIfPresent(String.self, forKey: key) ?? defaultValue
 				return model.contains("llama3.1-8b") || model.contains("llama-4-scout") ? LLMProviderPreset.groq.defaultConfig.modelName : model
 			}

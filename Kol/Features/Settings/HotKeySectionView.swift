@@ -1,152 +1,70 @@
 import ComposableArchitecture
-import Inject
+import KolCore
 import SwiftUI
 
 struct HotKeySectionContent: View {
-    @ObserveInjection var inject
     @Bindable var store: StoreOf<SettingsFeature>
 
     var body: some View {
-        let hotKey = store.kolSettings.hotkey
-        let key = store.isSettingHotKey ? nil : hotKey.key
-        let modifiers = store.isSettingHotKey ? store.currentModifiers : hotKey.modifiers
-
-        VStack(spacing: 0) {
-            // Centered hotkey display
-            HStack {
-                Spacer()
-                HotKeyView(modifiers: modifiers, key: key, isActive: store.isSettingHotKey)
-                    .animation(.spring(), value: key)
-                    .animation(.spring(), value: modifiers)
-                Spacer()
-            }
-            .padding(.vertical, 16)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                store.send(.startSettingHotKey)
-            }
-
-            // Modifier side controls
-            if !store.isSettingHotKey,
-               hotKey.key == nil,
-               !hotKey.modifiers.isEmpty {
-                ModifierSideControls(
-                    modifiers: hotKey.modifiers,
-                    onSelect: { kind, side in
-                        store.send(.setModifierSide(kind, side))
-                    }
+        let hotkey = store.kolSettings.hotkey
+        let minimumHoldFloor = hotkey.key == nil ? RecordingDecisionEngine.modifierOnlyMinimumDuration : 0
+        let effectiveMinimumHold = max(store.kolSettings.minimumKeyTime, minimumHoldFloor)
+        LabeledContent("Record") {
+            Button { store.send(.startSettingHotKey) } label: {
+                HotKeyView(
+                    modifiers: store.isSettingHotKey ? store.currentModifiers : hotkey.modifiers,
+                    key: store.isSettingHotKey ? nil : hotkey.key,
+                    isActive: store.isSettingHotKey
                 )
-                .transition(.opacity)
             }
-
-            SettingsRow {
-                Text("Enable double-tap lock")
-                    .font(.body)
-            } trailing: {
-                Toggle("", isOn: Binding(
-                    get: { store.kolSettings.doubleTapLockEnabled },
-                    set: { store.send(.setDoubleTapLockEnabled($0)) }
-                ))
-                .labelsHidden()
-                .toggleStyle(.switch)
-            }
-
-            if hotKey.key != nil {
-                Divider().background(Color.gray.opacity(0.15))
-
-                SettingsRow {
-                    Text("Use double-tap only")
-                        .font(.body)
-                } trailing: {
-                    Toggle("", isOn: Binding(
-                        get: { store.kolSettings.useDoubleTapOnly },
-                        set: { store.send(.setUseDoubleTapOnly($0)) }
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .disabled(!store.kolSettings.doubleTapLockEnabled)
-                }
-            }
-
-            if store.kolSettings.hotkey.key == nil {
-                Divider().background(Color.gray.opacity(0.15))
-
-                VStack(spacing: 12) {
-                    HStack {
-                        Text("Ignore below \(store.kolSettings.minimumKeyTime, specifier: "%.1f")s")
-                            .font(.body)
-                        Spacer()
-                    }
-                    Slider(
-                        value: Binding(
-                            get: { store.kolSettings.minimumKeyTime },
-                            set: { store.send(.setMinimumKeyTime($0)) }
-                        ),
-                        in: 0.0 ... 2.0,
-                        step: 0.1
-                    )
-                    .tint(.blue)
-                }
-                .padding(.vertical, 12)
+            .help("Click to change the recording shortcut. Press Escape to cancel.")
+        }
+        if store.isSettingHotKey {
+            HStack {
+                Text("Press a key or modifier. Press Escape to cancel.").settingsCaption()
+                Spacer()
+                Button("Cancel") { store.send(.cancelShortcutCapture) }
             }
         }
-
-        EmptyView()
-            .enableInjection()
-    }
-}
-
-/// A settings row with label on left and control on right, matching the design.
-private struct SettingsRow<Leading: View, Trailing: View>: View {
-    let leading: Leading
-    let trailing: Trailing
-
-    init(@ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing) {
-        self.leading = leading()
-        self.trailing = trailing()
-    }
-
-    var body: some View {
-        HStack {
-            leading
-            Spacer()
-            trailing
-        }
-        .padding(.vertical, 12)
-    }
-}
-
-private struct ModifierSideControls: View {
-    @ObserveInjection var inject
-    var modifiers: Modifiers
-    var onSelect: (Modifier.Kind, Modifier.Side) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(modifiers.kinds, id: \.self) { kind in
+        if !store.isSettingHotKey, hotkey.key == nil {
+            ForEach(hotkey.modifiers.kinds, id: \.self) { kind in
                 if kind.supportsSideSelection {
-                    let binding = Binding<Modifier.Side>(
-                        get: { modifiers.side(for: kind) ?? .either },
-                        set: { onSelect(kind, $0) }
-                    )
-
-                    HStack {
-                        Text("Modifier side")
-                            .font(.body)
-                        Spacer()
-                        Picker("", selection: binding) {
-                            ForEach(Modifier.Side.allCases, id: \.self) { side in
-                                Text(side.displayName)
-                                    .tag(side)
-                            }
+                    Picker("\(kind.displayName) modifier side", selection: Binding<Modifier.Side>(
+                        get: { hotkey.modifiers.side(for: kind) ?? .either },
+                        set: { store.send(.setModifierSide(kind, $0)) }
+                    )) {
+                        ForEach(Modifier.Side.allCases, id: \.self) { side in
+                            Text(side.displayName).tag(side)
                         }
-                        .pickerStyle(.segmented)
-                        .frame(width: 200)
                     }
-                    .padding(.vertical, 8)
                 }
             }
         }
-        .enableInjection()
+        Toggle("Enable double-tap lock", isOn: Binding(
+            get: { store.kolSettings.doubleTapLockEnabled },
+            set: { store.send(.setDoubleTapLockEnabled($0)) }
+        ))
+        if hotkey.key != nil {
+            Toggle("Use double-tap only", isOn: Binding(
+                get: { store.kolSettings.useDoubleTapOnly },
+                set: { store.send(.setUseDoubleTapOnly($0)) }
+            ))
+            .disabled(!store.kolSettings.doubleTapLockEnabled)
+        }
+        Slider(value: Binding(
+            get: { effectiveMinimumHold },
+            set: { store.send(.setMinimumKeyTime($0)) }
+        ), in: minimumHoldFloor...2, step: 0.1) {
+            Text("Minimum hold: \(effectiveMinimumHold, specifier: "%.1f") seconds")
+        }
+        if hotkey.key == nil {
+            Text("Modifier shortcuts require a hold of at least \(minimumHoldFloor, specifier: "%.1f") seconds to avoid accidental recordings.")
+                .settingsCaption()
+            if store.kolSettings.doubleTapLockEnabled {
+                Text("Double-tap to keep recording, then press the shortcut again to stop.")
+                    .settingsCaption()
+            }
+        }
+        Text("Press Escape to cancel a recording.").settingsCaption()
     }
 }

@@ -13,6 +13,7 @@ import Dependencies
 import DependenciesMacros
 import Foundation
 import KolCore
+import IOKit.pwr_mgt
 
 private let recordingLogger = KolLog.recording
 private typealias CoreAudioPropertyListenerBlock = @convention(block) (UInt32, UnsafePointer<AudioObjectPropertyAddress>) -> Void
@@ -24,8 +25,9 @@ extension RecordingClient: DependencyKey {
       await live?.startObservingSystemChanges()
     }
     return Self(
-      startRecording: { await live.startRecording() },
-      stopRecording: { await live.stopRecording() },
+      startRecording: { id in await live.startRecording(id) },
+      stopRecording: { id in await live.stopRecording(id) },
+      discardRecording: { id in await live.discardRecording(id) },
       requestMicrophoneAccess: { await live.requestMicrophoneAccess() },
       observeAudioLevel: { await live.observeAudioLevel() },
       getAvailableInputDevices: { await live.getAvailableInputDevices() },
@@ -54,18 +56,20 @@ actor RecordingClientLive {
     let startedAt: Date
     let mode: CaptureRecordingMode
     let backend: RecordingBackend
+    let url: URL
   }
 
   private var recorder: AVAudioRecorder?
-  private let recordingURL = FileManager.default.temporaryDirectory.appendingPathComponent("recording.wav")
+  private var recordingURL = FileManager.default.temporaryDirectory.appendingPathComponent("kol-fallback-\(UUID().uuidString).wav")
   private var isRecorderPrimedForNextSession = false
   private var lastPrimedDeviceID: AudioDeviceID?
-  private var recordingSessionID: UUID?
+  private var takeSlot = RecordingTakeSlot()
+  private var sleepAssertionID: IOPMAssertionID?
   private var activeRecordingSession: ActiveRecordingSession?
   private var lastRecordingEndedAt: Date?
   private var deferredCaptureRestartReason: String?
   private var environmentChangeDebounceTask: Task<Void, Never>?
-  private var mediaControlTask: Task<Void, Never>?
+  private var mediaOperations = RecordingMediaTaskChain()
   private let recorderSettings: [String: Any] = [
     AVFormatIDKey: Int(kAudioFormatLinearPCM),
     AVSampleRateKey: 16000.0,
@@ -574,18 +578,6 @@ actor RecordingClientLive {
     FileManager.default.temporaryDirectory.appendingPathComponent("kol-capture-\(UUID().uuidString).wav")
   }
 
-  private func makeIgnoredStopURL() -> URL {
-    FileManager.default.temporaryDirectory.appendingPathComponent("kol-ignored-stop-\(UUID().uuidString).wav")
-  }
-
-  nonisolated static func shouldIgnoreStopRequest(
-    snapshotSessionID: UUID?,
-    currentSessionID: UUID?
-  ) -> Bool {
-    guard let snapshotSessionID else { return false }
-    return currentSessionID != snapshotSessionID
-  }
-
   private func ensureCaptureControllerReady(
     for deviceID: AudioDeviceID?,
     reason: String,
@@ -680,177 +672,117 @@ actor RecordingClientLive {
 
   // MARK: - Recording
 
-  func startRecording() async {
-    // Check and fix device-level mute before recording
+  func startRecording(_ id: UUID) async -> RecordingStartOutcome {
+    guard !Task.isCancelled else { return .superseded }
+    if takeSlot.owns(id) { return .started }
+    guard takeSlot.canAdmit(id, cancelled: Task.isCancelled) else { return .superseded }
+    if let old = takeSlot.activeID { discardTake(old) }
+    guard takeSlot.admit(id, cancelled: Task.isCancelled) else { return .superseded }
     ensureInputDeviceUnmuted()
-
-    let sessionID = UUID()
-    recordingSessionID = sessionID
-    mediaControlTask?.cancel()
-    mediaControlTask = nil
-
-    // Pause/mute media in background — MediaControlClient manages its own state
-    let behavior = kolSettings.recordingAudioBehavior
-    if behavior != .doNothing {
-      mediaControlTask = Task {
-        await mediaControl.pauseForRecording(behavior)
-      }
-    }
-
     let activeInputDevice = applyPreferredInputDevice()
     let mode = currentCaptureMode()
     logRecordingStartRequest(mode: mode, inputDeviceID: activeInputDevice)
-    let startRequestAt = Date()
-
+    let requestedAt = Date()
+    let captureURL = makeCaptureRecordingURL()
     do {
       try ensureCaptureControllerReady(for: activeInputDevice, reason: "startRecording")
-      let recordingURL = makeCaptureRecordingURL()
-      try captureController.beginRecording(to: recordingURL, requestedAt: startRequestAt, mode: mode)
-      let startedAt = Date()
-      activeRecordingSession = ActiveRecordingSession(
-        startedAt: startedAt,
-        mode: mode,
-        backend: .captureEngine
-      )
-      recordingLogger.notice(
-        "Recording started mode=\(mode.rawValue) backend=\(RecordingBackend.captureEngine.rawValue) startup=\(self.formatDuration(startedAt.timeIntervalSince(startRequestAt)))"
-      )
-      return
+      try captureController.beginRecording(to: captureURL, requestedAt: requestedAt, mode: mode)
+      activeRecordingSession = ActiveRecordingSession(startedAt: Date(), mode: mode, backend: .captureEngine, url: captureURL)
     } catch {
-      recordingLogger.error("Failed to start capture engine for mode=\(mode.rawValue): \(error.localizedDescription); falling back to AVAudioRecorder")
+      try? FileManager.default.removeItem(at: captureURL)
       stopCaptureController(reason: "capture-engine-start-failed")
-    }
-
-    do {
-      let recorder = try ensureRecorderReadyForRecording()
-      let recordCallStartedAt = Date()
-      guard recorder.record() else {
-        recordingLogger.error("AVAudioRecorder refused to start recording")
-        endRecordingSession()
-        return
-      }
-      let startedAt = Date()
-      activeRecordingSession = ActiveRecordingSession(
-        startedAt: startedAt,
-        mode: mode,
-        backend: .recorderFallback
-      )
-      startMeterTask()
-      recordingLogger.notice(
-        "Recording started mode=\(mode.rawValue) backend=\(RecordingBackend.recorderFallback.rawValue) recordCall=\(self.formatDuration(Date().timeIntervalSince(recordCallStartedAt))) totalStart=\(self.formatDuration(startedAt.timeIntervalSince(startRequestAt)))"
-      )
-    } catch {
-      recordingLogger.error("Failed to start recording: \(error.localizedDescription)")
-      clearActiveRecordingMetadata()
-      endRecordingSession()
-    }
-  }
-
-  func stopRecording() async -> URL {
-    let stopSessionID = recordingSessionID
-    let activeSession = activeRecordingSession
-
-    if activeSession?.backend == .captureEngine || captureController.isRecording {
-      let stopTimingEstimate = captureController.stopTimingEstimate
-      recordingLogger.debug(
-        "Waiting \(self.formatDuration(stopTimingEstimate.gracePeriod)) before finalizing capture-engine recording callbackInterval=\(self.formatDuration(stopTimingEstimate.callbackInterval)) bufferDuration=\(self.formatDuration(stopTimingEstimate.bufferDuration))"
-      )
-      try? await Task.sleep(for: .milliseconds(Int((stopTimingEstimate.gracePeriod * 1000).rounded())))
-
-      if Self.shouldIgnoreStopRequest(
-        snapshotSessionID: stopSessionID,
-        currentSessionID: recordingSessionID
-      ) {
-        recordingLogger.notice("Ignoring stale stop request after a newer recording session started")
-        return makeIgnoredStopURL()
-      }
-    }
-
-    if let captureURL = captureController.finishRecording(clearBuffer: currentCaptureMode() == .superFast) {
-      let stoppedAt = Date()
-      let session = activeSession ?? ActiveRecordingSession(
-        startedAt: stoppedAt,
-        mode: currentCaptureMode(),
-        backend: .captureEngine
-      )
-      let recordingDuration = stoppedAt.timeIntervalSince(session.startedAt)
-      stopMeterTask()
-      endRecordingSession()
-      clearActiveRecordingMetadata()
-      lastRecordingEndedAt = stoppedAt
-      recordingLogger.notice(
-        "Recording stopped mode=\(session.mode.rawValue) backend=\(session.backend.rawValue) duration=\(self.formatDuration(recordingDuration))"
-      )
-
-      if !kolSettings.superFastModeEnabled {
-        stopCaptureController(reason: "mode-disabled-after-stop")
-        releaseRecorder(reason: "capture-engine-stop")
-      }
-
-      await flushDeferredCaptureRestartIfNeeded()
-      await mediaControl.resumeAfterRecording()
-      return captureURL
-    }
-
-    let stoppedAt = Date()
-    let session = activeSession ?? ActiveRecordingSession(
-      startedAt: stoppedAt,
-      mode: currentCaptureMode(),
-      backend: .recorderFallback
-    )
-    let recordingDuration = stoppedAt.timeIntervalSince(session.startedAt)
-    let wasRecording = recorder?.isRecording == true
-    recorder?.stop()
-    stopMeterTask()
-    endRecordingSession()
-    clearActiveRecordingMetadata()
-    lastRecordingEndedAt = stoppedAt
-    if wasRecording {
-      recordingLogger.notice("Recording stopped mode=\(session.mode.rawValue) backend=\(session.backend.rawValue) duration=\(self.formatDuration(recordingDuration))")
-    } else {
-      recordingLogger.notice("stopRecording() called while recorder was idle")
-    }
-
-    var exportedURL = recordingURL
-    var didCopyRecording = false
-    do {
-      exportedURL = try duplicateCurrentRecording()
-      didCopyRecording = true
-    } catch {
-      isRecorderPrimedForNextSession = false
-      recordingLogger.error("Failed to copy recording: \(error.localizedDescription)")
-    }
-
-    if didCopyRecording {
       do {
-        if session.backend == .recorderFallback {
-          try primeRecorderForNextSession()
-        }
+        let recorder = try ensureRecorderReadyForRecording()
+        guard recorder.record() else { throw RecordingFailure.unavailable }
+        activeRecordingSession = ActiveRecordingSession(startedAt: Date(), mode: mode, backend: .recorderFallback, url: recordingURL)
+        startMeterTask()
       } catch {
-        isRecorderPrimedForNextSession = false
-        recordingLogger.error("Failed to prime recorder fallback: \(error.localizedDescription)")
+        discardTake(id)
+        return .failed(.backend(error.localizedDescription))
       }
     }
-
-    if !kolSettings.superFastModeEnabled {
-      stopCaptureController(reason: "standard-stop")
+    guard !Task.isCancelled else {
+      discardTake(id)
+      return .superseded
     }
+    if kolSettings.preventSystemSleep { preventSleep() }
+    let behavior = kolSettings.recordingAudioBehavior
+    if behavior != .doNothing {
+      enqueueMediaOperation { [mediaControl] in await mediaControl.pauseForRecording(behavior) }
+    }
+    return .started
+  }
 
+  func stopRecording(_ id: UUID) async -> RecordingStopOutcome {
+    guard !Task.isCancelled, takeSlot.owns(id), let session = activeRecordingSession else { return .stale }
+    if session.backend == .captureEngine {
+      let grace = captureController.stopTimingEstimate.gracePeriod
+      do { try await Task.sleep(for: .milliseconds(Int((grace * 1000).rounded()))) }
+      catch { return .stale }
+      guard !Task.isCancelled, takeSlot.owns(id) else { return .stale }
+    }
+    let url: URL?
+    if session.backend == .captureEngine {
+      url = captureController.finishRecording(clearBuffer: currentCaptureMode() == .superFast)
+    } else {
+      recorder?.stop()
+      url = session.url
+    }
+    finishTake(id)
+    if session.backend == .recorderFallback { releaseRecorder(reason: "fallback-stop") }
+    if !kolSettings.superFastModeEnabled { stopCaptureController(reason: "standard-stop") }
     await flushDeferredCaptureRestartIfNeeded()
-    await mediaControl.resumeAfterRecording()
-
-    return exportedURL
+    guard let url, FileManager.default.fileExists(atPath: url.path) else {
+      try? FileManager.default.removeItem(at: session.url)
+      return .failed(.missingAudio)
+    }
+    guard !Task.isCancelled else {
+      try? FileManager.default.removeItem(at: url)
+      return .stale
+    }
+    return .audio(url)
   }
 
-  // Actor state update helpers
-  private func isCurrentSession(_ sessionID: UUID) -> Bool {
-    recordingSessionID == sessionID
+  func discardRecording(_ id: UUID) {
+    discardTake(id)
   }
 
-  private func endRecordingSession() {
-    recordingSessionID = nil
-    mediaControlTask?.cancel()
-    mediaControlTask = nil
+  private func discardTake(_ id: UUID) {
+    guard takeSlot.owns(id) else { return }
+    let url = activeRecordingSession?.url
+    _ = captureController.finishRecording(clearBuffer: true)
+    recorder?.stop()
+    finishTake(id)
+    releaseRecorder(reason: "discard")
+    if !kolSettings.superFastModeEnabled { stopCaptureController(reason: "discard") }
+    if let url { try? FileManager.default.removeItem(at: url) }
+    else { try? FileManager.default.removeItem(at: recordingURL) }
+  }
+
+  private func finishTake(_ id: UUID) {
+    guard takeSlot.finish(id) else { return }
+    stopMeterTask()
+    clearActiveRecordingMetadata()
+    lastRecordingEndedAt = Date()
+    if let assertion = sleepAssertionID {
+      IOPMAssertionRelease(assertion)
+      sleepAssertionID = nil
+    }
+    enqueueMediaOperation { [mediaControl] in await mediaControl.resumeAfterRecording() }
+  }
+
+  private func preventSleep() {
+    var assertion: IOPMAssertionID = 0
+    if IOPMAssertionCreateWithName(
+      kIOPMAssertionTypeNoDisplaySleep as CFString,
+      IOPMAssertionLevel(kIOPMAssertionLevelOn),
+      "Kol Voice Recording" as CFString,
+      &assertion
+    ) == kIOReturnSuccess { sleepAssertionID = assertion }
+  }
+
+  private func enqueueMediaOperation(_ operation: @escaping @Sendable () async -> Void) {
+    mediaOperations.enqueue(operation)
   }
 
   private func clearActiveRecordingMetadata() {
@@ -864,7 +796,6 @@ actor RecordingClientLive {
 
   private enum RecorderPreparationError: Error {
     case failedToPrepareRecorder
-    case missingRecordingOnDisk
   }
 
   private func ensureRecorderReadyForRecording() throws -> AVAudioRecorder {
@@ -888,29 +819,11 @@ actor RecordingClientLive {
       return recorder
     }
 
+    recordingURL = FileManager.default.temporaryDirectory.appendingPathComponent("kol-fallback-\(UUID().uuidString).wav")
     let recorder = try AVAudioRecorder(url: recordingURL, settings: recorderSettings)
     recorder.isMeteringEnabled = true
     self.recorder = recorder
     return recorder
-  }
-
-  private func duplicateCurrentRecording() throws -> URL {
-    let fm = FileManager.default
-
-    guard fm.fileExists(atPath: recordingURL.path) else {
-      throw RecorderPreparationError.missingRecordingOnDisk
-    }
-
-    let exportURL = recordingURL
-      .deletingLastPathComponent()
-      .appendingPathComponent("kol-recording-\(UUID().uuidString).wav")
-
-    if fm.fileExists(atPath: exportURL.path) {
-      try fm.removeItem(at: exportURL)
-    }
-
-    try fm.copyItem(at: recordingURL, to: exportURL)
-    return exportURL
   }
 
   private func primeRecorderForNextSession() throws {
@@ -950,6 +863,7 @@ actor RecordingClientLive {
   }
 
   func warmUpRecorder() async {
+    guard takeSlot.activeID == nil else { return }
     let activeInputDevice = applyPreferredInputDevice()
 
     if kolSettings.superFastModeEnabled {
@@ -969,7 +883,7 @@ actor RecordingClientLive {
 
   /// Release recorder resources. Call on app termination.
   func cleanup() {
-    endRecordingSession()
+    if let id = takeSlot.activeID { discardTake(id) }
     stopObservingSystemChanges()
     stopCaptureController(reason: "cleanup")
     releaseRecorder(reason: "cleanup")

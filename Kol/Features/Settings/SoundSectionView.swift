@@ -28,11 +28,12 @@ struct SoundSectionContent: View {
 		HStack {
 			Text("Sound Theme")
 			Spacer()
-			Picker("", selection: themeBinding) {
+			Picker("Sound theme", selection: themeBinding) {
 				ForEach(SoundTheme.allCases, id: \.self) { theme in
 					Text(theme.rawValue.capitalized).tag(theme)
 				}
 			}
+			.labelsHidden()
 			.pickerStyle(.menu)
 			.frame(width: 120)
 		}
@@ -47,6 +48,7 @@ struct SoundSectionContent: View {
 					.monospacedDigit()
 			}
 			Slider(value: sliderBinding, in: 0...1)
+                .accessibilityLabel("Sound effects volume")
 				.disabled(!store.kolSettings.soundEffectsEnabled)
 		}
 

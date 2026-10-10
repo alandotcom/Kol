@@ -32,7 +32,6 @@
 		3779908C2F7A4CF800FAAFD1 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = 227F0592816A17126D6C6878 /* CustomDump */; };
 		3779908D2F7A4CF800FAAFD1 /* SwiftNavigation in Frameworks */ = {isa = PBXBuildFile; productRef = 47F37C5EC9694CD4D44182EC /* SwiftNavigation */; };
 		3779908E2F7A4CF800FAAFD1 /* CombineSchedulers in Frameworks */ = {isa = PBXBuildFile; productRef = C5562093AA581178D34EC294 /* CombineSchedulers */; };
-		3779908F2F7A4CF800FAAFD1 /* XCTestDynamicOverlay in Frameworks */ = {isa = PBXBuildFile; productRef = 7433F6E64A031D1C4AE440B4 /* XCTestDynamicOverlay */; };
 		377999182F7AD84400FAAFD1 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 9B1137862CEB38C43538B9BE /* Dependencies */; };
 		377999192F7AD84400FAAFD1 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = D0046C259393F2A4938AB19A /* DependenciesMacros */; };
 		3779991A2F7AD84400FAAFD1 /* Sauce in Frameworks */ = {isa = PBXBuildFile; productRef = F54DF918503E20282D61202F /* Sauce */; };
@@ -49,6 +48,7 @@
 		4F0D6A022F1A000100000001 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 47E05E012D444EE900D26DA6 /* ComposableArchitecture */; };
 		4F0D6A042F1A000100000002 /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = 4F0D6A052F1A000100000002 /* Sharing */; };
 		4F0D6A062F1A000100000003 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = 4F0D6A072F1A000100000003 /* CasePaths */; };
+		4F0D6A082F1A000100000004 /* Clocks in Frameworks */ = {isa = PBXBuildFile; productRef = 666EE21E76FBCFAFB6CFB6C7 /* Clocks */; };
 		B5045C972D78DED500D0A119 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = B5045C962D78DED500D0A119 /* MarkdownUI */; };
 		B53356002D7B8D4900E5F542 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B53355FF2D7B8D4900E5F542 /* Localizable.xcstrings */; };
 		C84995FA9130723B621B5575 /* KolCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7F7962AB52729F8E987112D /* KolCore.framework */; };
@@ -140,7 +140,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3779908F2F7A4CF800FAAFD1 /* XCTestDynamicOverlay in Frameworks */,
 				3779908E2F7A4CF800FAAFD1 /* CombineSchedulers in Frameworks */,
 				3779908D2F7A4CF800FAAFD1 /* SwiftNavigation in Frameworks */,
 				3779908C2F7A4CF800FAAFD1 /* CustomDump in Frameworks */,
@@ -170,6 +169,7 @@
 				377999192F7AD84400FAAFD1 /* DependenciesMacros in Frameworks */,
 				377999182F7AD84400FAAFD1 /* Dependencies in Frameworks */,
 				4F0D6A022F1A000100000001 /* ComposableArchitecture in Frameworks */,
+				4F0D6A082F1A000100000004 /* Clocks in Frameworks */,
 				4F0D6A042F1A000100000002 /* Sharing in Frameworks */,
 				4F0D6A062F1A000100000003 /* CasePaths in Frameworks */,
 				FCDB5A11B2A3B902784F1FA1 /* KolCore.framework in Frameworks */,
@@ -278,6 +278,7 @@
 			name = KolTests;
 			packageProductDependencies = (
 				47E05E012D444EE900D26DA6 /* ComposableArchitecture */,
+				666EE21E76FBCFAFB6CFB6C7 /* Clocks */,
 				9B1137862CEB38C43538B9BE /* Dependencies */,
 				D0046C259393F2A4938AB19A /* DependenciesMacros */,
 				F54DF918503E20282D61202F /* Sauce */,
@@ -365,7 +366,6 @@
 				227F0592816A17126D6C6878 /* CustomDump */,
 				47F37C5EC9694CD4D44182EC /* SwiftNavigation */,
 				C5562093AA581178D34EC294 /* CombineSchedulers */,
-				7433F6E64A031D1C4AE440B4 /* XCTestDynamicOverlay */,
 			);
 			productName = KolCore;
 			productReference = B7F7962AB52729F8E987112D /* KolCore.framework */;
@@ -400,6 +400,14 @@
 			mainGroup = 47E05DE52D444EC600D26DA6;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A76B0A5E2FE1000100000008 /* XCRemoteSwiftPackageReference "swift-issue-reporting" */,
+				A76B0A5E2FE1000100000007 /* XCRemoteSwiftPackageReference "swift-navigation" */,
+				A76B0A5E2FE1000100000006 /* XCRemoteSwiftPackageReference "swift-custom-dump" */,
+				A76B0A5E2FE1000100000005 /* XCRemoteSwiftPackageReference "swift-perception" */,
+				A76B0A5E2FE1000100000004 /* XCRemoteSwiftPackageReference "swift-case-paths" */,
+				A76B0A5E2FE1000100000003 /* XCRemoteSwiftPackageReference "swift-clocks" */,
+				A76B0A5E2FE1000100000002 /* XCRemoteSwiftPackageReference "combine-schedulers" */,
+				A76B0A5E2FE1000100000001 /* XCRemoteSwiftPackageReference "swift-sharing" */,
 				47E05E002D444EE900D26DA6 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
 				47E05E032D444EF800D26DA6 /* XCRemoteSwiftPackageReference "Sauce" */,
 				47E05E082D44525B00D26DA6 /* XCRemoteSwiftPackageReference "swift-dependencies" */,
@@ -865,6 +873,77 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A76B0A5E2FE1000100000008 /* XCRemoteSwiftPackageReference "swift-issue-reporting" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-issue-reporting";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.1.1;
+			};
+		};
+
+		A76B0A5E2FE1000100000007 /* XCRemoteSwiftPackageReference "swift-navigation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-navigation";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.11.2;
+			};
+		};
+
+		A76B0A5E2FE1000100000006 /* XCRemoteSwiftPackageReference "swift-custom-dump" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-custom-dump";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.7.3;
+			};
+		};
+
+		A76B0A5E2FE1000100000005 /* XCRemoteSwiftPackageReference "swift-perception" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-perception";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.12;
+			};
+		};
+
+		A76B0A5E2FE1000100000004 /* XCRemoteSwiftPackageReference "swift-case-paths" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-case-paths";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.10.0;
+			};
+		};
+
+		A76B0A5E2FE1000100000003 /* XCRemoteSwiftPackageReference "swift-clocks" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-clocks";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.1;
+			};
+		};
+
+		A76B0A5E2FE1000100000002 /* XCRemoteSwiftPackageReference "combine-schedulers" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/combine-schedulers";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.2;
+			};
+		};
+
+		A76B0A5E2FE1000100000001 /* XCRemoteSwiftPackageReference "swift-sharing" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-sharing";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.1;
+			};
+		};
 		00ACE93179EC4A99179E8CC3 /* XCRemoteSwiftPackageReference "AXorcist" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/steipete/AXorcist.git";
@@ -893,8 +972,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pointfreeco/swift-composable-architecture";
 			requirement = {
-				kind = revision;
-				revision = 055ca459ca8f413fe4b91ac1a067627f42d51fa8;
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.26.2;
 			};
 		};
 		47E05E032D444EF800D26DA6 /* XCRemoteSwiftPackageReference "Sauce" */ = {
@@ -910,7 +989,7 @@
 			repositoryURL = "https://github.com/pointfreeco/swift-dependencies";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.11.0;
+				minimumVersion = 1.17.1;
 			};
 		};
 		47E16A602EC6C9D300885CF7 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
@@ -939,6 +1018,7 @@
 		};
 		15C0465AEB781CAC239453CD /* CasePaths */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000004 /* XCRemoteSwiftPackageReference "swift-case-paths" */;
 			productName = CasePaths;
 		};
 		1A49FDC9D3A96580756DD5ED /* IdentifiedCollections */ = {
@@ -947,10 +1027,12 @@
 		};
 		214CD0B6112373FF134D3F0C /* Sharing */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000001 /* XCRemoteSwiftPackageReference "swift-sharing" */;
 			productName = Sharing;
 		};
 		227F0592816A17126D6C6878 /* CustomDump */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000006 /* XCRemoteSwiftPackageReference "swift-custom-dump" */;
 			productName = CustomDump;
 		};
 		308BB8438F4D3B47B457BB1D /* ConcurrencyExtras */ = {
@@ -959,6 +1041,7 @@
 		};
 		357C1A50A91F15118BC185C4 /* Sharing */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000001 /* XCRemoteSwiftPackageReference "swift-sharing" */;
 			productName = Sharing;
 		};
 		3B9944FCDBF0437F952241BC /* FluidAudio */ = {
@@ -968,10 +1051,12 @@
 		};
 		3F2D910B1F803177B9C3D83A /* IssueReporting */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000008 /* XCRemoteSwiftPackageReference "swift-issue-reporting" */;
 			productName = IssueReporting;
 		};
 		4303D8322FB668DC38AB6018 /* IssueReporting */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000008 /* XCRemoteSwiftPackageReference "swift-issue-reporting" */;
 			productName = IssueReporting;
 		};
 		4765045D2D45900200C7EA60 /* Pow */ = {
@@ -1011,14 +1096,17 @@
 		};
 		47F37C5EC9694CD4D44182EC /* SwiftNavigation */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000007 /* XCRemoteSwiftPackageReference "swift-navigation" */;
 			productName = SwiftNavigation;
 		};
 		4F0D6A052F1A000100000002 /* Sharing */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000001 /* XCRemoteSwiftPackageReference "swift-sharing" */;
 			productName = Sharing;
 		};
 		4F0D6A072F1A000100000003 /* CasePaths */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000004 /* XCRemoteSwiftPackageReference "swift-case-paths" */;
 			productName = CasePaths;
 		};
 		510DE99898ED98A98EA00074 /* DependenciesMacros */ = {
@@ -1028,19 +1116,18 @@
 		};
 		55EB14581A7A77F45016B74E /* IssueReporting */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000008 /* XCRemoteSwiftPackageReference "swift-issue-reporting" */;
 			productName = IssueReporting;
 		};
 		5BAEC2B4F7B077AFA58FE153 /* CasePaths */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000004 /* XCRemoteSwiftPackageReference "swift-case-paths" */;
 			productName = CasePaths;
 		};
 		666EE21E76FBCFAFB6CFB6C7 /* Clocks */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000003 /* XCRemoteSwiftPackageReference "swift-clocks" */;
 			productName = Clocks;
-		};
-		7433F6E64A031D1C4AE440B4 /* XCTestDynamicOverlay */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = XCTestDynamicOverlay;
 		};
 		93CBD2F56664506274695FFE /* ConcurrencyExtras */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1052,6 +1139,7 @@
 		};
 		A46E807918773E4595BA1134 /* CustomDump */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000006 /* XCRemoteSwiftPackageReference "swift-custom-dump" */;
 			productName = CustomDump;
 		};
 		ADA9CC764388229BF645AC0D /* IdentifiedCollections */ = {
@@ -1060,6 +1148,7 @@
 		};
 		B13BCBF62A0026E6C49C8B23 /* Clocks */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000003 /* XCRemoteSwiftPackageReference "swift-clocks" */;
 			productName = Clocks;
 		};
 		B5045C962D78DED500D0A119 /* MarkdownUI */ = {
@@ -1069,10 +1158,12 @@
 		};
 		C5562093AA581178D34EC294 /* CombineSchedulers */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000002 /* XCRemoteSwiftPackageReference "combine-schedulers" */;
 			productName = CombineSchedulers;
 		};
 		C68C753588DB5F3169873099 /* Perception */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000005 /* XCRemoteSwiftPackageReference "swift-perception" */;
 			productName = Perception;
 		};
 		CDA7122B55A3E7005199AC18 /* Sauce */ = {
@@ -1082,6 +1173,7 @@
 		};
 		CDE567DF5980ADAAA3B5E3E8 /* Perception */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000005 /* XCRemoteSwiftPackageReference "swift-perception" */;
 			productName = Perception;
 		};
 		D0046C259393F2A4938AB19A /* DependenciesMacros */ = {
@@ -1090,6 +1182,7 @@
 		};
 		D8214A7E522E16B329D19381 /* SwiftNavigation */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000100000007 /* XCRemoteSwiftPackageReference "swift-navigation" */;
 			productName = SwiftNavigation;
 		};
 		D8F03E26D6C7C1DADA9EBD5C /* Dependencies */ = {

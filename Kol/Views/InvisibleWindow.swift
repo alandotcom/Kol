@@ -1,94 +1,76 @@
-//
-//  InvisibleWindow.swift
-//  Kol
-//
-//  Created by Kit Langton on 1/24/25.
-//
-
 import AppKit
 import SwiftUI
 
-/// This allows us to render SwiftUI views anywhere on the screen, without dealing with the awkward
-/// rendering issues that come with normal MacOS windows. Essentially, we create one giant invisible
-/// window that covers the entire screen, and render our SwiftUI views into it.
-///
-/// I'm pretty sure this is what CleanShot X and other apps do to render their floating widgets.
-/// But if there's a better way to do this, I'd love to know!
+/// A compact status panel that leaves keyboard focus in the dictation destination.
 class InvisibleWindow: NSPanel {
-  override var canBecomeKey: Bool { true }
-  override var canBecomeMain: Bool { true }
+  override var canBecomeKey: Bool { false }
+  override var canBecomeMain: Bool { false }
 
-  /// Post this notification to reposition the window to whichever screen
-  /// currently contains the mouse cursor. Used by TranscriptionView when
-  /// the indicator becomes visible, replacing the old continuous mouseMoved
-  /// global monitor (which was always-on and energy-expensive).
-  static let repositionNotification = Notification.Name("InvisibleWindowReposition")
+  static let visibilityNotification = Notification.Name("KolRecordingPanelVisibility")
 
   init() {
-    let screen = NSScreen.main ?? NSScreen.screens[0]
-    let styleMask: NSWindow.StyleMask = [.fullSizeContentView, .borderless, .utilityWindow, .nonactivatingPanel]
-
-    super.init(contentRect: screen.frame,
-               styleMask: styleMask,
-               backing: .buffered,
-               defer: false)
-
+    super.init(
+      contentRect: NSRect(x: 0, y: 0, width: 248, height: 52),
+      styleMask: [.borderless, .nonactivatingPanel],
+      backing: .buffered,
+      defer: false
+    )
     level = .statusBar
     backgroundColor = .clear
     isOpaque = false
-    hasShadow = false
-    hidesOnDeactivate = false // Prevent hiding when app loses focus
+    hasShadow = true
+    hidesOnDeactivate = false
     canHide = false
+    // The status display has no controls and never consumes destination clicks.
+    ignoresMouseEvents = true
     collectionBehavior = [.fullScreenAuxiliary, .canJoinAllSpaces, .stationary, .ignoresCycle]
 
-    // Set initial frame
-    updateToScreenWithMouse()
-
-    // Start observing screen changes
     NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(screenDidChange),
-      name: NSWindow.didChangeScreenNotification,
-      object: nil
+      self, selector: #selector(visibilityChanged),
+      name: Self.visibilityNotification, object: nil
     )
-
-    // Also observe screen parameters for resolution changes
     NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(screenDidChange),
-      name: NSApplication.didChangeScreenParametersNotification,
-      object: nil
-    )
-
-    // Reposition on demand (e.g. when transcription indicator becomes visible)
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(screenDidChange),
-      name: Self.repositionNotification,
-      object: nil
+      self, selector: #selector(screenParametersChanged),
+      name: NSApplication.didChangeScreenParametersNotification, object: nil
     )
   }
 
-  deinit {
-    NotificationCenter.default.removeObserver(self)
+  deinit { NotificationCenter.default.removeObserver(self) }
+
+  private func position(on screen: NSScreen) {
+    let visibleFrame = screen.visibleFrame
+    setFrameOrigin(NSPoint(
+      x: visibleFrame.midX - frame.width / 2,
+      y: visibleFrame.maxY - frame.height - 12
+    ))
   }
 
-  private func updateToScreenWithMouse() {
-    let mouseLocation = NSEvent.mouseLocation
-    guard let screenWithMouse = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) else { return }
-    setFrame(screenWithMouse.frame, display: true)
+  @objc private func visibilityChanged(_ notification: Notification) {
+    guard let visible = notification.userInfo?["visible"] as? Bool else { return }
+    if visible {
+      guard !isVisible else { return }
+      let destination = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
+        ?? NSScreen.main
+      if let destination { position(on: destination) }
+      orderFrontRegardless()
+    } else {
+      orderOut(nil)
+    }
   }
 
-  @objc private func screenDidChange(_: Notification) {
-    updateToScreenWithMouse()
+  @objc private func screenParametersChanged(_: Notification) {
+    guard isVisible, let destination = screen ?? NSScreen.main else { return }
+    position(on: destination)
   }
 }
 
-extension InvisibleWindow: NSWindowDelegate {
+extension InvisibleWindow {
   static func fromView<V: View>(_ view: V) -> InvisibleWindow {
     let window = InvisibleWindow()
-    window.contentView = NSHostingView(rootView: view)
-    window.delegate = window
+    let hostingView = NSHostingView(rootView: view)
+    window.contentView = hostingView
+    let size = hostingView.fittingSize
+    if size.width > 0, size.height > 0 { window.setContentSize(size) }
     return window
   }
 }

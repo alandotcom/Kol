@@ -7,8 +7,15 @@ private let cacheLogger = KolLog.caches
 @MainActor
 class KolAppDelegate: NSObject, NSApplicationDelegate {
 	var invisibleWindow: InvisibleWindow?
-	var settingsWindow: NSWindow?
-	var statusItem: NSStatusItem!
+	#if DEBUG
+	private var recordingPanelPreview: RecordingPanelPreviewController?
+	#endif
+	var openNativeSettings: (() -> Void)? {
+		didSet {
+			if pendingSettingsPresentation { presentSettingsView() }
+		}
+	}
+	private var pendingSettingsPresentation = false
 	private var launchedAtLogin = false
 
 	@Dependency(\.soundEffects) var soundEffect
@@ -16,6 +23,20 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 	@Shared(.kolSettings) var kolSettings: KolSettings
 
 	func applicationDidFinishLaunching(_: Notification) {
+		#if DEBUG
+		if ProcessInfo.processInfo.arguments.contains("--preview-appearance=light") {
+			NSApp.appearance = NSAppearance(named: .aqua)
+		} else if ProcessInfo.processInfo.arguments.contains("--preview-appearance=dark") {
+			NSApp.appearance = NSAppearance(named: .darkAqua)
+		}
+		if ProcessInfo.processInfo.arguments.contains("--preview-recording-panel") {
+			NSApp.setActivationPolicy(.regular)
+			let preview = RecordingPanelPreviewController()
+			recordingPanelPreview = preview
+			preview.show()
+			return
+		}
+		#endif
 		DiagnosticsLogging.bootstrapIfNeeded()
 		// Ensure Parakeet/FluidAudio caches live under Application Support, not ~/.cache
 		configureLocalCaches()
@@ -94,53 +115,18 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		let transcriptionStore = KolApp.appStore.scope(state: \.transcription, action: \.transcription)
-		let transcriptionView = TranscriptionView(store: transcriptionStore).padding().padding(.top).padding(.top)
-			.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+		let transcriptionView = TranscriptionView(store: transcriptionStore)
 		invisibleWindow = InvisibleWindow.fromView(transcriptionView)
-		invisibleWindow?.makeKeyAndOrderFront(nil)
 	}
 
 	func presentSettingsView() {
-		if let settingsWindow = settingsWindow {
-			settingsWindow.makeKeyAndOrderFront(nil)
-			NSApp.activate(ignoringOtherApps: true)
+		guard let openNativeSettings else {
+			pendingSettingsPresentation = true
 			return
 		}
-
-		let settingsView = AppView(store: KolApp.appStore)
-		let settingsWindow = NSWindow(
-			contentRect: .init(x: 0, y: 0, width: 900, height: 700),
-			styleMask: [.titled, .fullSizeContentView, .closable, .miniaturizable],
-			backing: .buffered,
-			defer: false
-		)
-		settingsWindow.title = "Kol"
-		settingsWindow.titleVisibility = .visible
-		settingsWindow.titlebarAppearsTransparent = true
-		settingsWindow.backgroundColor = .clear
-		settingsWindow.isMovableByWindowBackground = true
-
-		let visualEffectView = NSVisualEffectView()
-		visualEffectView.blendingMode = .behindWindow
-		visualEffectView.material = .sidebar
-		visualEffectView.state = .active
-
-		let hostingView = NSHostingView(rootView: settingsView)
-		hostingView.translatesAutoresizingMaskIntoConstraints = false
-		visualEffectView.addSubview(hostingView)
-		NSLayoutConstraint.activate([
-			hostingView.topAnchor.constraint(equalTo: visualEffectView.topAnchor),
-			hostingView.leftAnchor.constraint(equalTo: visualEffectView.leftAnchor),
-			hostingView.rightAnchor.constraint(equalTo: visualEffectView.rightAnchor),
-			hostingView.bottomAnchor.constraint(equalTo: visualEffectView.bottomAnchor),
-		])
-		settingsWindow.contentView = visualEffectView
-		settingsWindow.isReleasedWhenClosed = false
-		settingsWindow.setFrameAutosaveName("KolSettingsWindow")
-		settingsWindow.center()
-		settingsWindow.makeKeyAndOrderFront(nil)
+		pendingSettingsPresentation = false
+		openNativeSettings()
 		NSApp.activate(ignoringOtherApps: true)
-		self.settingsWindow = settingsWindow
 	}
 
 	@objc private func handleAppModeUpdate() {
@@ -160,11 +146,24 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows _: Bool) -> Bool {
+		#if DEBUG
+		if let recordingPanelPreview {
+			recordingPanelPreview.show()
+			return true
+		}
+		#endif
 		presentSettingsView()
 		return true
 	}
 
+	func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
+		false
+	}
+
 	func applicationWillTerminate(_: Notification) {
+		#if DEBUG
+		if recordingPanelPreview != nil { return }
+		#endif
 		NotificationCenter.default.removeObserver(self)
 		// Fire-and-forget: Task.detached avoids deadlocking the @MainActor
 		// (a plain Task would need the main actor, which is blocked by sema.wait).

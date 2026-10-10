@@ -7,8 +7,8 @@ description: "Kol ASR post-processing quality evaluation"
 maxConcurrency: 1
 
 providers:
-  - id: openai:chat:llama-3.3-70b-versatile
-    label: groq-llama3.3-70b
+  - id: openai:chat:openai/gpt-oss-120b
+    label: groq-gpt-oss-120b
     config:
       apiBaseUrl: https://api.groq.com/openai/v1
       apiKeyEnvar: GROQ_API_KEY
@@ -18,7 +18,7 @@ providers:
 defaultTest:
   options:
     provider:
-      # LLM-as-judge uses a stronger model for reliable grading
+      # Keep the grading model independent of the candidate model.
       id: openai:chat:llama-3.3-70b-versatile
       config:
         apiBaseUrl: https://api.groq.com/openai/v1

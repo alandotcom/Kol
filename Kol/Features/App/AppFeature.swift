@@ -12,32 +12,8 @@ import KolCore
 
 @Reducer
 struct AppFeature {
-  enum ActiveTab: Equatable, CaseIterable {
-    case settings
-    case remappings
-    case history
-    case advanced
-    case about
-
-    var title: String {
-      switch self {
-      case .settings: "Settings"
-      case .remappings: "Transforms"
-      case .history: "History"
-      case .advanced: "Advanced"
-      case .about: "About"
-      }
-    }
-
-    var icon: String {
-      switch self {
-      case .settings: "gearshape"
-      case .remappings: "wand.and.stars"
-      case .history: "clock"
-      case .advanced: "slider.horizontal.3"
-      case .about: "info.circle"
-      }
-    }
+  enum SettingsPane: String, Hashable, CaseIterable {
+    case general, recording, text, models, privacy
   }
 
 	@ObservableState
@@ -45,7 +21,7 @@ struct AppFeature {
 		var transcription: TranscriptionFeature.State = .init()
 		var settings: SettingsFeature.State = .init()
 		var history: HistoryFeature.State = .init()
-		var activeTab: ActiveTab = .settings
+		var settingsPane: SettingsPane = .general
 		@Shared(.kolSettings) var kolSettings: KolSettings
 		@Shared(.modelBootstrapState) var modelBootstrapState: ModelBootstrapState
 
@@ -61,7 +37,7 @@ struct AppFeature {
     case transcription(TranscriptionFeature.Action)
     case settings(SettingsFeature.Action)
     case history(HistoryFeature.Action)
-    case setActiveTab(ActiveTab)
+    case setSettingsPane(SettingsPane)
     case task
     case pasteLastTranscript
 
@@ -120,17 +96,18 @@ struct AppFeature {
           return .none
         }
         return .run { _ in
-          await pasteboard.paste(lastTranscript)
+          try? await pasteboard.paste(lastTranscript) { true }
         }
         
       case .transcription(.modelMissing):
         KolLog.app.notice("Model missing - activating app and switching to settings")
-        state.activeTab = .settings
+        state.settingsPane = .models
         state.settings.shouldFlashModelSection = true
         return .run { send in
           await MainActor.run {
             KolLog.app.notice("Activating app for model missing")
             NSApplication.shared.activate(ignoringOtherApps: true)
+            NotificationCenter.default.post(name: .presentKolSettings, object: nil)
           }
           try? await Task.sleep(for: .seconds(2))
           await send(.settings(.set(\.shouldFlashModelSection, false)))
@@ -147,12 +124,12 @@ struct AppFeature {
         return .none
 
       case .history(.navigateToSettings):
-        state.activeTab = .settings
+        state.settingsPane = .privacy
         return .none
       case .history:
         return .none
-		case let .setActiveTab(tab):
-			state.activeTab = tab
+		case let .setSettingsPane(pane):
+			state.settingsPane = pane
 			return .none
 
       // Permission handling

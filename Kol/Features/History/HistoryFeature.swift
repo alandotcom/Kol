@@ -12,6 +12,8 @@ struct HistoryFeature {
 	struct State: Equatable {
 		@Shared(.transcriptionHistory) var transcriptionHistory: TranscriptionHistory
 		var playingTranscriptID: UUID?
+		var playbackSessionID: UUID?
+		var playbackError: String?
 		var audioPlayer: AVAudioPlayer?
 		var audioPlayerController: AudioPlayerController?
 
@@ -20,6 +22,7 @@ struct HistoryFeature {
 			audioPlayer = nil
 			audioPlayerController = nil
 			playingTranscriptID = nil
+			playbackSessionID = nil
 		}
 	}
 
@@ -30,9 +33,12 @@ struct HistoryFeature {
 		case deleteTranscript(UUID)
 		case deleteAllTranscripts
 		case confirmDeleteAll
-		case playbackFinished
+		case playbackFinished(UUID)
+		case dismissPlaybackError
 		case navigateToSettings
 	}
+
+	private enum CancelID { case playback }
 
 	@Dependency(\.pasteboard) var pasteboard
 	@Dependency(\.transcriptPersistence) var transcriptPersistence
@@ -47,39 +53,53 @@ struct HistoryFeature {
 		Reduce { state, action in
 			switch action {
 			case let .playTranscript(id):
+				state.playbackError = nil
 				if state.playingTranscriptID == id {
 					state.stopAudioPlayback()
-					return .none
+					return .cancel(id: CancelID.playback)
 				}
 
 				state.stopAudioPlayback()
 
 				guard let transcript = state.transcriptionHistory.history.first(where: { $0.id == id }) else {
-					return .none
+					return .cancel(id: CancelID.playback)
 				}
 
 				do {
 					let controller = AudioPlayerController()
+					let sessionID = UUID()
+					let completion = AsyncStream<Void> { continuation in
+						controller.onPlaybackFinished = {
+							continuation.yield(())
+							continuation.finish()
+						}
+					}
 					let player = try controller.play(url: transcript.audioPath)
 
 					state.audioPlayer = player
 					state.audioPlayerController = controller
 					state.playingTranscriptID = id
+					state.playbackSessionID = sessionID
 
 					return .run { send in
-						await withCheckedContinuation { continuation in
-							controller.onPlaybackFinished = {
-								continuation.resume()
-							}
+						for await _ in completion {
+							guard !Task.isCancelled else { return }
+							await send(.playbackFinished(sessionID))
 						}
-						await send(.playbackFinished)
 					}
+					.cancellable(id: CancelID.playback, cancelInFlight: true)
 				} catch {
 					historyLogger.error("Failed to play audio: \(error.localizedDescription)")
-					return .none
+					state.playbackError = "The recording is missing or could not be opened. You can still read and copy its transcript."
+					return .cancel(id: CancelID.playback)
 				}
 
-			case .stopPlayback, .playbackFinished:
+			case .stopPlayback:
+				state.stopAudioPlayback()
+				return .cancel(id: CancelID.playback)
+
+			case let .playbackFinished(sessionID):
+				guard state.playbackSessionID == sessionID else { return .none }
 				state.stopAudioPlayback()
 				return .none
 
@@ -89,21 +109,24 @@ struct HistoryFeature {
 				}
 
 			case let .deleteTranscript(id):
-				guard let index = state.transcriptionHistory.history.firstIndex(where: { $0.id == id }) else {
+				guard let transcript = state.transcriptionHistory.history.first(where: { $0.id == id }) else {
 					return .none
 				}
 
-				let transcript = state.transcriptionHistory.history[index]
+				let wasPlaying = state.playingTranscriptID == id
 
 				if state.playingTranscriptID == id {
 					state.stopAudioPlayback()
 				}
 
-				_ = state.$transcriptionHistory.withLock { history in
-					history.history.remove(at: index)
+				state.$transcriptionHistory.withLock { history in
+					history.history.removeAll { $0.id == id }
 				}
 
-				return deleteAudioEffect(for: [transcript])
+				return .merge(
+					deleteAudioEffect(for: [transcript]),
+					wasPlaying ? .cancel(id: CancelID.playback) : .none
+				)
 
 			case .deleteAllTranscripts:
 				return .send(.confirmDeleteAll)
@@ -116,7 +139,11 @@ struct HistoryFeature {
 					history.history.removeAll()
 				}
 
-				return deleteAudioEffect(for: transcripts)
+				return .merge(deleteAudioEffect(for: transcripts), .cancel(id: CancelID.playback))
+
+			case .dismissPlaybackError:
+				state.playbackError = nil
+				return .none
 
 			case .navigateToSettings:
 				return .none
