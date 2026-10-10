@@ -45,6 +45,10 @@ Once you've configured a global hotkey, there are **two recording modes**:
 1. **Press-and-hold** the hotkey to begin recording, say whatever you want, and then release the hotkey to start the transcription process.
 2. **Double-tap** the hotkey to *lock recording*, say whatever you want, and then **tap** the hotkey once more to start the transcription process.
 
+## Releases
+
+See [Releasing Kol](docs/releasing.md) for notarization setup and release commands.
+
 ## License
 
 This project is licensed under the MIT License — originally created by [Kit Langton](https://github.com/kitlangton). See `LICENSE` for details.

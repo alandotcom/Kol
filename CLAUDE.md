@@ -265,7 +265,10 @@ bun run eval:view
 
 ## Releasing a New Version
 
-Releases use `scripts/release.sh`, which bumps versions, builds, signs, creates a ZIP, pushes to GitHub, and creates a GitHub release.
+Releases use `scripts/release.sh`, which collects changesets, runs tests, builds,
+signs with Developer ID, notarizes, staples, and verifies the ZIP before pushing
+and publishing a GitHub release. See [docs/releasing.md](docs/releasing.md) for
+credential setup and failure diagnostics.
 
 ```bash
 # Ensure all changes are committed (clean working tree required)
@@ -275,12 +278,12 @@ Releases use `scripts/release.sh`, which bumps versions, builds, signs, creates 
 
 ### What the Release Script Does
 
-1. Validates semver and checks for clean working tree
-2. Bumps version in `Info.plist`, `project.pbxproj`, and `package.json`
-3. Increments build number
-4. Commits version bump + creates git tag `v<version>`
-5. Builds with xcodebuild (Release configuration)
-6. Signs with Apple Development identity
-7. Creates ZIP artifact in `build/`
-8. Pushes commit + tag to `origin` remote
-9. Creates GitHub release via `gh release create` with ZIP attached
+1. Validates the version, working tree, branch, GitHub access, and notarization credentials
+2. Collects changesets, synchronizes version metadata, and increments the build number
+3. Runs tests through `xcodebuildmcp`
+4. Builds through `build-install.sh --release`, using Xcode's Developer ID signing with hardened runtime and secure timestamps, without installing the app
+5. Submits a ZIP with `notarytool` and requires an `Accepted` result
+6. Staples and validates the ticket, verifies the signature, and checks Gatekeeper
+7. Creates the distribution ZIP and verifies its extracted ticket and signature
+8. Commits the version bump, tags, and atomically pushes to `origin`
+9. Creates a draft GitHub release, verifies the uploaded digest, and publishes it

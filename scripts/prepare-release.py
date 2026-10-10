@@ -80,8 +80,8 @@ def prepare(version: str, notes_path: Path) -> None:
     notes_path.parent.mkdir(parents=True, exist_ok=True)
     notes_path.write_text(
         entry + "\n\nRequires macOS 26 or later.\n\n"
-        "This release is Developer ID signed but is not notarized. macOS may require "
-        "manual approval in System Settings > Privacy & Security after download.\n"
+        "This release is Developer ID signed and notarized by Apple. "
+        "The app includes a stapled notarization ticket for offline verification.\n"
     )
     for path, _, _ in fragments:
         path.unlink()

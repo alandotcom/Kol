@@ -31,6 +31,13 @@ if git rev-parse --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
 fi
 gh api "repos/${REPO}" >/dev/null
 
+NOTARY_PROFILE="${KOL_NOTARY_PROFILE:-kol-notary}"
+echo "Checking notarization credentials for Keychain profile ${NOTARY_PROFILE}..."
+if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --output-format json >/dev/null; then
+  echo "ERROR: Notarization credentials are unavailable. Run: xcrun notarytool store-credentials \"${NOTARY_PROFILE}\"" >&2
+  exit 1
+fi
+
 ARTIFACT_DIR="$PWD/build"
 VERIFY_DIR="${ARTIFACT_DIR}/verification/release-${VERSION}"
 DERIVED_DATA_PATH="${KOL_DERIVED_DATA_PATH:-$PWD/build/DerivedData}"
@@ -48,7 +55,7 @@ if ! grep -Eq '([0-9]+ tests passed, 0 failed|Overall Result: Passed)' "$VERIFY_
 fi
 
 echo "Building Release..."
-./scripts/build-install.sh > "$VERIFY_DIR/build.log" 2>&1
+./scripts/build-install.sh --release > "$VERIFY_DIR/build.log" 2>&1
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Kol.app"
 codesign --verify --deep --strict "$APP_PATH" > "$VERIFY_DIR/signature.log" 2>&1
 python3 - "$APP_PATH" "$VERSION" <<'PY'
@@ -60,8 +67,52 @@ if info['CFBundleShortVersionString'] != sys.argv[2] or info['CFBundleIdentifier
 PY
 
 ZIP_PATH="${ARTIFACT_DIR}/Kol-v${VERSION}.zip"
+SUBMISSION_ZIP="$VERIFY_DIR/notarization-submission.zip"
+ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$SUBMISSION_ZIP"
+echo "Submitting Kol ${VERSION} for notarization..."
+NOTARY_EXIT=0
+xcrun notarytool submit "$SUBMISSION_ZIP" --keychain-profile "$NOTARY_PROFILE" \
+  --wait --timeout "${KOL_NOTARY_TIMEOUT:-1h}" --output-format json \
+  > "$VERIFY_DIR/notarization.json" 2> "$VERIFY_DIR/notarization-stderr.log" || NOTARY_EXIT=$?
+SUBMISSION_ID=$(python3 - "$VERIFY_DIR/notarization.json" <<'PY'
+import json, sys
+from pathlib import Path
+try:
+    print(json.loads(Path(sys.argv[1]).read_text()).get('id', ''))
+except (ValueError, OSError):
+    pass
+PY
+)
+if [[ -n "$SUBMISSION_ID" ]]; then
+  xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "$NOTARY_PROFILE" \
+    "$VERIFY_DIR/notarization-log.json" > "$VERIFY_DIR/notarization-log-command.log" 2>&1 || true
+fi
+if [[ "$NOTARY_EXIT" != 0 ]]; then
+  echo "ERROR: Notarization failed or timed out. See ${VERIFY_DIR}/notarization*." >&2
+  exit 1
+fi
+python3 - "$VERIFY_DIR/notarization.json" <<'PY'
+import json, sys
+from pathlib import Path
+result = json.loads(Path(sys.argv[1]).read_text())
+if result.get('status') != 'Accepted':
+    raise SystemExit(f"ERROR: Notarization status is {result.get('status', 'unknown')}. See {sys.argv[1]} and notarization-log.json.")
+PY
+
+echo "Stapling and verifying the notarization ticket..."
+xcrun stapler staple "$APP_PATH" > "$VERIFY_DIR/staple.log" 2>&1
+xcrun stapler validate "$APP_PATH" > "$VERIFY_DIR/staple-validation.log" 2>&1
+codesign --verify --deep --strict "$APP_PATH" > "$VERIFY_DIR/signature.log" 2>&1
+spctl --assess --type execute --verbose=2 "$APP_PATH" > "$VERIFY_DIR/gatekeeper.log" 2>&1
+
+# ZIP files cannot be stapled. Package the app after attaching its ticket.
 ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
 unzip -tq "$ZIP_PATH" > "$VERIFY_DIR/archive.log"
+EXTRACT_DIR="$VERIFY_DIR/extracted"
+rm -rf "$EXTRACT_DIR"
+ditto -x -k "$ZIP_PATH" "$EXTRACT_DIR"
+xcrun stapler validate "$EXTRACT_DIR/Kol.app" > "$VERIFY_DIR/archive-staple-validation.log" 2>&1
+codesign --verify --deep --strict "$EXTRACT_DIR/Kol.app" > "$VERIFY_DIR/archive-signature.log" 2>&1
 shasum -a 256 "$ZIP_PATH" > "$VERIFY_DIR/sha256.txt"
 
 git diff --check
