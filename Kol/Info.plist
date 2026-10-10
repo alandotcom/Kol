@@ -9,9 +9,9 @@
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.3.4</string>
+	<string>1.4.0</string>
 	<key>CFBundleVersion</key>
-	<string>7</string>
+	<string>8</string>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>Kol needs accessibility access to monitor keyboard events for hotkey detection.</string>
 	<key>NSAppTransportSecurity</key>
@@ -21,19 +21,19 @@
 	</dict>
 	<key>NSInputMonitoringUsageDescription</key>
 	<string>Kol needs Input Monitoring permission so your global hotkey works in every app.</string>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
 	<key>SUFeedURL</key>
 	<string>https://github.com/alandotcom/Kol/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>W75KGGMOw/hSm5ZTB0181Kcv+TmxtRm8Ymlx6LDxwn8=</string>
-	<key>SUEnableInstallerLauncherService</key>
-	<true/>
-	<key>SUEnableAutomaticChecks</key>
-	<true/>
-	<key>SUAutomaticallyUpdate</key>
+	<key>SURequireSignedFeed</key>
 	<true/>
 	<key>SUVerifyUpdateBeforeExtraction</key>
-	<true/>
-	<key>SURequireSignedFeed</key>
 	<true/>
 </dict>
 </plist>

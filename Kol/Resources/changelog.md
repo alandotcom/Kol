@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0
+
+### Minor Changes
+
+- Add automatic updates with signed downloads, update preferences, and a Check for Updates command.
+
 ## 1.3.4
 
 ### Patch Changes
