@@ -22,14 +22,20 @@ bun run eval:view
 ```bash
 cd evals
 
-# English only
-npx promptfoo@latest eval --tests datasets/english.yaml
+# English suite with each case routed to its app-context prompt
+bun run --cwd .. eval
 
 # Hebrew only
 npx promptfoo@latest eval --tests datasets/hebrew.yaml --prompts prompts/hebrew-general.txt
 
 # Edge cases only
 npx promptfoo@latest eval --tests datasets/edge-cases.yaml
+
+# Folder-path vocabulary in a general compose field
+bun run --cwd .. eval:paths
+
+# Explicit separators and hyphenated identifiers in messaging
+bun run --cwd .. eval:separators
 ```
 
 ## Test Structure
@@ -86,7 +92,7 @@ Add a new entry to the appropriate dataset YAML:
 
 ## Updating Prompts
 
-If you change `PromptLayers` in `Kol/Core/Models/LLMPostProcessing.swift`, regenerate the prompt template files to match. The eval tests the actual prompt text the LLM receives, not the Swift assembly logic (that's covered by `PromptAssemblerTests.swift`).
+If you change `PromptLayers` in `KolCore/LLMPostProcessing.swift`, regenerate the prompt template files to match. The eval tests the actual prompt text the LLM receives, not the Swift assembly logic (that's covered by `PromptAssemblerTests.swift`).
 
 ## Comparing Providers / Models
 
@@ -110,3 +116,12 @@ providers:
 ```
 
 Then run `bun run eval` — promptfoo will test all providers side-by-side.
+
+Focused text and vocabulary-only window context cases run with `bun run eval:focused` after sourcing `.env`. The screen prompt copies match the runtime focused-text labels. Mention cases provide extracted vocabulary rather than raw message history.
+
+
+Each English case selects a prompt label through `prompts`. The default config
+registers those labels; per-test `options.prompt` overrides are unsupported by the
+current promptfoo evaluator. Dedicated CLI suites have no inherited prompt filter.
+The grading model is Qwen 3.8 27B on Groq, independent of the GPT-OSS candidate.
+The candidate uses low reasoning effort, matching runtime cleanup requests.

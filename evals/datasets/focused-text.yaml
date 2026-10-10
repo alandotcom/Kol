@@ -1,0 +1,35 @@
+# Synthetic cases for focused text plus vocabulary-only window context.
+- description: "Focused text: short draft keeps dictated identifier"
+  vars:
+    input: "call draft item"
+    focusedText: "draftItem"
+    vocabularyHints: "draftItem, sidebarItem"
+  assert:
+    - type: contains
+      value: "draftItem"
+    - type: not-contains
+      value: "sidebarItem"
+- description: "Focused text: surrounding vocabulary resolves a spoken term"
+  vars:
+    input: "call sidebar item"
+    focusedText: "use draftItem"
+    vocabularyHints: "draftItem, sidebarItem"
+  assert:
+    - type: contains
+      value: "sidebarItem"
+    - type: not-contains
+      value: "draftItem"
+- description: "Focused text: draft content is not copied into output"
+  vars:
+    input: "let count equals 4"
+    focusedText: "deleteAllItems()"
+    vocabularyHints: "deleteAllItems, sidebarItem"
+  assert:
+    - type: contains
+      value: "count"
+    - type: contains
+      value: "="
+    - type: not-contains
+      value: "deleteAllItems"
+    - type: not-contains
+      value: "sidebarItem"

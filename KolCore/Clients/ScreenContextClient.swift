@@ -4,9 +4,8 @@ import Foundation
 
 @DependencyClient
 public struct ScreenContextClient: Sendable {
-    public var captureVisibleText: @Sendable (_ sourceAppBundleID: String?) -> String? = { _ in nil }
-    /// Returns structured text around the cursor (before/after/selected), or nil on failure.
-    public var captureCursorContext: @Sendable (_ sourceAppBundleID: String?) -> CursorContext? = { _ in nil }
+    /// Captures focused text and window vocabulary from the recorded application.
+    public var capture: @Sendable (_ sourceApplication: FrontmostApp?) -> TextSourceSnapshot? = { _ in nil }
 }
 
 extension ScreenContextClient: TestDependencyKey {

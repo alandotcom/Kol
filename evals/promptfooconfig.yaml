@@ -14,12 +14,15 @@ providers:
       apiKeyEnvar: GROQ_API_KEY
       temperature: 0
       max_tokens: 4096
+      reasoning_effort: low
+      # Kol consumes message.content and excludes the separate reasoning field.
+      showThinking: false
 
 defaultTest:
   options:
     provider:
       # Keep the grading model independent of the candidate model.
-      id: openai:chat:llama-3.3-70b-versatile
+      id: openai:chat:qwen/qwen3.8-27b
       config:
         apiBaseUrl: https://api.groq.com/openai/v1
         apiKeyEnvar: GROQ_API_KEY
@@ -41,6 +44,14 @@ defaultTest:
 prompts:
   - label: english-general
     raw: file://prompts/english-general.txt
+  - label: english-code
+    raw: file://prompts/english-code.txt
+  - label: english-messaging
+    raw: file://prompts/english-messaging.txt
+  - label: english-document
+    raw: file://prompts/english-document.txt
+  - label: english-messaging-screen
+    raw: file://prompts/english-messaging-screen.txt
 
 tests: file://datasets/english.yaml
 

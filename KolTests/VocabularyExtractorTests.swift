@@ -33,12 +33,25 @@ struct VocabularyExtractorTests {
 
 	// MARK: - Proper Nouns
 
+	@Test("Retains hyphenated identifiers from error text")
+	func hyphenatedIdentifiers() {
+		let result = VocabularyExtractor.extract(from: "events:invite-to-review-email\nMissing account for invite-to-review")
+		#expect(result.identifiers.contains("invite-to-review-email"))
+		#expect(result.identifiers.contains("invite-to-review"))
+	}
+
+	@Test("Keeps hyphenated spelling distinct from spaced prose")
+	func hyphenatedBoundaries() {
+		let result = VocabularyExtractor.extract(from: "invite-to-review invite to review invite - to - review")
+		#expect(result.allTerms == ["invite-to-review"])
+	}
+
 	@Test("Extracts multi-word proper nouns")
 	func properNouns() {
-		let result = VocabularyExtractor.extract(from: "Talk to Alan Cohen about Claude Code at Fountain Bio")
-		#expect(result.properNouns.contains("Alan Cohen"))
+		let result = VocabularyExtractor.extract(from: "Talk to Carlos Mendes about Claude Code at Example Labs")
+		#expect(result.properNouns.contains("Carlos Mendes"))
 		#expect(result.properNouns.contains("Claude Code"))
-		#expect(result.properNouns.contains("Fountain Bio"))
+		#expect(result.properNouns.contains("Example Labs"))
 	}
 
 	@Test("Does not extract single capitalized words as proper nouns")
@@ -48,6 +61,38 @@ struct VocabularyExtractorTests {
 	}
 
 	// MARK: - File Names
+
+	@Test("Retains folder paths and their spelling as vocabulary")
+	func folderPaths() {
+		let result = VocabularyExtractor.extract(from: "Kol/Clients\nKolCore\nKolTests")
+		#expect(result.allTerms.contains("Kol/Clients"))
+		#expect(result.allTerms.contains("Kol"))
+		#expect(result.allTerms.contains("Clients"))
+	}
+
+	@Test("Path spelling survives a crowded vocabulary budget")
+	func pathPriority() {
+		let identifiers = (1...55).map { "identifier\($0)Value" }.joined(separator: " ")
+		let result = VocabularyExtractor.extract(from: identifiers + "\nKol/Clients")
+		#expect(result.allTerms.contains("Kol"))
+		#expect(result.allTerms.contains("Kol/Clients"))
+		#expect(result.allTerms.count == VocabularyExtractor.maxTerms)
+	}
+
+	@Test("Retains nested paths with punctuation in file names")
+	func nestedPaths() {
+		let result = VocabularyExtractor.extract(from: "Open ./voice-kit/src/audio_input.swift and docs/decisions")
+		#expect(result.allTerms.contains("voice-kit/src/audio_input.swift"))
+		#expect(result.allTerms.contains("voice-kit"))
+		#expect(result.allTerms.contains("audio_input.swift"))
+		#expect(result.allTerms.contains("docs/decisions"))
+	}
+
+	@Test("Slash-separated prose, URLs, and incomplete paths do not add path terms")
+	func excludesNonPaths() {
+		let result = VocabularyExtractor.extract(from: "Coal / clients\nread/write\nand/or\nhttps://example.com/docs\nKol/\n/Clients")
+		#expect(result.allTerms.isEmpty)
+	}
 
 	@Test("Extracts file names with known extensions")
 	func fileNames() {
@@ -106,10 +151,10 @@ struct VocabularyExtractorTests {
 
 	@Test("allTerms combines all categories")
 	func allTermsCombines() {
-		let result = VocabularyExtractor.extract(from: "handleStart by Alan Cohen in AppFeature.swift")
+		let result = VocabularyExtractor.extract(from: "handleStart by Carlos Mendes in AppFeature.swift")
 		let all = result.allTerms
 		// Should contain identifier, proper noun, and file name
-		#expect(all.contains("Alan Cohen"))
+		#expect(all.contains("Carlos Mendes"))
 		#expect(all.contains("AppFeature.swift"))
 	}
 

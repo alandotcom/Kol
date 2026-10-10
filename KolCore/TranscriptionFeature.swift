@@ -11,7 +11,6 @@ import Foundation
 private let transcriptionFeatureLogger = KolLog.transcription
 
 private let maxVocabularyHints = 30
-private let ocrQualityThreshold = 50
 private let axTimeoutSeconds: Double = 2.0
 
 /// Runs a closure on MainActor with a timeout. Returns nil if the deadline expires,
@@ -63,15 +62,11 @@ public struct TranscriptionFeature {
     public var sourceAppName: String?
     public var sourceAppPID: pid_t?
     public var resolvedLanguage: String?
-    public var capturedScreenContext: String?
-    public var capturedCursorContext: CursorContext?
+    public var capturedFocusedText: FocusedText?
     public var capturedVocabulary: [String]?
     public var capturedIDEContext: IDEContext?
     public var capturedConversationContext: ConversationContext?
     public var resolvedAppCategory: AppContextCategory?
-    public var contextUpdateCount: Int = 0
-    public var ocrTriggered: Bool = false
-    public var lastOCRTickNumber: Int = 0
     public var capturedOCRVocabulary: [String]?
     public var capturedRemoteVocabulary: [String]?
     public var remoteVocabularyIncludesConversation: Bool = false
@@ -134,24 +129,21 @@ public struct TranscriptionFeature {
 
     // Context refresh during recording
     case contextRefreshTick(generation: UUID)
-    case contextRefreshed(generation: UUID, CursorContext?, String?, [String]?)
+    case contextRefreshed(generation: UUID, textSource: TextSourceSnapshot?)
 
     // Initial context capture (async, dispatched from startRecording)
     case recordingContextCaptured(
       generation: UUID,
-      screenContext: String?,
-      cursorContext: CursorContext?,
-      vocabulary: [String]?,
+      textSource: TextSourceSnapshot?,
       ideContext: IDEContext?,
-      conversationContext: ConversationContext?,
-      ocrTriggered: Bool
+      conversationContext: ConversationContext?
     )
 
     // Post-processing state
     case postProcessingFinished(generation: UUID)
     case contextSessionFinished(generation: UUID)
 
-    // OCR fallback for Electron/Chromium apps
+    // Local OCR vocabulary
     case ocrCaptured(generation: UUID, vocabulary: [String])
     case vocabularyCaptured(generation: UUID, names: [String], provider: ContextProvider, includesConversation: Bool)
 
@@ -164,6 +156,7 @@ public struct TranscriptionFeature {
     case contextRefresh(UUID)
     case initialContextCapture(UUID)
     case refreshCapture(UUID)
+    case ocrCapture(UUID)
     case session(UUID)
   }
 
@@ -316,47 +309,32 @@ public struct TranscriptionFeature {
         }
         let bundleID = state.sourceAppBundleID
         let sourceAppPID = state.sourceAppPID
-        let shouldOCR = state.ocrTriggered && state.kolSettings.ocrContextEnabled
-          && state.contextUpdateCount - state.lastOCRTickNumber >= 3
         let settings = state.$kolSettings
         let session = state.$contextSession
-        return .run { [screenContext, ocrClient] send in
+        return .run { [screenContext] send in
           guard Self.acceptsContext(session, settings, generation: generation) else { return }
-          let cursor = await withMainActorTimeout {
-            screenContext.captureCursorContext(bundleID)
-          } ?? nil
-          let visibleText: String? = PromptLayers.isTerminal(bundleID)
-            ? nil
-            : await withMainActorTimeout { screenContext.captureVisibleText(bundleID) } ?? nil
-          guard Self.acceptsContext(session, settings, generation: generation) else { return }
-          let flatText = cursor?.flatText ?? visibleText
-          let vocabulary = (visibleText ?? flatText).map { VocabularyExtractor.extract(from: $0).allTerms }
-          await send(.contextRefreshed(generation: generation, cursor, flatText, vocabulary))
-          if shouldOCR, settings.wrappedValue.ocrContextEnabled,
-             (flatText?.count ?? 0) < ocrQualityThreshold, let pid = sourceAppPID,
-             Self.acceptsContext(session, settings, generation: generation),
-             let text = await ocrClient.captureWindowText(pid) {
-            await send(.ocrCaptured(generation: generation, vocabulary: VocabularyExtractor.extract(from: text).allTerms))
+          let sourceApplication = sourceAppPID.map {
+            FrontmostApp(bundleIdentifier: bundleID, localizedName: nil, processIdentifier: $0)
           }
+          let snapshot = PromptLayers.isTerminal(bundleID)
+            ? nil : await withMainActorTimeout { screenContext.capture(sourceApplication) } ?? nil
+          guard Self.acceptsContext(session, settings, generation: generation) else { return }
+          await send(.contextRefreshed(generation: generation, textSource: snapshot))
         }
         .cancellable(id: CancelID.refreshCapture(generation), cancelInFlight: true)
         .cancellable(id: CancelID.session(generation))
 
-      case let .contextRefreshed(generation, cursor, flatText, vocabulary):
+      case let .contextRefreshed(generation, snapshot):
         guard acceptsContext(state, generation: generation) else { return .none }
-        guard cursor != state.capturedCursorContext || flatText != state.capturedScreenContext
-          || vocabulary != state.capturedVocabulary else { return .none }
-        state.capturedCursorContext = cursor
-        state.capturedScreenContext = flatText
+        let vocabulary = Self.contextTerms(snapshot?.vocabularyTerms ?? [])
+        guard snapshot?.focused != state.capturedFocusedText || vocabulary != state.capturedVocabulary else { return .none }
+        state.capturedFocusedText = snapshot?.focused
         state.capturedVocabulary = vocabulary
-        state.contextUpdateCount += 1
         return .none
 
       case let .ocrCaptured(generation, vocabulary):
         guard acceptsContext(state, generation: generation), state.kolSettings.ocrContextEnabled else { return .none }
         state.capturedOCRVocabulary = vocabulary
-        state.lastOCRTickNumber = state.contextUpdateCount
-        state.contextUpdateCount += 1
         return .none
 
       case let .vocabularyCaptured(generation, names, provider, includesConversation):
@@ -368,14 +346,12 @@ public struct TranscriptionFeature {
         state.remoteVocabularyIncludesConversation = includesConversation
         return .none
 
-      case let .recordingContextCaptured(generation, screenContext, cursorContext, vocabulary, ide, conversation, ocrTriggered):
+      case let .recordingContextCaptured(generation, snapshot, ide, conversation):
         guard acceptsContext(state, generation: generation) else { return .none }
-        state.capturedScreenContext = screenContext
-        state.capturedCursorContext = cursorContext
-        state.capturedVocabulary = vocabulary
+        state.capturedFocusedText = snapshot?.focused
+        state.capturedVocabulary = Self.contextTerms(snapshot?.vocabularyTerms ?? [])
         state.capturedIDEContext = ide
         state.capturedConversationContext = state.kolSettings.conversationContextEnabled ? conversation : nil
-        state.ocrTriggered = ocrTriggered && state.kolSettings.ocrContextEnabled
         return .none
 
       case let .postProcessingFinished(generation):
@@ -414,6 +390,13 @@ private extension TranscriptionFeature {
     return result.isEmpty ? nil : Array(result.prefix(maxVocabularyHints))
   }
 
+  static func prioritizedContextTerms(
+    focused: FocusedText?, ocr: [String]?, window: [String]?, ide: [String]?, remote: [String]?
+  ) -> [String]? {
+    contextTerms((focused.map { VocabularyExtractor.extract(from: $0.plainText).allTerms } ?? [])
+      + (ocr ?? []) + (window ?? []) + (ide ?? []) + (remote ?? []))
+  }
+
   static func acceptsContext(
     _ session: Shared<ContextSession?>,
     _ settings: Shared<KolSettings>,
@@ -430,17 +413,13 @@ private extension TranscriptionFeature {
   }
 
   func clearCapturedContext(_ state: inout State) {
-    state.capturedScreenContext = nil
-    state.capturedCursorContext = nil
+    state.capturedFocusedText = nil
     state.capturedVocabulary = nil
     state.capturedOCRVocabulary = nil
     state.capturedRemoteVocabulary = nil
     state.remoteVocabularyIncludesConversation = false
     state.capturedIDEContext = nil
     state.capturedConversationContext = nil
-    state.ocrTriggered = false
-    state.lastOCRTickNumber = 0
-    state.contextUpdateCount = 0
   }
 
   func retireContext(_ state: inout State) {
@@ -635,7 +614,6 @@ private extension TranscriptionFeature {
       state.resolvedAppCategory = nil
     }
 
-    state.contextUpdateCount = 0
     transcriptionFeatureLogger.notice("Recording started at \(startTime.ISO8601Format())")
 
     let session = state.$contextSession
@@ -670,22 +648,18 @@ private extension TranscriptionFeature {
     let provider = contextSession.provider
 
     let initialContextEffect: Effect<Action> = screenContextEnabled
-      ? .run { [screenContext, ideContext, windowContext, keychain, llmVocabulary, ocrClient] send in
+      ? .run { [screenContext, ideContext, windowContext, keychain, llmVocabulary, workspace] send in
           guard Self.acceptsContext(session, settings, generation: generation) else { return }
-          let cursor = await withMainActorTimeout { screenContext.captureCursorContext(bundleID) } ?? nil
-          let visibleText: String? = PromptLayers.isTerminal(bundleID)
-            ? nil
-            : await withMainActorTimeout { screenContext.captureVisibleText(bundleID) } ?? nil
+          transcriptionFeatureLogger.debug("Initial context capture started for pid \(pid ?? 0)")
+          let snapshot = PromptLayers.isTerminal(bundleID)
+            ? nil : await withMainActorTimeout { screenContext.capture(activeApp) } ?? nil
           guard Self.acceptsContext(session, settings, generation: generation) else { return }
-          let flatText = cursor?.flatText ?? visibleText
-          let vocabText = visibleText ?? flatText
-          var vocabulary = vocabText.map { VocabularyExtractor.extract(from: $0).allTerms } ?? []
+          let vocabText = snapshot?.vocabularySourceText
           var ide: IDEContext?
           if PromptLayers.appContextCategory(for: bundleID) == .code, let pid {
             let titles = await withMainActorTimeout { ideContext.extractTabTitles(pid) } ?? []
             if !titles.isEmpty {
               ide = IDEContext(openFileNames: titles)
-              vocabulary = Self.contextTerms(vocabulary + titles) ?? []
             }
           }
           var conversation: ConversationContext?
@@ -695,22 +669,12 @@ private extension TranscriptionFeature {
             conversation = ConversationContext(conversationName: ConversationContext.conversationName(fromWindowTitle: title))
           }
           guard Self.acceptsContext(session, settings, generation: generation) else { return }
-          let shouldOCR = settings.wrappedValue.ocrContextEnabled
-            && (flatText?.count ?? 0) < ocrQualityThreshold && pid != nil
           await send(.recordingContextCaptured(
             generation: generation,
-            screenContext: flatText,
-            cursorContext: cursor,
-            vocabulary: vocabulary.isEmpty ? nil : vocabulary,
+            textSource: snapshot,
             ideContext: ide,
-            conversationContext: conversation,
-            ocrTriggered: shouldOCR
+            conversationContext: conversation
           ))
-          if shouldOCR, let pid, settings.wrappedValue.ocrContextEnabled,
-             Self.acceptsContext(session, settings, generation: generation),
-             let text = await ocrClient.captureWindowText(pid) {
-            await send(.ocrCaptured(generation: generation, vocabulary: VocabularyExtractor.extract(from: text).allTerms))
-          }
           guard let text = vocabText, !text.isEmpty,
                 Self.acceptsContext(session, settings, generation: generation),
                 settings.wrappedValue.llmPostProcessingEnabled else { return }
@@ -718,6 +682,7 @@ private extension TranscriptionFeature {
           guard Self.acceptsContext(session, settings, generation: generation),
                 settings.wrappedValue.llmPostProcessingEnabled,
                 provider == ContextProvider(settings: settings.wrappedValue),
+                let pid, workspace.frontmostApplication()?.processIdentifier == pid,
                 let apiKey, !apiKey.isEmpty else { return }
           let conversationID = settings.wrappedValue.conversationContextEnabled ? conversation?.conversationName : nil
           do {
@@ -745,13 +710,36 @@ private extension TranscriptionFeature {
         .cancellable(id: CancelID.session(generation))
       : .none
 
-    return .merge(startRecordingEffect, initialContextEffect, contextRefreshEffect)
+    let ocrEffect: Effect<Action> = screenContextEnabled && state.kolSettings.ocrContextEnabled && pid != nil
+      ? .run { [ocrClient, clock, workspace] send in
+          guard let pid else { return }
+          while Self.acceptsContext(session, settings, generation: generation),
+                settings.wrappedValue.ocrContextEnabled {
+            if workspace.frontmostApplication()?.processIdentifier == pid,
+               let vocabulary = await ocrClient.captureWindowVocabulary(pid),
+               Self.acceptsContext(session, settings, generation: generation),
+               settings.wrappedValue.ocrContextEnabled,
+               workspace.frontmostApplication()?.processIdentifier == pid {
+              await send(.ocrCaptured(generation: generation, vocabulary: vocabulary))
+            }
+            try await clock.sleep(for: .seconds(3))
+          }
+        }
+        .cancellable(id: CancelID.ocrCapture(generation), cancelInFlight: true)
+        .cancellable(id: CancelID.session(generation))
+      : .none
+
+    return .merge(startRecordingEffect, initialContextEffect, contextRefreshEffect, ocrEffect)
   }
 
   func handleStopRecording(_ state: inout State) -> Effect<Action> {
     guard state.isRecording, state.phase != .acquiring(stopRequested: true),
           let generation = state.contextSession?.id else { return .none }
+    transcriptionFeatureLogger.debug("Recording stop requested")
     state.$contextSession.withLock { $0?.acceptingCaptures = false }
+    if let pid = state.sourceAppPID, workspace.frontmostApplication()?.processIdentifier != pid {
+      clearCapturedContext(&state)
+    }
     state.recordingDuration = state.recordingStartTime.map { now.timeIntervalSince($0) } ?? 0
     let decision = RecordingDecisionEngine.decide(
       .init(
@@ -793,12 +781,14 @@ private extension TranscriptionFeature {
     let vadEnabled = state.kolSettings.vadSilenceDetectionEnabled
     let vocabulary = state.kolSettings.llmScreenContextEnabled
       && state.contextSession?.provider == ContextProvider(settings: state.kolSettings)
-      ? Self.contextTerms(
-          (state.capturedVocabulary ?? []) + (state.capturedIDEContext?.openFileNames ?? [])
-            + (state.kolSettings.ocrContextEnabled ? state.capturedOCRVocabulary ?? [] : [])
-            + (state.kolSettings.llmPostProcessingEnabled
-                && (!state.remoteVocabularyIncludesConversation || state.kolSettings.conversationContextEnabled)
-               ? state.capturedRemoteVocabulary ?? [] : [])
+      ? Self.prioritizedContextTerms(
+          focused: state.capturedFocusedText,
+          ocr: state.kolSettings.ocrContextEnabled ? state.capturedOCRVocabulary : nil,
+          window: state.capturedVocabulary,
+          ide: state.capturedIDEContext?.openFileNames,
+          remote: state.kolSettings.llmPostProcessingEnabled
+            && (!state.remoteVocabularyIncludesConversation || state.kolSettings.conversationContextEnabled)
+            ? state.capturedRemoteVocabulary : nil
         )
       : nil
     return .run { @MainActor send in
@@ -826,6 +816,7 @@ private extension TranscriptionFeature {
     .merge(
       .cancel(id: CancelID.contextRefresh(generation)),
       .cancel(id: CancelID.refreshCapture(generation)),
+      .cancel(id: CancelID.ocrCapture(generation)),
       .cancel(id: CancelID.initialContextCapture(generation))
     )
   }
@@ -901,6 +892,7 @@ private extension TranscriptionFeature {
     }
 
     let sourceAppBundleID = state.sourceAppBundleID
+    let sourceAppPID = state.sourceAppPID
     let sourceAppName = state.sourceAppName
     let llmEnabled = state.kolSettings.llmPostProcessingEnabled
 
@@ -910,8 +902,7 @@ private extension TranscriptionFeature {
     let provider = ContextProvider(settings: state.kolSettings)
     let capturedProvider = state.contextSession?.provider
     let resolvedLanguage = state.resolvedLanguage
-    let capturedScreenContext = state.capturedScreenContext
-    let capturedCursorContext = state.capturedCursorContext
+    let capturedFocusedText = state.capturedFocusedText
     let capturedVocabulary = state.capturedVocabulary
     let capturedOCRVocabulary = state.capturedOCRVocabulary
     let capturedRemoteVocabulary = state.capturedRemoteVocabulary
@@ -931,13 +922,17 @@ private extension TranscriptionFeature {
              liveSettings.llmPostProcessingEnabled,
              provider == ContextProvider(settings: liveSettings),
              let apiKey, !apiKey.isEmpty {
-            let contextAllowed = liveSettings.llmScreenContextEnabled && capturedProvider == provider
+            let targetMatches = sourceAppPID.map { workspace.frontmostApplication()?.processIdentifier == $0 } ?? false
+            let contextAllowed = targetMatches && liveSettings.llmScreenContextEnabled && capturedProvider == provider
             let conversationAllowed = contextAllowed && liveSettings.conversationContextEnabled
             let ocrAllowed = contextAllowed && liveSettings.ocrContextEnabled
             let vocabulary = contextAllowed
-              ? Self.contextTerms(
-                  (capturedVocabulary ?? []) + (capturedIDEContext?.openFileNames ?? []) + (ocrAllowed ? capturedOCRVocabulary ?? [] : [])
-                    + (!remoteVocabularyIncludesConversation || conversationAllowed ? capturedRemoteVocabulary ?? [] : [])
+              ? Self.prioritizedContextTerms(
+                  focused: capturedFocusedText,
+                  ocr: ocrAllowed ? capturedOCRVocabulary : nil,
+                  window: capturedVocabulary,
+                  ide: capturedIDEContext?.openFileNames,
+                  remote: !remoteVocabularyIncludesConversation || conversationAllowed ? capturedRemoteVocabulary : nil
                 )
               : nil
             let overrides = AppContextOverrides(
@@ -953,8 +948,7 @@ private extension TranscriptionFeature {
               customRules: liveSettings.llmCustomRules.isEmpty ? nil : liveSettings.llmCustomRules,
               appContextOverrides: overrides,
               ideContext: contextAllowed ? capturedIDEContext : nil,
-              screenContext: contextAllowed ? capturedScreenContext : nil,
-              structuredContext: contextAllowed ? capturedCursorContext : nil,
+              focusedText: contextAllowed ? capturedFocusedText : nil,
               vocabularyHints: vocabulary,
               conversationContext: conversationAllowed ? capturedConversationContext : nil,
               resolvedCategory: resolvedAppCategory,
@@ -966,6 +960,7 @@ private extension TranscriptionFeature {
               let consentStillValid = (!contextAllowed || currentSettings.llmScreenContextEnabled)
                 && (!conversationAllowed || currentSettings.conversationContextEnabled)
                 && (!ocrAllowed || currentSettings.ocrContextEnabled)
+                && (!contextAllowed || workspace.frontmostApplication()?.processIdentifier == sourceAppPID)
               if session.wrappedValue?.id == generation,
                  currentSettings.llmPostProcessingEnabled,
                  provider == ContextProvider(settings: currentSettings), consentStillValid {
@@ -1051,8 +1046,10 @@ private extension TranscriptionFeature {
   func insertText(_ state: inout State, generation: UUID, text: String) -> Effect<Action> {
     let session = state.$contextSession
     return .run { send in
+      let started = Date()
       do {
         try await pasteboard.paste(text) { session.wrappedValue?.id == generation && !Task.isCancelled }
+        transcriptionFeatureLogger.debug("Insertion completed in \(Int(Date().timeIntervalSince(started) * 1000))ms")
       } catch {
         transcriptionFeatureLogger.error("Insertion ended: \(error.localizedDescription)")
       }

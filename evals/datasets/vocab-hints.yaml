@@ -15,13 +15,13 @@
 
 - description: "Vocab hints: phonetic match with minimal context"
   vars:
-    input: "ask share lock about the meeting"
-    vocabularyHints: "Sharlok Vaidya, Yuki Tanaka, Telegram"
+    input: "ask knee co about the meeting"
+    vocabularyHints: "Niko Tanaka, Yuki Tanaka, Telegram"
   assert:
     - type: icontains
-      value: "Sharlok"
+      value: "Niko"
     - type: not-icontains
-      value: "share lock"
+      value: "knee co"
 
 - description: "Vocab hints: group name preserved over common words"
   vars:
@@ -54,3 +54,20 @@
       value: "Carlos"
     - type: not-icontains
       value: "WisprFlow"
+
+
+- description: "Prose stays prose: OCR retries is not an invented identifier"
+  vars:
+    input: "OCR retries."
+    vocabularyHints: "KolCore, localCapture, currentItem"
+  assert:
+    - type: equals
+      value: "OCR retries."
+
+- description: "Prose stays prose: visible project spelling resolves split ASR words"
+  vars:
+    input: "We're working on coal core."
+    vocabularyHints: "KolCore, localCapture, currentItem"
+  assert:
+    - type: equals
+      value: "We're working on KolCore."

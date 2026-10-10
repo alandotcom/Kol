@@ -78,6 +78,12 @@ struct AppContextResolverTests {
 		#expect(category == .email)
 	}
 
+	@Test("An app with Code in its name keeps prose context")
+	func proseComposer() {
+		#expect(AppContextResolver.resolve(bundleID: "com.t3tools.t3code", appName: "T3 Code (Nightly)") == nil)
+		#expect(PromptLayers.appContextCategory(for: "Code") == .code)
+	}
+
 	@Test("VS Code resolves to code via bundle ID")
 	func vsCode() {
 		let category = AppContextResolver.resolve(

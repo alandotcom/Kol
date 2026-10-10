@@ -17,12 +17,15 @@ struct TranscriptionContextPrivacyTests {
     })
     dependencies.recording.startRecording = { _ in .started }
     dependencies.recording.discardRecording = { _ in }
-    dependencies.workspace.frontmostApplication = { nil }
-    dependencies.screenContext.captureCursorContext = { _ in nil }
-    dependencies.screenContext.captureVisibleText = { _ in nil }
+    dependencies.workspace.frontmostApplication = { FrontmostApp(bundleIdentifier: "example.editor", localizedName: "Example Editor", processIdentifier: 101) }
+    dependencies.screenContext.capture = { _ in nil }
     dependencies.windowContext.windowTitle = { _ in nil }
     dependencies.windowContext.browserURL = { _ in nil }
     dependencies.pasteboard.paste = { _, _ in }
+  }
+
+  nonisolated private static func snapshot(_ text: String) -> TextSourceSnapshot? {
+    TextSourceSnapshot(focused: FocusedText(value: text), surroundingText: nil)
   }
 
   private func settings(ai: Bool = true, screen: Bool = true) -> KolSettings {
@@ -52,8 +55,8 @@ struct TranscriptionContextPrivacyTests {
     state.recordingDuration = 2
     state.sourceAppBundleID = "example.editor"
     state.sourceAppName = "Example Editor"
-    state.capturedScreenContext = "use currentItem"
-    state.capturedCursorContext = CursorContext(beforeCursor: "use currentItem", afterCursor: "", selectedText: nil, isTerminal: false)
+    state.sourceAppPID = 101
+    state.capturedFocusedText = FocusedText(value: "use currentItem", selectedRange: NSRange(location: 15, length: 0))
     state.capturedVocabulary = ["currentItem"]
     state.capturedOCRVocabulary = ["ocrOnlyItem"]
     state.capturedIDEContext = IDEContext(openFileNames: ["Example.swift"])
@@ -76,7 +79,7 @@ struct TranscriptionContextPrivacyTests {
     } withDependencies: {
       Self.testDependencies(&$0)
       $0.continuousClock = clock
-      $0.screenContext.captureVisibleText = { _ in text.value }
+      $0.screenContext.capture = { _ in Self.snapshot(text.value) }
       $0.keychain.load = { _ in
         do { try await clock.sleep(for: .seconds(10)) }
         catch { keychainCancelled.setValue(true) }
@@ -86,12 +89,11 @@ struct TranscriptionContextPrivacyTests {
     store.exhaustivity = .off
     await store.send(.startRecording)
     await store.receive(\.recordingContextCaptured)
-    #expect(store.state.capturedScreenContext == "firstItem")
+    #expect(store.state.capturedFocusedText?.plainText == "firstItem")
     text.setValue("refreshedItem")
     await clock.advance(by: .seconds(1))
     await store.receive(\.contextRefreshed)
-    #expect(store.state.capturedScreenContext == "refreshedItem")
-    #expect(store.state.contextUpdateCount == 1)
+    #expect(store.state.capturedFocusedText?.plainText == "refreshedItem")
     store.state.$kolSettings.withLock { $0.llmScreenContextEnabled = false }
     await store.send(.startRecording)
     await store.receive(\.recordingStarted)
@@ -100,18 +102,17 @@ struct TranscriptionContextPrivacyTests {
     #expect(keychainCancelled.value == true)
     await clock.advance(by: .seconds(3))
     #expect(store.state.phase == .recording)
-    #expect(store.state.capturedScreenContext == nil)
-    #expect(store.state.contextUpdateCount == 0)
+    #expect(store.state.capturedFocusedText?.plainText == nil)
     store.state.$kolSettings.withLock { $0.llmScreenContextEnabled = true }
     store.dependencies.keychain.load = { _ in nil }
     text.setValue("currentItem")
     await store.send(.startRecording)
     await store.receive(\.recordingContextCaptured)
-    #expect(store.state.capturedScreenContext == "currentItem")
+    #expect(store.state.capturedFocusedText?.plainText == "currentItem")
     text.setValue("currentRefreshItem")
     await clock.advance(by: .seconds(1))
     await store.receive(\.contextRefreshed)
-    #expect(store.state.capturedScreenContext == "currentRefreshItem")
+    #expect(store.state.capturedFocusedText?.plainText == "currentRefreshItem")
     await store.send(.discard)
     await store.finish()
     try await clock.checkSuspension()
@@ -129,7 +130,7 @@ struct TranscriptionContextPrivacyTests {
       Self.testDependencies(&$0)
       $0.continuousClock = clock
       $0.recording.startRecording = { _ in await startup.wait() }
-      $0.screenContext.captureVisibleText = { _ in text.value }
+      $0.screenContext.capture = { _ in Self.snapshot(text.value) }
       $0.keychain.load = { _ in
         do { try await clock.sleep(for: .seconds(10)) }
         catch { keychainCancelled.setValue(true) }
@@ -140,11 +141,11 @@ struct TranscriptionContextPrivacyTests {
     await store.send(.startRecording)
     await store.receive(\.recordingContextCaptured)
     await startup.waitUntilRequested()
-    #expect(store.state.capturedScreenContext == "startingItem")
+    #expect(store.state.capturedFocusedText?.plainText == "startingItem")
     text.setValue("startingRefreshItem")
     await clock.advance(by: .seconds(1))
     await store.receive(\.contextRefreshed)
-    #expect(store.state.capturedScreenContext == "startingRefreshItem")
+    #expect(store.state.capturedFocusedText?.plainText == "startingRefreshItem")
     await startup.release(outcome)
     await store.receive(\.recordingStarted)
     await store.finish()
@@ -153,17 +154,17 @@ struct TranscriptionContextPrivacyTests {
     await clock.advance(by: .seconds(3))
     #expect(store.state.phase == nil)
     #expect(store.state.contextSession == nil)
-    #expect(store.state.capturedScreenContext == nil)
+    #expect(store.state.capturedFocusedText?.plainText == nil)
     store.dependencies.recording.startRecording = { _ in .started }
     store.dependencies.keychain.load = { _ in nil }
     text.setValue("currentItem")
     await store.send(.startRecording)
     await store.receive(\.recordingContextCaptured)
-    #expect(store.state.capturedScreenContext == "currentItem")
+    #expect(store.state.capturedFocusedText?.plainText == "currentItem")
     text.setValue("currentRefreshItem")
     await clock.advance(by: .seconds(1))
     await store.receive(\.contextRefreshed)
-    #expect(store.state.capturedScreenContext == "currentRefreshItem")
+    #expect(store.state.capturedFocusedText?.plainText == "currentRefreshItem")
     await store.send(.discard)
     await store.finish()
     try await clock.checkSuspension()
@@ -183,7 +184,7 @@ struct TranscriptionContextPrivacyTests {
       $0.recording.stopRecording = { _ in .audio(URL(fileURLWithPath: "/tmp/kol-synthetic-context-test.wav")) }
       $0.date.now = startTime
       $0.continuousClock = ContextTestClock()
-      $0.screenContext.captureVisibleText = { _ in "use localItem in Example.swift" }
+      $0.screenContext.capture = { _ in Self.snapshot("use localItem in Example.swift") }
       $0.keychain.load = { _ in keychainCalls.withValue { $0 += 1 }; return "synthetic-key" }
       $0.llmVocabulary.extractNames = { _, _, _, _ in vocabularyCalls.withValue { $0 += 1 }; return [] }
       $0.llmPostProcessing.process = { context, _, _ in
@@ -212,6 +213,35 @@ struct TranscriptionContextPrivacyTests {
     #expect(store.state.contextSession == nil)
   }
 
+  @Test("Changing the target while keychain waits prevents remote vocabulary extraction")
+  func targetChangeBeforeRemoteVocabulary() async throws {
+    let keychain = ContextTestGate<String?>()
+    let pid = LockIsolated<pid_t>(101)
+    let calls = LockIsolated(0)
+    let store = TestStore(initialState: state(settings())) {
+      TranscriptionFeature()
+    } withDependencies: {
+      Self.testDependencies(&$0)
+      $0.continuousClock = ContextTestClock()
+      $0.screenContext.capture = { _ in Self.snapshot("visibleItem") }
+      $0.workspace.frontmostApplication = {
+        FrontmostApp(bundleIdentifier: "example.editor", localizedName: "Example Editor", processIdentifier: pid.value)
+      }
+      $0.keychain.load = { _ in await keychain.wait() }
+      $0.llmVocabulary.extractNames = { _, _, _, _ in calls.withValue { $0 += 1 }; return [] }
+    }
+    store.exhaustivity = .off
+    await store.send(.startRecording)
+    await store.receive(\.recordingContextCaptured)
+    await keychain.waitUntilRequested()
+    pid.setValue(202)
+    await keychain.release("synthetic-key")
+    await store.finish()
+    #expect(calls.value == 0)
+    await store.send(.discard)
+    await store.finish()
+  }
+
   @Test("Starting another capture clears the previous app and rejects every old context action")
   func generationsAreIsolated() async throws {
     let keychain = ContextTestGate<String?>()
@@ -222,7 +252,7 @@ struct TranscriptionContextPrivacyTests {
       $0.recording.stopRecording = { _ in .audio(URL(fileURLWithPath: "/tmp/kol-synthetic-context-test.wav")) }
       $0.continuousClock = ContextTestClock()
       $0.workspace.frontmostApplication = { FrontmostApp(bundleIdentifier: "example.first", localizedName: "Example First", processIdentifier: 42) }
-      $0.screenContext.captureVisibleText = { _ in "oldAppItem" }
+      $0.screenContext.capture = { _ in Self.snapshot("oldAppItem") }
       $0.keychain.load = { _ in await keychain.wait() }
     }
     store.exhaustivity = .off
@@ -238,17 +268,17 @@ struct TranscriptionContextPrivacyTests {
     #expect(store.state.sourceAppBundleID == nil)
     #expect(store.state.sourceAppName == nil)
     #expect(store.state.sourceAppPID == nil)
-    #expect(store.state.capturedScreenContext == nil)
+    #expect(store.state.capturedFocusedText?.plainText == nil)
     #expect(store.state.capturedVocabulary == nil)
     await keychain.release("synthetic-key")
-    await store.send(.recordingContextCaptured(generation: old.id, screenContext: "oldAppItem", cursorContext: nil, vocabulary: ["oldAppItem"], ideContext: nil, conversationContext: nil, ocrTriggered: true))
-    await store.send(.contextRefreshed(generation: old.id, nil, "oldAppItem", ["oldAppItem"]))
+    await store.send(.recordingContextCaptured(generation: old.id, textSource: Self.snapshot("oldAppItem"), ideContext: nil, conversationContext: nil))
+    await store.send(.contextRefreshed(generation: old.id, textSource: Self.snapshot("oldAppItem")))
     await store.send(.ocrCaptured(generation: old.id, vocabulary: ["oldOCRItem"]))
     await store.send(.vocabularyCaptured(generation: old.id, names: ["Carlos Mendes"], provider: old.provider, includesConversation: false))
     await store.send(.postProcessingFinished(generation: old.id))
     await store.send(.contextSessionFinished(generation: old.id))
     #expect(store.state.contextSession?.id == new.id)
-    #expect(store.state.capturedScreenContext == nil)
+    #expect(store.state.capturedFocusedText?.plainText == nil)
     #expect(store.state.capturedVocabulary == nil)
     #expect(store.state.capturedOCRVocabulary == nil)
     #expect(store.state.capturedRemoteVocabulary == nil)
@@ -267,7 +297,7 @@ struct TranscriptionContextPrivacyTests {
       $0.recording.stopRecording = { _ in .audio(URL(fileURLWithPath: "/tmp/kol-synthetic-context-test.wav")) }
       $0.date.now = Date(timeIntervalSince1970: 100)
       $0.continuousClock = ContextTestClock()
-      $0.screenContext.captureVisibleText = { _ in "firstItem" }
+      $0.screenContext.capture = { _ in Self.snapshot("firstItem") }
       $0.transcription.transcribe = { _, _, _, _, _, _ in
         if await asr.wait() { throw CancellationError() }
         return "old text"
@@ -284,7 +314,7 @@ struct TranscriptionContextPrivacyTests {
     store.dependencies.date.now = Date(timeIntervalSince1970: 102)
     await store.send(.stopRecording)
     await asr.waitUntilRequested()
-    store.dependencies.screenContext.captureVisibleText = { _ in "secondItem" }
+    store.dependencies.screenContext.capture = { _ in Self.snapshot("secondItem") }
     await store.send(.startRecording)
     await store.receive(\.recordingContextCaptured)
     let second = try #require(store.state.contextSession)
@@ -293,7 +323,7 @@ struct TranscriptionContextPrivacyTests {
     await store.finish()
     #expect(store.state.contextSession?.id == second.id)
     #expect(store.state.contextSession?.acceptingCaptures == true)
-    #expect(store.state.capturedScreenContext == "secondItem")
+    #expect(store.state.capturedFocusedText?.plainText == "secondItem")
     #expect(store.state.capturedVocabulary == ["secondItem"])
     #expect(store.state.error == nil)
     #expect(cleanupCalls.value == 0)
@@ -325,7 +355,7 @@ struct TranscriptionContextPrivacyTests {
       Self.testDependencies(&$0)
       $0.recording.stopRecording = { _ in .audio(URL(fileURLWithPath: "/tmp/kol-synthetic-context-test.wav")) }
       $0.continuousClock = ContextTestClock()
-      $0.screenContext.captureVisibleText = { _ in "currentItem" }
+      $0.screenContext.capture = { _ in Self.snapshot("currentItem") }
       $0.keychain.load = { _ in await keychain.wait() }
       $0.llmVocabulary.extractNames = { _, _, _, _ in calls.withValue { $0 += 1 }; return [] }
     }
@@ -375,7 +405,7 @@ struct TranscriptionContextPrivacyTests {
     await store.receive(\.contextSessionFinished)
     await store.finish()
     #expect(requests.value.count == 1)
-    #expect(requests.value.first?.screenContext == "use currentItem")
+    #expect(requests.value.first?.focusedText?.plainText == "use currentItem")
     #expect(requests.value.first?.vocabularyHints == ["currentItem", "Example.swift"])
     #expect(requests.value.first?.conversationContext == nil)
     #expect(requests.value.first?.atMentionEnabled == false)
@@ -429,20 +459,96 @@ struct TranscriptionContextPrivacyTests {
     await store.receive(\.contextSessionFinished)
     await store.finish()
     #expect(requests.value.count == 1)
-    #expect(requests.value.first?.screenContext == nil)
-    #expect(requests.value.first?.structuredContext == nil)
+    #expect(requests.value.first?.focusedText?.plainText == nil)
+    #expect(requests.value.first?.focusedText == nil)
     #expect(requests.value.first?.ideContext == nil)
     #expect(requests.value.first?.vocabularyHints == nil)
     #expect(requests.value.first?.conversationContext == nil)
     #expect(requests.value.first?.customRules == "Prefer ExampleProduct.")
-    #expect(store.state.capturedScreenContext == nil)
+    #expect(store.state.capturedFocusedText?.plainText == nil)
+  }
+
+  @Test("Nearby OCR runs beside abundant static AX text and survives AX refresh")
+  func localOCRWithStaticAX() async throws {
+    var settings = settings(ai: false)
+    settings.ocrContextEnabled = true
+    let clock = TestClock()
+    let calls = LockIsolated(0)
+    let cancelled = LockIsolated(false)
+    let targetActive = LockIsolated(true)
+    let store = TestStore(initialState: state(settings)) {
+      TranscriptionFeature()
+    } withDependencies: {
+      Self.testDependencies(&$0)
+      $0.continuousClock = clock
+      $0.workspace.frontmostApplication = {
+        FrontmostApp(bundleIdentifier: "example.editor", localizedName: "Example Editor",
+                     processIdentifier: targetActive.value ? 101 : 202)
+      }
+      $0.screenContext.capture = { _ in
+        TextSourceSnapshot(focused: nil, surroundingText: String(repeating: "sidebarItem ", count: 100))
+      }
+      $0.ocrClient.captureWindowVocabulary = { _ in
+        calls.withValue { $0 += 1 }
+        do { try await clock.sleep(for: .seconds(2)) }
+        catch { cancelled.setValue(true); return nil }
+        return ["nearbyItem"]
+      }
+    }
+    store.exhaustivity = .off
+    await store.send(.startRecording)
+    await store.receive(\.recordingContextCaptured)
+    await Task.yield()
+    #expect(calls.value == 1)
+    await clock.advance(by: .seconds(2))
+    await store.receive(\.ocrCaptured)
+    #expect(store.state.capturedOCRVocabulary?.contains("nearbyItem") == true)
+    #expect(!cancelled.value)
+    targetActive.setValue(false)
+    await clock.advance(by: .seconds(3))
+    await Task.yield()
+    #expect(calls.value == 1)
+    targetActive.setValue(true)
+    await clock.advance(by: .seconds(3))
+    await Task.yield()
+    #expect(calls.value == 2)
+    await store.send(.discard)
+    await store.finish()
+  }
+
+  @Test("Focused and nearby OCR terms reach cleanup before the sidebar fills its budget")
+  func nearbyVocabularyPrecedence() async throws {
+    var settings = settings()
+    settings.ocrContextEnabled = true
+    var initial = completedCapture(settings)
+    initial.capturedFocusedText = FocusedText(value: "focusedItem")
+    initial.capturedVocabulary = (0..<35).map { "sidebarItem\($0)" }
+    initial.capturedOCRVocabulary = ["nearbyItem"]
+    let hints = LockIsolated<[String]?>(nil)
+    let store = TestStore(initialState: initial) {
+      TranscriptionFeature()
+    } withDependencies: {
+      Self.testDependencies(&$0)
+      $0.continuousClock = ContextTestClock()
+      $0.keychain.load = { _ in "synthetic-key" }
+      $0.llmPostProcessing.process = { context, _, _ in
+        hints.setValue(context.vocabularyHints)
+        return LLMProcessingResult(text: context.text, metadata: LLMMetadata(originalText: context.text, model: "synthetic"))
+      }
+    }
+    store.exhaustivity = .off
+    let generation = try #require(store.state.contextSession?.id)
+    await store.send(.transcriptionResult(generation: generation, "working on nearby item", audioURL, asrMs: 0))
+    await store.receive(\.contextSessionFinished)
+    await store.finish()
+    #expect(hints.value?.prefix(2) == ["focusedItem", "nearbyItem"])
   }
 
   @Test("A late OCR client response cannot update another generation")
   func lateOCRResponse() async throws {
     var settings = settings(ai: false)
     settings.ocrContextEnabled = true
-    let ocr = ContextTestGate<String?>()
+    let ocr = ContextTestGate<[String]?>()
     let store = TestStore(initialState: state(settings)) {
       TranscriptionFeature()
     } withDependencies: {
@@ -452,7 +558,7 @@ struct TranscriptionContextPrivacyTests {
       $0.workspace.frontmostApplication = {
         FrontmostApp(bundleIdentifier: "example.first", localizedName: "Example First", processIdentifier: 42)
       }
-      $0.ocrClient.captureWindowText = { _ in await ocr.wait() }
+      $0.ocrClient.captureWindowVocabulary = { _ in await ocr.wait() }
     }
     store.exhaustivity = .off
     await store.send(.startRecording)
@@ -463,7 +569,7 @@ struct TranscriptionContextPrivacyTests {
     await store.send(.startRecording)
     await store.receive(\.recordingContextCaptured)
     let new = try #require(store.state.contextSession?.id)
-    await ocr.release("oldOCRItem")
+    await ocr.release(["oldOCRItem"])
     await store.finish()
     #expect(old != new)
     #expect(store.state.capturedOCRVocabulary == nil)
@@ -577,7 +683,7 @@ struct TranscriptionContextPrivacyTests {
       $0.workspace.frontmostApplication = {
         FrontmostApp(bundleIdentifier: "com.microsoft.VSCode", localizedName: "Example Editor", processIdentifier: 42)
       }
-      $0.screenContext.captureVisibleText = { _ in "firstItem" }
+      $0.screenContext.capture = { _ in Self.snapshot("firstItem") }
       $0.ideContext.extractTabTitles = { _ in ["UnseenFile.swift"] }
       $0.transcription.transcribe = { _, _, _, _, vocabulary, _ in
         asrVocabulary.setValue(vocabulary)
@@ -588,12 +694,66 @@ struct TranscriptionContextPrivacyTests {
     await store.send(.startRecording)
     await store.receive(\.recordingContextCaptured)
     let generation = try #require(store.state.contextSession?.id)
-    await store.send(.contextRefreshed(generation: generation, nil, "secondItem", ["secondItem"]))
+    await store.send(.contextRefreshed(generation: generation, textSource: Self.snapshot("secondItem")))
     store.dependencies.date.now = Date(timeIntervalSince1970: 102)
     await store.send(.stopRecording)
     await store.receive(\.contextSessionFinished)
     await store.finish()
     #expect(asrVocabulary.value == ["secondItem", "UnseenFile.swift"])
+  }
+
+  @Test("Switching apps before stop clears every captured source")
+  func targetSwitchAtStop() async {
+    var initialState = completedCapture(settings())
+    initialState.phase = .recording
+    initialState.recordingStartTime = Date(timeIntervalSince1970: 95)
+    initialState.capturedRemoteVocabulary = ["remoteItem"]
+    let store = TestStore(initialState: initialState) { TranscriptionFeature() } withDependencies: {
+      Self.testDependencies(&$0)
+      $0.workspace.frontmostApplication = { FrontmostApp(bundleIdentifier: "example.other", localizedName: "Other", processIdentifier: 202) }
+      $0.recording.stopRecording = { _ in .stale }
+    }
+    store.exhaustivity = .off
+    await store.send(.stopRecording)
+    #expect(store.state.capturedFocusedText == nil)
+    #expect(store.state.capturedVocabulary == nil)
+    #expect(store.state.capturedRemoteVocabulary == nil)
+    #expect(store.state.capturedOCRVocabulary == nil)
+    #expect(store.state.capturedIDEContext == nil)
+    #expect(store.state.capturedConversationContext == nil)
+    await store.finish()
+  }
+
+  @Test("Switching apps while keychain waits excludes every screen-derived request field")
+  func targetSwitchBeforeDispatch() async {
+    let appPID = LockIsolated<pid_t>(101)
+    let keychain = ContextTestGate<String?>()
+    let requests = LockIsolated<[PostProcessingContext]>([])
+    var initialState = completedCapture(settings())
+    initialState.capturedFocusedText = nil
+    initialState.capturedVocabulary = nil
+    initialState.capturedRemoteVocabulary = ["remoteItem"]
+    let store = TestStore(initialState: initialState) { TranscriptionFeature() } withDependencies: {
+      Self.testDependencies(&$0)
+      $0.workspace.frontmostApplication = { FrontmostApp(bundleIdentifier: "example.editor", localizedName: "Editor", processIdentifier: appPID.value) }
+      $0.keychain.load = { _ in await keychain.wait() }
+      $0.llmPostProcessing.process = { context, _, _ in
+        requests.withValue { $0.append(context) }
+        return LLMProcessingResult(text: context.text, metadata: LLMMetadata(originalText: context.text, model: "synthetic"))
+      }
+    }
+    store.exhaustivity = .off
+    await store.send(.transcriptionResult(generation: store.state.contextSession!.id, "raw text", audioURL, asrMs: 1))
+    await keychain.waitUntilRequested()
+    appPID.setValue(202)
+    await keychain.release("synthetic-key")
+    await store.receive(\.contextSessionFinished)
+    await store.finish()
+    #expect(requests.value.count == 1)
+    #expect(requests.value.first?.focusedText == nil)
+    #expect(requests.value.first?.vocabularyHints == nil)
+    #expect(requests.value.first?.ideContext == nil)
+    #expect(requests.value.first?.conversationContext == nil)
   }
 
   @Test("Authorized current-session context reaches cleanup")
@@ -619,10 +779,10 @@ struct TranscriptionContextPrivacyTests {
     await store.receive(\.contextSessionFinished)
     await store.finish()
     #expect(requests.value.count == 1)
-    #expect(requests.value.first?.screenContext == "use currentItem")
-    #expect(requests.value.first?.structuredContext?.beforeCursor == "use currentItem")
+    #expect(requests.value.first?.focusedText?.plainText == "use currentItem")
+    #expect(requests.value.first?.focusedText?.content == .positioned(before: "use currentItem", selected: nil, after: ""))
     #expect(requests.value.first?.ideContext?.openFileNames == ["Example.swift"])
-    #expect(requests.value.first?.vocabularyHints == ["currentItem", "Example.swift", "ocrOnlyItem"])
+    #expect(requests.value.first?.vocabularyHints == ["currentItem", "ocrOnlyItem", "Example.swift"])
     #expect(requests.value.first?.conversationContext?.conversationName == "Open Source Weekly")
     #expect(requests.value.first?.atMentionEnabled == true)
   }

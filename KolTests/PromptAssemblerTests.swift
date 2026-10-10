@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import KolCore
 
@@ -93,10 +94,10 @@ struct PromptAssemblerTests {
 	func customRulesAppended() {
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: nil,
-			customRules: "My name is Alan. I work at Fountain Bio."
+			customRules: "My name is Carlos. I work at Example Labs."
 		)
-		#expect(prompt.contains("My name is Alan"))
-		#expect(prompt.contains("Fountain Bio"))
+		#expect(prompt.contains("My name is Carlos"))
+		#expect(prompt.contains("Example Labs"))
 		#expect(prompt.contains("Background context about the speaker"))
 	}
 
@@ -117,7 +118,7 @@ struct PromptAssemblerTests {
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en",
 			sourceApp: "com.apple.Terminal",
-			customRules: "My name is Alan"
+			customRules: "My name is Carlos"
 		)
 		// Core
 		#expect(prompt.contains("Fix punctuation"))
@@ -126,7 +127,7 @@ struct PromptAssemblerTests {
 		// Code
 		#expect(prompt.contains("code editor"))
 		// Custom
-		#expect(prompt.contains("Alan"))
+		#expect(prompt.contains("Carlos"))
 	}
 
 	@Test("App context override replaces default for code apps")
@@ -192,30 +193,17 @@ struct PromptAssemblerTests {
 	func screenContextIncluded() {
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: nil, customRules: nil,
-			screenContext: "func resolveModelAndLanguage() {"
+			focusedText: FocusedText(value: "func resolveModelAndLanguage() {")
 		)
-		#expect(prompt.contains("currently visible on the user's screen"))
+		#expect(prompt.contains("text from the focused control"))
 		#expect(prompt.contains("resolveModelAndLanguage"))
 	}
 
-	@Test("Screen context uses terminal preamble for terminal apps")
-	func screenContextTerminalPreamble() {
-		let prompt = PromptAssembler.systemPrompt(
-			language: "en", sourceApp: "com.mitchellh.ghostty", customRules: nil,
-			screenContext: "$ git status"
-		)
-		#expect(prompt.contains("recent terminal output"))
-		#expect(!prompt.contains("currently visible on the user's screen near the cursor"))
-		#expect(prompt.contains("git status"))
-	}
-
-	@Test("Screen context uses standard preamble for non-terminal apps")
-	func screenContextEditorPreamble() {
-		let prompt = PromptAssembler.systemPrompt(
-			language: "en", sourceApp: "com.microsoft.VSCode", customRules: nil,
-			screenContext: "func foo() {"
-		)
-		#expect(prompt.contains("currently visible on the user's screen"))
+	@Test("Focused context uses the same source labels for every app category")
+	func focusedContextLabels() {
+		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: "com.microsoft.VSCode", customRules: nil,
+			focusedText: FocusedText(value: "func example() {"))
+		#expect(prompt.contains("text from the focused control"))
 		#expect(!prompt.contains("recent terminal output"))
 	}
 
@@ -223,18 +211,18 @@ struct PromptAssemblerTests {
 	func screenContextExcludedNil() {
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: nil, customRules: nil,
-			screenContext: nil
+			focusedText: FocusedText(value: nil)
 		)
-		#expect(!prompt.contains("currently visible"))
+		#expect(!prompt.contains("text from the focused control"))
 	}
 
 	@Test("Empty/whitespace screen context excluded")
 	func screenContextExcludedEmpty() {
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: nil, customRules: nil,
-			screenContext: "  \n  "
+			focusedText: FocusedText(value: "  \n  ")
 		)
-		#expect(!prompt.contains("currently visible"))
+		#expect(!prompt.contains("text from the focused control"))
 	}
 
 	@Test("Screen context appears between app context and custom rules")
@@ -242,11 +230,11 @@ struct PromptAssemblerTests {
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en",
 			sourceApp: "Terminal",
-			customRules: "My name is Alan",
-			screenContext: "let x = 42"
+			customRules: "My name is Carlos",
+			focusedText: FocusedText(value: "let x = 42")
 		)
 		let appContextRange = prompt.range(of: "code editor or terminal")!
-		let screenRange = prompt.range(of: "recent terminal output")!
+		let screenRange = prompt.range(of: "text from the focused control")!
 		let rulesRange = prompt.range(of: "Background context about the speaker")!
 		#expect(appContextRange.lowerBound < screenRange.lowerBound)
 		#expect(screenRange.lowerBound < rulesRange.lowerBound)
@@ -266,76 +254,32 @@ struct PromptAssemblerTests {
 
 	@Test("Structured screen context is included")
 	func structuredScreenContextIncluded() {
-		let ctx = CursorContext(
-			beforeCursor: "let x = ",
-			afterCursor: "\nprint(x)",
-			selectedText: nil,
-			isTerminal: false
-		)
+		let ctx = FocusedText(value: "let x = \nprint(x)", selectedRange: NSRange(location: "let x = ".utf16.count, length: "".utf16.count))
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: "com.apple.dt.Xcode",
-			customRules: nil, structuredContext: ctx
+			customRules: nil, focusedText: ctx
 		)
 		#expect(prompt.contains("--- BEFORE CURSOR ---"))
 		#expect(prompt.contains("--- AFTER CURSOR ---"))
 	}
 
-	@Test("Structured context takes precedence over flat screenContext")
-	func structuredContextPrecedence() {
-		let ctx = CursorContext(
-			beforeCursor: "structured",
-			afterCursor: "content",
-			selectedText: nil,
-			isTerminal: false
-		)
-		let prompt = PromptAssembler.systemPrompt(
-			language: "en", sourceApp: nil, customRules: nil,
-			screenContext: "flat text",
-			structuredContext: ctx
-		)
-		#expect(prompt.contains("--- BEFORE CURSOR ---"))
-		#expect(!prompt.contains("flat text"))
+	@Test("Unpositioned text never claims cursor-relative sections")
+	func unpositionedTextLabels() {
+		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: nil, customRules: nil,
+			focusedText: FocusedText(value: "currentItem"))
+		#expect(prompt.contains("cursor position is unavailable"))
+		#expect(prompt.contains("--- FOCUSED TEXT ---"))
+		#expect(!prompt.contains("--- BEFORE CURSOR ---"))
+		#expect(!prompt.contains("--- AFTER CURSOR ---"))
 	}
 
-	@Test("Fallback to flat screenContext when structuredContext is nil")
-	func fallbackToFlatScreenContext() {
-		let prompt = PromptAssembler.systemPrompt(
-			language: "en", sourceApp: nil, customRules: nil,
-			screenContext: "some visible text",
-			structuredContext: nil
-		)
-		#expect(prompt.contains("some visible text"))
-	}
-
-	@Test("Fallback to flat screenContext when structuredContext has empty flatText")
-	func fallbackWhenStructuredContextEmpty() {
-		let ctx = CursorContext(
-			beforeCursor: "",
-			afterCursor: "",
-			selectedText: nil,
-			isTerminal: false
-		)
-		let prompt = PromptAssembler.systemPrompt(
-			language: "en", sourceApp: nil, customRules: nil,
-			screenContext: "fallback text",
-			structuredContext: ctx
-		)
-		#expect(prompt.contains("fallback text"))
-	}
-
-	@Test("Terminal preamble in structured context")
-	func structuredContextTerminalPreamble() {
-		let ctx = CursorContext(
-			beforeCursor: "$ git status",
-			afterCursor: "",
-			selectedText: nil,
-			isTerminal: true
-		)
-		let prompt = PromptAssembler.systemPrompt(
-			language: "en", sourceApp: nil, customRules: nil,
-			structuredContext: ctx
-		)
-		#expect(prompt.contains("terminal output"))
+	@Test("Selection without a value keeps unavailable position explicit")
+	func selectionOnlyLabels() {
+		let prompt = PromptAssembler.systemPrompt(language: "en", sourceApp: nil, customRules: nil,
+			focusedText: FocusedText(value: nil, selectedText: "chosenItem"))
+		#expect(prompt.contains("--- SELECTED TEXT (POSITION UNAVAILABLE) ---"))
+		#expect(prompt.contains("chosenItem"))
+		#expect(!prompt.contains("--- BEFORE CURSOR ---"))
 	}
 
 	@Test("Vocabulary hints included")
@@ -360,16 +304,11 @@ struct PromptAssemblerTests {
 
 	@Test("Ordering: structuredContext before vocabularyHints before customRules")
 	func structuredContextVocabCustomRulesOrdering() {
-		let ctx = CursorContext(
-			beforeCursor: "let x = 42",
-			afterCursor: "",
-			selectedText: nil,
-			isTerminal: false
-		)
+		let ctx = FocusedText(value: "let x = 42", selectedRange: NSRange(location: "let x = 42".utf16.count, length: "".utf16.count))
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: nil,
-			customRules: "My name is Alan",
-			structuredContext: ctx,
+			customRules: "My name is Carlos",
+			focusedText: ctx,
 			vocabularyHints: ["handleStartRecording"]
 		)
 		let structuredRange = prompt.range(of: "--- BEFORE CURSOR ---")!
@@ -416,18 +355,13 @@ struct PromptAssemblerTests {
 	@Test("IDE context ordering: between app context and screen context")
 	func ideContextOrdering() {
 		let ide = IDEContext(openFileNames: ["App.swift"])
-		let ctx = CursorContext(
-			beforeCursor: "let x = 42",
-			afterCursor: "",
-			selectedText: nil,
-			isTerminal: false
-		)
+		let ctx = FocusedText(value: "let x = 42", selectedRange: NSRange(location: "let x = 42".utf16.count, length: "".utf16.count))
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en",
 			sourceApp: "Terminal",
-			customRules: "My name is Alan",
+			customRules: "My name is Carlos",
 			ideContext: ide,
-			structuredContext: ctx,
+			focusedText: ctx,
 			vocabularyHints: ["someIdentifier"]
 		)
 		let appContextRange = prompt.range(of: "code editor or terminal")!
@@ -496,12 +430,12 @@ struct PromptAssemblerTests {
 		let convo = ConversationContext(conversationName: "#test")
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: "Slack", customRules: nil,
-			screenContext: "some visible text",
+			focusedText: FocusedText(value: "some visible text"),
 			conversationContext: convo
 		)
 		let messagingIdx = prompt.range(of: "messaging app")!.lowerBound
 		let convoIdx = prompt.range(of: "Conversation: #test")!.lowerBound
-		let screenIdx = prompt.range(of: "visible on the user's screen")!.lowerBound
+		let screenIdx = prompt.range(of: "text from the focused control")!.lowerBound
 		#expect(messagingIdx < convoIdx)
 		#expect(convoIdx < screenIdx)
 	}
@@ -531,11 +465,11 @@ struct PromptAssemblerTests {
 	func atMentionOrdering() {
 		let prompt = PromptAssembler.systemPrompt(
 			language: "en", sourceApp: "Slack", customRules: nil,
-			screenContext: "Alice Johnson\nHello",
+			focusedText: FocusedText(value: "Alice Johnson\nHello"),
 			vocabularyHints: ["handleFoo"],
 			atMentionEnabled: true
 		)
-		let screenIdx = prompt.range(of: "visible on the user's screen")!.lowerBound
+		let screenIdx = prompt.range(of: "text from the focused control")!.lowerBound
 		let mentionIdx = prompt.range(of: "@-mention")!.lowerBound
 		let vocabIdx = prompt.range(of: "Names and identifiers visible on screen")!.lowerBound
 		#expect(screenIdx < mentionIdx)

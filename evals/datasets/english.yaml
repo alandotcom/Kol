@@ -6,6 +6,8 @@
 # =============================================================================
 
 - description: "Basic filler removal"
+  prompts:
+    - english-general
   vars:
     input: "um so I was thinking uh we should probably like go to the store"
   assert:
@@ -19,6 +21,8 @@
       value: "output.length > 0"
 
 - description: "Punctuation and sentence structure"
+  prompts:
+    - english-general
   vars:
     input: "hey how are you doing today I wanted to ask you something"
   assert:
@@ -30,6 +34,8 @@
       value: "output.length > 10"
 
 - description: "Run-on sentence with punctuation"
+  prompts:
+    - english-general
   vars:
     input: "so the meeting is at three and then we have lunch and then the presentation starts"
   assert:
@@ -43,6 +49,8 @@
       value: "output.includes(',') || output.includes('.')"
 
 - description: "Numbers preserved"
+  prompts:
+    - english-general
   vars:
     input: "I need to buy like 3 or maybe 4 apples and um 2 bananas"
   assert:
@@ -66,6 +74,8 @@
       value: "output.length > 0"
 
 - description: "Question with fillers"
+  prompts:
+    - english-general
   vars:
     input: "do you think we should um go with option A or option B"
   assert:
@@ -79,6 +89,8 @@
       value: "output.toLowerCase().startsWith('do you think')"
 
 - description: "Short utterance - yes"
+  prompts:
+    - english-general
   vars:
     input: "yes"
   assert:
@@ -86,6 +98,8 @@
       value: "output.trim().toLowerCase() === 'yes' || output.trim().toLowerCase() === 'yes.'"
 
 - description: "Short utterance - acknowledgment"
+  prompts:
+    - english-general
   vars:
     input: "okay sounds good"
   assert:
@@ -95,6 +109,8 @@
       value: "output.split(/\\s+/).length <= 6"
 
 - description: "Filler-heavy input (has real content)"
+  prompts:
+    - english-general
   vars:
     input: "so um like uh you know I was um thinking about it"
   assert:
@@ -108,6 +124,8 @@
       value: "thinking"
 
 - description: "ASR stutter / repeated words"
+  prompts:
+    - english-general
   vars:
     input: "I I want to to go to the the park"
   assert:
@@ -123,6 +141,8 @@
       value: "output.length > 0"
 
 - description: "Proper noun capitalization"
+  prompts:
+    - english-general
   vars:
     input: "I talked to john and sarah about the new york trip"
   assert:
@@ -136,6 +156,8 @@
       value: "output.length > 0"
 
 - description: "Dates and times"
+  prompts:
+    - english-general
   vars:
     input: "the meeting is on january 15th at 2 30 pm"
   assert:
@@ -155,9 +177,8 @@
 - description: "ASR error correction - Claude Code"
   vars:
     input: "we should use clawed code for the refactoring"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: contains
       value: "Claude Code"
@@ -167,9 +188,8 @@
 - description: "Tech term capitalization"
   vars:
     input: "I'm using next js with typescript and react"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: contains
       value: "TypeScript"
@@ -181,9 +201,8 @@
 - description: "camelCase function name"
   vars:
     input: "the function name is get user profile and it returns a user object"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: javascript
       value: "output.includes('getUserProfile') || output.includes('get user profile') || output.includes('get_user_profile')"
@@ -195,9 +214,8 @@
 - description: "CLI commands"
   vars:
     input: "run npm install and then npm run dev"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: contains
       value: "npm install"
@@ -207,9 +225,8 @@
 - description: "Variable names"
   vars:
     input: "set the value of max retries to 5"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: javascript
       value: "output.includes('max retries') || output.includes('maxRetries') || output.includes('MAX_RETRIES') || output.includes('max_retries')"
@@ -221,9 +238,8 @@
 - description: "Code dictation"
   vars:
     input: "function hello world open paren close paren"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: not-contains
       value: "open paren"
@@ -235,9 +251,8 @@
 - description: "File paths"
   vars:
     input: "look at the file at source slash components slash header dot tsx"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: not-contains
       value: " slash "
@@ -249,9 +264,8 @@
 - description: "Git commands"
   vars:
     input: "lets cherry pick commit a b c 1 2 3"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: javascript
       value: "output.includes('cherry-pick') || output.includes('cherry pick')"
@@ -261,9 +275,8 @@
 - description: "API endpoints"
   vars:
     input: "the endpoint is slash api slash v2 slash users"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: contains
       value: "/api/v2/users"
@@ -273,9 +286,8 @@
 - description: "Error message"
   vars:
     input: "the error says cannot read property of undefined"
-  options:
-    prompt:
-      raw: file://prompts/english-code.txt
+  prompts:
+    - english-code
   assert:
     - type: contains
       value: "undefined"
@@ -289,9 +301,8 @@
 - description: "Casual messaging - running late"
   vars:
     input: "hey yeah im gonna be like 10 minutes late sorry about that"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging.txt
+  prompts:
+    - english-messaging
   assert:
     - type: contains
       value: "10"
@@ -305,9 +316,8 @@
 - description: "Casual reaction"
   vars:
     input: "that's so funny haha yeah I agree"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging.txt
+  prompts:
+    - english-messaging
   assert:
     - type: javascript
       value: "output.includes('haha') || output.includes('Haha') || output.includes('lol') || output.includes('Lol')"
@@ -321,9 +331,8 @@
 - description: "Short messaging"
   vars:
     input: "ok cool"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging.txt
+  prompts:
+    - english-messaging
   assert:
     - type: javascript
       value: "output.toLowerCase().includes('cool') || output.toLowerCase().includes('ok')"
@@ -333,9 +342,8 @@
 - description: "Informal question"
   vars:
     input: "hey did you see that thing I sent you earlier"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging.txt
+  prompts:
+    - english-messaging
   assert:
     - type: contains
       value: "?"
@@ -349,9 +357,8 @@
 - description: "Group chat"
   vars:
     input: "who's coming to dinner tonight is it just us or is mike coming too"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging.txt
+  prompts:
+    - english-messaging
   assert:
     - type: contains
       value: "?"
@@ -371,9 +378,8 @@
 - description: "Enumerated list"
   vars:
     input: "there are three things we need to do first update the docs second fix the tests and third deploy"
-  options:
-    prompt:
-      raw: file://prompts/english-document.txt
+  prompts:
+    - english-document
   assert:
     - type: contains
       value: "docs"
@@ -387,9 +393,8 @@
 - description: "Formal statement"
   vars:
     input: "I would like to inform you that the project is on track and we expect delivery by friday"
-  options:
-    prompt:
-      raw: file://prompts/english-document.txt
+  prompts:
+    - english-document
   assert:
     - type: contains
       value: "Friday"
@@ -405,9 +410,8 @@
 - description: "Email sign-off"
   vars:
     input: "thanks for your help let me know if you need anything cheers"
-  options:
-    prompt:
-      raw: file://prompts/english-document.txt
+  prompts:
+    - english-document
   assert:
     - type: contains-any
       value:
@@ -424,9 +428,8 @@
 - description: "Multi-topic paragraph"
   vars:
     input: "regarding your question about the budget we've allocated 50000 for q1 moving on to staffing we plan to hire two engineers"
-  options:
-    prompt:
-      raw: file://prompts/english-document.txt
+  prompts:
+    - english-document
   assert:
     - type: javascript
       value: "output.includes('50,000') || output.includes('50000') || output.includes('fifty thousand')"
@@ -440,9 +443,8 @@
 - description: "Action items"
   vars:
     input: "action items for today one review the PR two update the roadmap three schedule the retro"
-  options:
-    prompt:
-      raw: file://prompts/english-document.txt
+  prompts:
+    - english-document
   assert:
     - type: contains
       value: "PR"
@@ -461,9 +463,8 @@
   vars:
     input: "can you ping gal about the deploy"
     screenContext: "Gal Mor\n2:41 PM\nthe build passed, looks good to merge"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging-screen.txt
+  prompts:
+    - english-messaging-screen
   assert:
     - type: contains
       value: "Gal"
@@ -472,37 +473,34 @@
 
 - description: "Screen context: uncommon name capitalized from screen"
   vars:
-    input: "tell rivka we're on schedule"
-    screenContext: "Rivka Shamir\n3:12 PM\nany updates on the release?"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging-screen.txt
+    input: "tell yuki we're on schedule"
+    screenContext: "Yuki Tanaka\n3:12 PM\nany updates on the release?"
+  prompts:
+    - english-messaging-screen
   assert:
     - type: contains
-      value: "Rivka"
+      value: "Yuki"
     - type: not-contains
-      value: "rivka"
+      value: "yuki"
 
 - description: "Screen context: company name from screen"
   vars:
-    input: "reach out to the fountain bio team"
-    screenContext: "Fountain Bio\nSubject: Partnership inquiry\nHi,"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging-screen.txt
+    input: "reach out to the example labs team"
+    screenContext: "Example Labs\nSubject: Partnership inquiry\nHi,"
+  prompts:
+    - english-messaging-screen
   assert:
     - type: contains
-      value: "Fountain Bio"
+      value: "Example Labs"
     - type: not-contains
-      value: "fountain bio"
+      value: "example labs"
 
 - description: "Screen context: spelling mismatch resolved from screen"
   vars:
     input: "tell jon we need the API keys"
     screenContext: "Jon Peretz\n4:05 PM\nI'll send the staging creds after lunch"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging-screen.txt
+  prompts:
+    - english-messaging-screen
   assert:
     - type: contains
       value: "Jon"
@@ -511,16 +509,15 @@
 
 - description: "Screen context: mixed identifiers and names resolved together"
   vars:
-    input: "ask rivka to check the validate item function"
-    screenContext: "Rivka Shamir\n3:12 PM\nthe validateItem function is throwing on nil input"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging-screen.txt
+    input: "ask yuki to check the validate item function"
+    screenContext: "Yuki Tanaka\n3:12 PM\nthe validateItem function is throwing on nil input"
+  prompts:
+    - english-messaging-screen
   assert:
     - type: contains
-      value: "Rivka"
+      value: "Yuki"
     - type: not-contains
-      value: "rivka"
+      value: "yuki"
     - type: javascript
       value: "output.includes('validateItem') || output.includes('ValidateItem')"
 
@@ -528,9 +525,8 @@
   vars:
     input: "can you check the logs"
     screenContext: "ERROR: connection timeout\nretrying in 5s\n[2026-03-31 14:22:01]"
-  options:
-    prompt:
-      raw: file://prompts/english-messaging-screen.txt
+  prompts:
+    - english-messaging-screen
   assert:
     - type: contains
       value: "logs"

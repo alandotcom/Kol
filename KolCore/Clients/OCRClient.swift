@@ -3,14 +3,13 @@ import DependenciesMacros
 import Foundation
 
 /// Captures window screenshots via ScreenCaptureKit and extracts text via Vision OCR.
-/// Used as a fallback when AX-captured text is too sparse (< 50 chars), which happens
-/// for all Electron/Chromium apps (Slack, Discord, Teams, browsers).
+/// Prioritizes vocabulary near the insertion caret or focused control.
 @DependencyClient
 public struct OCRClient: Sendable {
-	/// Capture a window screenshot for the given PID and return OCR-extracted text.
+	/// Capture the active target window and return nearby vocabulary in proximity order.
 	/// Returns nil if Screen Recording permission is not granted, the window can't be found,
 	/// or OCR produces no results.
-	public var captureWindowText: @Sendable (_ pid: pid_t) async -> String? = { _ in nil }
+	public var captureWindowVocabulary: @Sendable (_ pid: pid_t) async -> [String]? = { _ in nil }
 }
 
 extension OCRClient: TestDependencyKey {

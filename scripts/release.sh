@@ -42,7 +42,7 @@ xcodebuildmcp macos test --project-path "$PWD/Kol.xcodeproj" --scheme Kol \
   --derived-data-path "$DERIVED_DATA_PATH" \
   --json '{"extraArgs":["-skipMacroValidation","-skipPackagePluginValidation"]}' \
   > "$VERIFY_DIR/tests.log" 2>&1
-if ! grep -q 'Overall Result: Passed' "$VERIFY_DIR/tests.log"; then
+if ! grep -Eq '([0-9]+ tests passed, 0 failed|Overall Result: Passed)' "$VERIFY_DIR/tests.log"; then
   echo "ERROR: Test log has no passing result. See ${VERIFY_DIR}/tests.log." >&2
   exit 1
 fi

@@ -24,8 +24,7 @@ public struct PostProcessingContext: Sendable {
 	public let customRules: String?
 	public let appContextOverrides: AppContextOverrides?
 	public let ideContext: IDEContext?
-	public let screenContext: String?
-	public let structuredContext: CursorContext?
+	public let focusedText: FocusedText?
 	public let vocabularyHints: [String]?
 	public let conversationContext: ConversationContext?
 	/// Resolved app category (when URL-based reclassification was applied).
@@ -40,8 +39,7 @@ public struct PostProcessingContext: Sendable {
 		customRules: String? = nil,
 		appContextOverrides: AppContextOverrides? = nil,
 		ideContext: IDEContext? = nil,
-		screenContext: String? = nil,
-		structuredContext: CursorContext? = nil,
+		focusedText: FocusedText? = nil,
 		vocabularyHints: [String]? = nil,
 		conversationContext: ConversationContext? = nil,
 		resolvedCategory: AppContextCategory? = nil,
@@ -53,8 +51,7 @@ public struct PostProcessingContext: Sendable {
 		self.customRules = customRules
 		self.appContextOverrides = appContextOverrides
 		self.ideContext = ideContext
-		self.screenContext = screenContext
-		self.structuredContext = structuredContext
+		self.focusedText = focusedText
 		self.vocabularyHints = vocabularyHints
 		self.conversationContext = conversationContext
 		self.resolvedCategory = resolvedCategory
@@ -156,6 +153,7 @@ public enum PromptLayers {
 
 	Rules:
 	- Fix punctuation (periods, commas, question marks).
+	- End spoken questions with a question mark, including informal questions beginning with "hey".
 	- Remove filler words (um, uh, like, you know) unless they carry meaning.
 	- Fix obvious ASR misrecognitions.
 	- Preserve the speaker's exact words, tone, slang, and profanity — never censor or soften.
@@ -171,6 +169,12 @@ public enum PromptLayers {
 	Input: "so um like uh you know I was um thinking about it"
 	Output: "So I was thinking about it."
 
+	Input: "hey how are you doing today I wanted to ask you something"
+	Output: "Hey, how are you doing today? I wanted to ask you something."
+
+	Input: "hey did you see that thing I sent you earlier"
+	Output: "Hey, did you see that thing I sent you earlier?"
+
 	Input: "um uh like"
 	Output: EMPTY
 	"""
@@ -179,6 +183,9 @@ public enum PromptLayers {
 	English-specific rules: \
 	Fix common tech ASR errors (e.g. "clawed code" → "Claude Code", "next js" → "Next.js", "react" → "React", "typescript" → "TypeScript"). \
 	Preserve camelCase, PascalCase, and technical terms.
+	Convert explicitly dictated "hyphen", "underscore", and "slash" between words into -, _, and /, joining adjacent words without spaces, in every app. \
+	Keep these words literal when discussing punctuation. Dictated separators override spaces in screen text.
+	Example: "a hyphen joins words" stays "A hyphen joins words." because it describes punctuation.
 	"""
 
 	public static let appContextCode = """
@@ -214,7 +221,8 @@ public enum PromptLayers {
 	public static let atMentionInstruction = """
 	When the speaker says "at" followed by a person's name (e.g., "at Alice", "at Bob Smith"), \
 	convert it to an @-mention: "@Alice", "@Bob Smith". \
-	Only do this for names that appear as message senders in the screen context. \
+	Check each name independently against the focused text and the supplied screen vocabulary. \
+	Never create an @-mention for a name absent from both sources; preserve the spoken "at Name" instead. \
 	Clean up redundant patterns like "at at Name" → "@Name".
 	"""
 
@@ -229,48 +237,32 @@ public enum PromptLayers {
 	Format enumerated items as bullet points.
 	"""
 
-	/// Screen context layer: visible text near the cursor to help resolve ambiguous terms.
-	public static func screenContext(visibleText: String, isTerminal: Bool = false) -> String {
-		let preamble = isTerminal
-			? "The following is recent terminal output visible on the user's screen."
-			: "The following text is currently visible on the user's screen near the cursor."
+	/// Focused-control text, with cursor labels only when position is known.
+	public static func focusedText(_ context: FocusedText) -> String {
+		let preamble: String
+		var sections: [String] = []
+		switch context.content {
+		case let .positioned(before, selected, after):
+			preamble = "The following is the text surrounding the user's cursor in the focused control."
+			if !before.isEmpty { sections.append("--- BEFORE CURSOR ---\n\(before)") }
+			if let selected { sections.append("--- SELECTED TEXT ---\n\(selected)") }
+			if !after.isEmpty { sections.append("--- AFTER CURSOR ---\n\(after)") }
+		case let .unpositioned(text, selected):
+			preamble = "The following is text from the focused control. The cursor position is unavailable."
+			if !text.isEmpty { sections.append("--- FOCUSED TEXT ---\n\(text)") }
+			if let selected { sections.append("--- SELECTED TEXT (POSITION UNAVAILABLE) ---\n\(selected)") }
+		case let .selectionOnly(text):
+			preamble = "The following is selected text from the focused control. The cursor position is unavailable."
+			sections.append("--- SELECTED TEXT (POSITION UNAVAILABLE) ---\n\(text)")
+		}
 		return """
 		\(preamble) \
 		Use it ONLY to resolve ambiguous words, technical terms, function names, variable names, \
 		or names of people and places that appear in the transcription. \
 		When a word matches something on screen, use the exact spelling and casing from screen. \
 		Do not add, summarize, or reference this text in your output.
-		---
-		\(visibleText)
-		---
+		\(sections.joined(separator: "\n"))
 		"""
-	}
-
-	/// Structured screen context layer: text before and after the cursor, with optional selection.
-	/// Used when CursorContext is available (replaces the flat screenContext layer).
-	public static func structuredScreenContext(_ context: CursorContext) -> String {
-		let preamble = context.isTerminal
-			? "The following is recent terminal output visible on the user's screen."
-			: "The following is the text surrounding the user's cursor."
-		var parts = """
-		\(preamble) \
-		Use it ONLY to resolve ambiguous words, technical terms, function names, variable names, \
-		or names of people and places that appear in the transcription. \
-		When a word matches something on screen, use the exact spelling and casing from screen. \
-		Do not add, summarize, or reference this text in your output.
-		"""
-
-		if !context.beforeCursor.isEmpty {
-			parts += "\n--- BEFORE CURSOR ---\n\(context.beforeCursor)"
-		}
-		if let sel = context.selectedText, !sel.isEmpty {
-			parts += "\n--- SELECTED TEXT ---\n\(sel)"
-		}
-		if !context.afterCursor.isEmpty {
-			parts += "\n--- AFTER CURSOR ---\n\(context.afterCursor)"
-		}
-
-		return parts
 	}
 
 	/// Vocabulary hints layer: terms extracted from screen context that the LLM should preserve.
@@ -281,6 +273,10 @@ public enum PromptLayers {
 		sounds like one of these terms — even if the ASR spelled it differently or split it \
 		across multiple words — replace it with the correct form from this list: \
 		\(joined)
+		Match only a contiguous spoken phrase. Preserve every intervening word; \
+		do not replace "send them for review" with "send-for-review".
+		Prefer a matching supplied spelling over a guessed technical correction.
+		With vocabulary "Nox/Tools, Nox", "we should fix knocks" becomes "We should fix Nox.", while "three knocks on the door" stays "Three knocks on the door."
 		"""
 	}
 
@@ -307,7 +303,7 @@ public enum PromptLayers {
 		let terminalIDs = KolCoreConstants.terminalBundleIDs.map { $0.lowercased() }
 		let terminalNames = Array(terminalShortNames)
 		let codeEditorApps = [
-			"vscode", "visual studio code", "code", "xcode", "neovim", "vim",
+			"vscode", "visual studio code", "xcode", "neovim", "vim",
 			"intellij", "webstorm", "pycharm", "cursor", "zed", "sublime",
 			"com.microsoft.vscode", "com.apple.dt.xcode", "com.todesktop.230313mzl4w4u92",
 			"dev.zed.zed",
@@ -330,7 +326,7 @@ public enum PromptLayers {
 			"com.microsoft.word", "com.apple.iwork.pages",
 		]
 
-		if codeApps.contains(where: { app.contains($0) }) { return .code }
+		if app == "code" || codeApps.contains(where: { app.contains($0) }) { return .code }
 		if messagingApps.contains(where: { app.contains($0) }) { return .messaging }
 		if emailApps.contains(where: { app.contains($0) }) { return .email }
 		if documentApps.contains(where: { app.contains($0) }) { return .document }
@@ -378,8 +374,7 @@ public enum PromptAssembler {
 	///   - sourceApp: App name or bundle ID of the frontmost app
 	///   - customRules: User-provided context/facts
 	///   - appContextOverrides: Optional per-category prompt text overrides
-	///   - screenContext: Flat visible text (used as fallback when structuredContext is nil)
-	///   - structuredContext: Cursor-relative text (preferred over screenContext when available)
+	///   - focusedText: Text belonging to the focused control, with optional cursor position
 	///   - vocabularyHints: Extracted terms to preserve in transcription
 	public static func systemPrompt(
 		language: String?,
@@ -387,8 +382,7 @@ public enum PromptAssembler {
 		customRules: String?,
 		appContextOverrides: AppContextOverrides? = nil,
 		ideContext ideCtx: IDEContext? = nil,
-		screenContext: String? = nil,
-		structuredContext: CursorContext? = nil,
+		focusedText: FocusedText? = nil,
 		vocabularyHints: [String]? = nil,
 		conversationContext: ConversationContext? = nil,
 		resolvedCategory: AppContextCategory? = nil,
@@ -417,14 +411,8 @@ public enum PromptAssembler {
 			parts.append(PromptLayers.conversationContext(conversationName: name))
 		}
 
-		// Screen context: prefer structured (before/after cursor) over flat string
-		if let structured = structuredContext, !structured.flatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-			parts.append(PromptLayers.structuredScreenContext(structured))
-		} else if let ctx = screenContext, !ctx.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-			parts.append(PromptLayers.screenContext(
-				visibleText: ctx,
-				isTerminal: PromptLayers.isTerminal(sourceApp)
-			))
+		if let focusedText, !focusedText.plainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+			parts.append(PromptLayers.focusedText(focusedText))
 		}
 
 		// @-mention instruction: convert "at Name" → "@Name" using screen context names

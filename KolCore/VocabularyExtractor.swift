@@ -2,25 +2,27 @@ import Foundation
 
 private let logger = KolLog.vocabulary
 
-/// Extracts proper nouns, code identifiers, and file names from screen text using regex patterns.
+/// Extracts proper nouns, code identifiers, and file or folder names from screen text.
 /// All extraction is local (no network), runs synchronously, and is designed for ~3000 char inputs.
 public enum VocabularyExtractor {
 	public struct Result: Sendable, Equatable {
 		public let properNouns: [String]
 		public let identifiers: [String]
 		public let fileNames: [String]
+		public let pathTerms: [String]
 
-		public init(properNouns: [String], identifiers: [String], fileNames: [String]) {
+		public init(properNouns: [String], identifiers: [String], fileNames: [String], pathTerms: [String] = []) {
 			self.properNouns = properNouns
 			self.identifiers = identifiers
 			self.fileNames = fileNames
+			self.pathTerms = pathTerms
 		}
 
 		/// All terms combined, deduplicated, capped at `maxTerms`.
 		public var allTerms: [String] {
 			var seen = Set<String>()
 			var terms: [String] = []
-			for term in identifiers + properNouns + fileNames {
+			for term in pathTerms + identifiers + properNouns + fileNames {
 				let key = term.lowercased()
 				if seen.insert(key).inserted {
 					terms.append(term)
@@ -60,6 +62,10 @@ public enum VocabularyExtractor {
 		pattern: #"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b"#
 	)
 
+	private static let kebabCaseRegex = try! NSRegularExpression(
+		pattern: #"\b[a-z][a-z0-9]*(?:-[a-z][a-z0-9]*)+\b"#
+	)
+
 	/// Sequences of capitalized words (2+ words, same line only).
 	/// Uses `[ \t]+` instead of `\s+` to avoid matching across OCR line breaks,
 	/// which would stitch unrelated sidebar words into garbage "proper nouns".
@@ -73,6 +79,13 @@ public enum VocabularyExtractor {
 	private static let fileNameRegex = try! NSRegularExpression(
 		pattern: #"\b[\w][\w.-]*\.(\w{1,5})\b"#
 	)
+
+	/// Contiguous relative paths, including extensionless folders. Excludes URL fragments.
+	private static let pathRegex = try! NSRegularExpression(
+		pattern: #"(?<![\w.:/\\-])(?:\./)?(\.?[\p{L}_][\p{L}\p{N}_-]*(?:\.[\p{L}\p{N}_-]+)*(?:/\.?[\p{L}_][\p{L}\p{N}_-]*(?:\.[\p{L}\p{N}_-]+)*)+)(?![\w/\\-])"#
+	)
+
+	private static let slashPhrases: Set<String> = ["and/or", "read/write", "input/output", "yes/no", "on/off", "true/false"]
 
 	/// Maximum input length for extraction. Screen text beyond this threshold
 	/// adds diminishing returns for vocabulary quality but increases regex cost.
@@ -89,11 +102,13 @@ public enum VocabularyExtractor {
 		let identifiers = extractIdentifiers(from: input).filter { !looksLikeGarbage($0) }
 		let properNouns = extractProperNouns(from: input).filter { !looksLikeGarbage($0) }
 		let fileNames = extractFileNames(from: input)
+		let pathTerms = extractPathTerms(from: input)
 
 		let result = Result(
 			properNouns: properNouns,
 			identifiers: identifiers,
-			fileNames: fileNames
+			fileNames: fileNames,
+			pathTerms: pathTerms
 		)
 		let termsPreview = result.allTerms.joined(separator: ", ")
 		logger.info("Extracted \(result.allTerms.count) terms [\(termsPreview)]: \(identifiers.count) identifiers, \(properNouns.count) nouns, \(fileNames.count) files")
@@ -102,13 +117,13 @@ public enum VocabularyExtractor {
 
 	// MARK: - Identifier Extraction
 
-	/// Matches camelCase, PascalCase, and snake_case identifiers.
+	/// Matches camelCase, PascalCase, snake_case, and kebab-case identifiers.
 	private static func extractIdentifiers(from text: String) -> [String] {
 		var results: [String] = []
 		var seen = Set<String>()
 
 		let range = NSRange(text.startIndex..., in: text)
-		for regex in [camelCaseRegex, pascalCaseRegex, snakeCaseRegex] {
+		for regex in [camelCaseRegex, pascalCaseRegex, snakeCaseRegex, kebabCaseRegex] {
 			for match in regex.matches(in: text, range: range) {
 				if let matchRange = Range(match.range, in: text) {
 					let term = String(text[matchRange])
@@ -146,7 +161,7 @@ public enum VocabularyExtractor {
 	]
 
 	/// Matches sequences of capitalized words (2+ words).
-	/// e.g., "Alan Cohen", "Claude Code", "Fountain Bio"
+	/// e.g., "Carlos Mendes", "Claude Code", "Example Labs"
 	private static func extractProperNouns(from text: String) -> [String] {
 		let range = NSRange(text.startIndex..., in: text)
 		var results: [String] = []
@@ -178,6 +193,23 @@ public enum VocabularyExtractor {
 		}
 
 		return results
+	}
+
+	// MARK: - Path Extraction
+
+	private static func extractPathTerms(from text: String) -> [String] {
+		let range = NSRange(text.startIndex..., in: text)
+		var terms: [String] = []
+		for match in pathRegex.matches(in: text, range: range) {
+			guard let pathRange = Range(match.range(at: 1), in: text) else { continue }
+			let path = String(text[pathRange])
+			guard !slashPhrases.contains(path.lowercased()) else { continue }
+			let components = path.split(separator: "/").map(String.init)
+			guard !components.contains(where: looksLikeGarbage) else { continue }
+			terms.append(path)
+			terms.append(contentsOf: components.filter { $0.count >= 3 })
+		}
+		return terms
 	}
 
 	// MARK: - File Name Extraction

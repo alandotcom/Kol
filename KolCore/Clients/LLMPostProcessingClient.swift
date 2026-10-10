@@ -32,8 +32,7 @@ extension LLMPostProcessingClient: DependencyKey {
 					customRules: context.customRules,
 					appContextOverrides: context.appContextOverrides,
 					ideContext: context.ideContext,
-					screenContext: context.screenContext,
-					structuredContext: context.structuredContext,
+					focusedText: context.focusedText,
 					vocabularyHints: context.vocabularyHints,
 					conversationContext: context.conversationContext,
 					resolvedCategory: context.resolvedCategory,
@@ -42,7 +41,7 @@ extension LLMPostProcessingClient: DependencyKey {
 				let userMessage = PromptAssembler.userMessage(text: context.text)
 
 				logger.notice("LLM sourceApp: \(context.sourceApp ?? "nil")")
-				logger.notice("LLM screenContext length: \(context.screenContext?.count ?? 0)")
+				logger.notice("LLM screenContext length: \(context.focusedText?.plainText.count ?? 0)")
 				let vocabPreview = context.vocabularyHints?.joined(separator: ", ") ?? "(none)"
 				logger.notice("LLM vocabulary hints: \(vocabPreview)")
 				logger.notice("LLM system prompt preview: \(String(systemPrompt.suffix(200)))")
@@ -60,7 +59,7 @@ extension LLMPostProcessingClient: DependencyKey {
 					throw LLMError.invalidConfiguration("Model name is empty")
 				}
 
-				let body: [String: Any] = [
+				var body: [String: Any] = [
 					"model": config.modelName,
 					"messages": [
 						["role": "system", "content": systemPrompt],
@@ -69,6 +68,10 @@ extension LLMPostProcessingClient: DependencyKey {
 					"temperature": 0,
 					"max_tokens": 4096,
 				]
+				if url.host?.lowercased() == "api.groq.com",
+				   ["openai/gpt-oss-120b", "openai/gpt-oss-20b"].contains(config.modelName) {
+					body["reasoning_effort"] = "low"
+				}
 				request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
 				let startTime = Date()

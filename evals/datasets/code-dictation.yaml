@@ -3,6 +3,106 @@
 # Run: npx promptfoo eval --prompts prompts/english-code.txt --tests datasets/code-dictation.yaml
 # Screen context tests: npx promptfoo eval --prompts prompts/english-code-screen.txt --tests datasets/code-dictation.yaml
 
+- description: "Spoken separator: explicit hyphens survive conflicting compose text"
+  vars:
+    input: "Invite hyphen to hyphen review."
+    screenContext: "Invite to review."
+  assert:
+    - type: icontains
+      value: "invite-to-review"
+    - type: not-icontains
+      value: "hyphen"
+
+- description: "Spoken separator: underscores join an identifier in messaging"
+  vars:
+    input: "send underscore for underscore review"
+    screenContext: "send for review"
+  assert:
+    - type: icontains
+      value: "send_for_review"
+
+- description: "Spoken separator: slashes join a path in messaging"
+  vars:
+    input: "voice slash to slash review"
+    screenContext: "voice to review"
+  assert:
+    - type: javascript
+      value: '/voice\s*\/\s*to\s*\/\s*review/i.test(output)'
+
+- description: "Spoken separator: literal discussion of a hyphen remains prose"
+  vars:
+    input: "a hyphen joins words"
+    screenContext: "send-for-review"
+  assert:
+    - type: icontains
+      value: "a hyphen joins words"
+    - type: not-contains
+      value: "send-for-review"
+
+- description: "Hyphenated vocabulary: resolves spelling without adding an event suffix"
+  vars:
+    input: "invite hyphen to hyphen review"
+    vocabularyHints: "invite-to-review-email, invite-to-review"
+  assert:
+    - type: icontains
+      value: "invite-to-review"
+    - type: not-icontains
+      value: "email"
+
+- description: "Hyphenated vocabulary: separated words match the visible identifier"
+  vars:
+    input: "invite to review"
+    vocabularyHints: "invite-to-review-email, invite-to-review"
+  assert:
+    - type: icontains
+      value: "invite-to-review"
+    - type: not-icontains
+      value: "email"
+
+- description: "Hyphenated vocabulary: unrelated prose remains unchanged"
+  vars:
+    input: "please invite them to review the document"
+    vocabularyHints: "invite-to-review-email, invite-to-review"
+  assert:
+    - type: icontains
+      value: "invite them to review"
+    - type: not-icontains
+      value: "invite-to-review"
+
+- description: "Path vocabulary: extensionless folder resolves Coal in a general compose field"
+  vars:
+    input: "Coal / clients"
+    vocabularyHints: "Kol/Clients, Kol, Clients, docs/decisions, docs, decisions, KolCore, KolTests"
+  assert:
+    - type: regex
+      value: '\bKol\s*/\s*Clients\b'
+    - type: not-icontains
+      value: "Coal"
+    - type: not-contains
+      value: "KolCore"
+
+- description: "Path vocabulary: folder component resolves a standalone product name"
+  vars:
+    input: "we should fix coal"
+    vocabularyHints: "Kol/Clients, Kol, Clients, KolCore, KolTests"
+  assert:
+    - type: contains
+      value: "Kol"
+    - type: not-icontains
+      value: "coal"
+    - type: not-contains
+      value: "Clients"
+
+- description: "Path vocabulary: unrelated common homophone remains ordinary prose"
+  vars:
+    input: "we burn coal for heat"
+    vocabularyHints: "Kol/Clients, Kol, Clients, KolCore, KolTests"
+  assert:
+    - type: contains
+      value: "coal"
+    - type: not-contains
+      value: "Kol"
+
 # =============================================================================
 # Keywords — must stay as-is, not "corrected" to prose
 # =============================================================================

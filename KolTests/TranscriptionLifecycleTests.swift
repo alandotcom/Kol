@@ -101,8 +101,7 @@ struct TranscriptionLifecycleTests {
       Self.testDependencies(&$0, recorder: recorder, pasted: pasted)
       $0.continuousClock = clock
       $0.llmVocabulary = LLMVocabularyClient(extractNames: { _, _, _, _ in [] })
-      $0.screenContext.captureCursorContext = { _ in nil }
-      $0.screenContext.captureVisibleText = { _ in nil }
+      $0.screenContext.capture = { _ in nil }
       $0.recording.startRecording = { id in
         starts.withValue { $0.append(id) }
         return await recorder.start(id, take: "current")
