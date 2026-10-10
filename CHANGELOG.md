@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.3
+
+### Patch Changes
+
+- Notarize macOS releases and include Apple's verification ticket in downloaded apps.
+
 ## 1.3.2
 
 ### Patch Changes
