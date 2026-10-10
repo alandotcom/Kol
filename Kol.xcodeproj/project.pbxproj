@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A76B0A5E2FE1000200000001 /* OrderedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = A76B0A5E2FE1000200000002 /* OrderedCollections */; };
 		16847F9110C1C667D621AC45 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E23613B199896A5DD0FC2BB /* Cocoa.framework */; };
 		37798B7E2F7A4B2000FAAFD1 /* AXorcist in Frameworks */ = {isa = PBXBuildFile; productRef = 026BEE407424C5C195DE8F03 /* AXorcist */; };
 		37798B7F2F7A4B2000FAAFD1 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = 15C0465AEB781CAC239453CD /* CasePaths */; };
@@ -180,6 +181,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A76B0A5E2FE1000200000001 /* OrderedCollections in Frameworks */,
 				37798B872F7A4B2000FAAFD1 /* SwiftNavigation in Frameworks */,
 				37798B862F7A4B2000FAAFD1 /* CustomDump in Frameworks */,
 				37798B852F7A4B2000FAAFD1 /* Perception in Frameworks */,
@@ -311,6 +313,7 @@
 			);
 			name = Kol;
 			packageProductDependencies = (
+				A76B0A5E2FE1000200000002 /* OrderedCollections */,
 				47E05E012D444EE900D26DA6 /* ComposableArchitecture */,
 				47E05E042D444EF800D26DA6 /* Sauce */,
 				47E05E092D44525B00D26DA6 /* Dependencies */,
@@ -400,6 +403,7 @@
 			mainGroup = 47E05DE52D444EC600D26DA6;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A76B0A5E2FE1000200000003 /* XCRemoteSwiftPackageReference "swift-collections" */,
 				A76B0A5E2FE1000100000008 /* XCRemoteSwiftPackageReference "swift-issue-reporting" */,
 				A76B0A5E2FE1000100000007 /* XCRemoteSwiftPackageReference "swift-navigation" */,
 				A76B0A5E2FE1000100000006 /* XCRemoteSwiftPackageReference "swift-custom-dump" */,
@@ -873,6 +877,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A76B0A5E2FE1000200000003 /* XCRemoteSwiftPackageReference "swift-collections" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-collections.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.0;
+			};
+		};
 		A76B0A5E2FE1000100000008 /* XCRemoteSwiftPackageReference "swift-issue-reporting" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pointfreeco/swift-issue-reporting";
@@ -1011,6 +1023,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A76B0A5E2FE1000200000002 /* OrderedCollections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A76B0A5E2FE1000200000003 /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = OrderedCollections;
+		};
 		026BEE407424C5C195DE8F03 /* AXorcist */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 00ACE93179EC4A99179E8CC3 /* XCRemoteSwiftPackageReference "AXorcist" */;
