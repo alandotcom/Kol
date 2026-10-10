@@ -2,16 +2,6 @@
 
 Kol (קול, Hebrew for "voice") is a fork of [kitlangton/Hex](https://github.com/kitlangton/Hex) — a macOS menu bar app for on-device voice-to-text using [Parakeet TDT](https://github.com/FluidInference/FluidAudio) on Apple Silicon, with optional LLM post-processing.
 
-<img width="812" alt="Kol Settings" src="docs/screenshots/settings.png" />
-
-<details>
-<summary>More screenshots</summary>
-
-<img width="812" alt="Kol Transforms" src="docs/screenshots/transforms.png" />
-<img width="812" alt="Kol Advanced" src="docs/screenshots/advanced.png" />
-
-</details>
-
 ## Features
 
 - **On-device transcription** via [Parakeet TDT](https://github.com/FluidInference/FluidAudio) — fast, accurate, multilingual, runs entirely on Apple Silicon
