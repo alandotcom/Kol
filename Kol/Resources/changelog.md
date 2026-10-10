@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.1
+
+### Patch Changes
+
+- Use visible folder paths to resolve dictated project names and spelling.
+- Preserve explicitly dictated separators in every app and use visible hyphenated identifiers for spelling.
+- Prioritize screen vocabulary near the insertion caret or focused field, and capture it independently of sidebar text and accessibility refreshes.
+
+Keep prose dictation in apps with Code in their names, and reduce Groq GPT-OSS cleanup reasoning for faster insertion.
+- Preserve short focused drafts and truthful cursor context while retaining separate window vocabulary; exclude terminal selections from AI cleanup.
+
 ## 1.3.0
 
 ### Minor Changes
