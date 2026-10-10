@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.3.0
+
+### Minor Changes
+
+- Adopt native macOS settings panes, searchable transcript history, and a nonactivating recording indicator.
+- Select OpenRouter post-processing models from a searchable live catalog and preserve the chosen model across restarts
+- Add OpenRouter as an AI post-processing provider with isolated API key storage
+
+### Patch Changes
+
+- Keep cancellation effective through microphone acquisition, archival, and insertion (KOL-04, KOL-05). Reduce clipboard overwrites during cancellation and delayed restoration (partial KOL-09).
+- Fix the oversized menu bar icon by giving its vector asset the correct native dimensions.
+- Add optional trailing space insertion and local filler word cleanup
+- Restore optimized release builds by linking Swift Collections explicitly.
+- Use openai/gpt-oss-120b as the default Groq model for transcription cleanup.
+- Keep automatic context vocabulary within each dictation and honor current AI, screen, conversation, and OCR privacy settings before provider requests.
+- Restore Xcode 27 builds with compatible state-management dependencies and reliable debug build output.
+- Keep History closed at launch, including when restoring a previous session.
+
 ## 1.2.0
 
 ### Minor Changes
