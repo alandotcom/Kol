@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1
+
+### Patch Changes
+
+- Fix Groq post-processing failing on a retired model that the Settings model field could not change
+
 ## 1.4.0
 
 ### Minor Changes
