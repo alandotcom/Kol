@@ -369,6 +369,14 @@ private enum KolSettingsSchema {
 				if preset == LLMProviderPreset.openrouter.rawValue {
 					return try container.decodeIfPresent(String.self, forKey: key) ?? LLMProviderPreset.openrouter.defaultConfig.modelName
 				}
+				// The Groq preset's model field is read-only in Settings, so a saved
+				// Groq model always loads as the current built-in default. A stored
+				// model that Groq has since retired would otherwise fail every request
+				// with no way for the user to change it. A missing preset decodes as
+				// Groq, and the removed Cerebras preset migrates to Groq.
+				if preset == nil || preset == LLMProviderPreset.groq.rawValue || preset == "cerebras" {
+					return LLMProviderPreset.groq.defaultConfig.modelName
+				}
 				let model = try container.decodeIfPresent(String.self, forKey: key) ?? defaultValue
 				return model.contains("llama3.1-8b") || model.contains("llama-4-scout") ? LLMProviderPreset.groq.defaultConfig.modelName : model
 			}

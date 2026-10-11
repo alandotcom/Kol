@@ -57,6 +57,30 @@ final class KolSettingsMigrationTests: XCTestCase {
 		}
 	}
 
+	func testGroqPresetLoadsCurrentDefaultModel() throws {
+		let payloads: [[String: Any]] = [
+			["llmProviderPreset": "groq", "llmModelName": "llama-3.3-70b-versatile"],
+			["llmProviderPreset": "groq", "llmModelName": "llama-3.1-8b-instant"],
+			["llmModelName": "llama-3.3-70b-versatile"],
+		]
+		for payload in payloads {
+			let data = try JSONSerialization.data(withJSONObject: payload)
+			let decoded = try JSONDecoder().decode(KolSettings.self, from: data)
+			XCTAssertEqual(decoded.llmProviderPreset, LLMProviderPreset.groq.rawValue)
+			XCTAssertEqual(decoded.llmModelName, LLMProviderPreset.groq.defaultConfig.modelName)
+		}
+	}
+
+	func testCustomPresetKeepsUserModel() throws {
+		let data = try JSONSerialization.data(withJSONObject: [
+			"llmProviderPreset": "custom",
+			"llmProviderBaseURL": "https://provider.example/v1",
+			"llmModelName": "llama-3.3-70b-versatile",
+		])
+		let decoded = try JSONDecoder().decode(KolSettings.self, from: data)
+		XCTAssertEqual(decoded.llmModelName, "llama-3.3-70b-versatile")
+	}
+
 	func testEncodeDecodeRoundTripPreservesDefaults() throws {
 		let settings = KolSettings()
 		let data = try JSONEncoder().encode(settings)
