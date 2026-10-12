@@ -14,47 +14,53 @@ struct LLMSectionContent: View {
                 get: { store.kolSettings.llmProviderPreset },
                 set: { store.send(.setLLMPreset($0)) }
             )) {
-                ForEach(LLMProviderPreset.allCases, id: \.rawValue) { preset in
+                ForEach(LLMProviderPreset.allCases.filter {
+                    $0 != .local || Bundle.main.url(forResource: "Cleanup", withExtension: "mlmodelc", subdirectory: "LocalCleanupModel") != nil
+                }, id: \.rawValue) { preset in
                     Text(preset.displayName).tag(preset.rawValue)
                 }
             }
-            SecureField("API key", text: Binding(
-                get: { store.llmApiKey },
-                set: { store.send(.setLLMApiKey($0)) }
-            ))
-            .disabled(!store.isLLMApiKeyLoaded)
-            Text("API keys are stored in macOS Keychain.").settingsCaption()
-            let isCustom = store.kolSettings.llmProviderPreset == LLMProviderPreset.custom.rawValue
-            TextField("Base URL", text: Binding(
-                get: { store.kolSettings.llmProviderBaseURL },
-                set: { store.send(.setLLMBaseURL($0)) }
-            ))
-            .disabled(!isCustom)
-            if store.kolSettings.llmProviderPreset == LLMProviderPreset.openrouter.rawValue {
-                LabeledContent("Model") {
-                    Button(store.kolSettings.llmModelName.isEmpty ? "Choose model…" : store.kolSettings.llmModelName) {
-                        store.send(.showOpenRouterModels)
-                    }
-                    .lineLimit(1)
-                    .sheet(isPresented: Binding(
-                        get: { store.showingOpenRouterModels },
-                        set: { if !$0 { store.send(.dismissOpenRouterModels) } }
-                    )) {
-                        OpenRouterModelPickerView(
-                            store: store.scope(state: \.openRouterModels, action: \.openRouterModels),
-                            dismiss: { store.send(.dismissOpenRouterModels) }
-                        )
-                    }
-                }
-                if store.kolSettings.llmModelName.isEmpty {
-                    Text("Choose a model to use OpenRouter post-processing.").settingsCaption()
-                }
+            if store.kolSettings.llmProviderPreset == LLMProviderPreset.local.rawValue {
+                Text("Cleans English dictation on this Mac. No API key is needed.").settingsCaption()
             } else {
-                TextField("Model", text: Binding(
-                    get: { store.kolSettings.llmModelName },
-                    set: { store.send(.setLLMModelName($0)) }
+                SecureField("API key", text: Binding(
+                    get: { store.llmApiKey },
+                    set: { store.send(.setLLMApiKey($0)) }
+                ))
+                .disabled(!store.isLLMApiKeyLoaded)
+                Text("API keys are stored in macOS Keychain.").settingsCaption()
+                let isCustom = store.kolSettings.llmProviderPreset == LLMProviderPreset.custom.rawValue
+                TextField("Base URL", text: Binding(
+                    get: { store.kolSettings.llmProviderBaseURL },
+                    set: { store.send(.setLLMBaseURL($0)) }
                 ))
                 .disabled(!isCustom)
+                if store.kolSettings.llmProviderPreset == LLMProviderPreset.openrouter.rawValue {
+                    LabeledContent("Model") {
+                        Button(store.kolSettings.llmModelName.isEmpty ? "Choose model…" : store.kolSettings.llmModelName) {
+                            store.send(.showOpenRouterModels)
+                        }
+                        .lineLimit(1)
+                        .sheet(isPresented: Binding(
+                            get: { store.showingOpenRouterModels },
+                            set: { if !$0 { store.send(.dismissOpenRouterModels) } }
+                        )) {
+                            OpenRouterModelPickerView(
+                                store: store.scope(state: \.openRouterModels, action: \.openRouterModels),
+                                dismiss: { store.send(.dismissOpenRouterModels) }
+                            )
+                        }
+                    }
+                    if store.kolSettings.llmModelName.isEmpty {
+                        Text("Choose a model to use OpenRouter post-processing.").settingsCaption()
+                    }
+                } else {
+                    TextField("Model", text: Binding(
+                        get: { store.kolSettings.llmModelName },
+                        set: { store.send(.setLLMModelName($0)) }
+                    ))
+                    .disabled(!isCustom)
+                }
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text("Custom context")
@@ -69,11 +75,13 @@ struct LLMSectionContent: View {
                     Button("Clear custom context") { store.send(.setLLMCustomRules("")) }
                 }
             }
-            Button("Customize app context prompts…") { store.send(.showPromptCustomization) }
-                .sheet(isPresented: Binding(
-                    get: { store.showingPromptCustomization },
-                    set: { if !$0 { store.send(.dismissPromptCustomization) } }
-                )) { PromptCustomizationView(store: store) }
+            if store.kolSettings.llmProviderPreset != LLMProviderPreset.local.rawValue {
+                Button("Customize app context prompts…") { store.send(.showPromptCustomization) }
+                    .sheet(isPresented: Binding(
+                        get: { store.showingPromptCustomization },
+                        set: { if !$0 { store.send(.dismissPromptCustomization) } }
+                    )) { PromptCustomizationView(store: store) }
+            }
         }
     }
 }

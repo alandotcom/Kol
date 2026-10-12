@@ -66,6 +66,8 @@ public struct LLMProviderConfig: Codable, Equatable, Sendable {
 	public var baseURL: String
 	public var modelName: String
 
+	public var isLocal: Bool { modelName == "kol-cleanup-360m" && baseURL.isEmpty }
+
 	public init(baseURL: String, modelName: String) {
 		self.baseURL = baseURL
 		self.modelName = modelName
@@ -74,12 +76,14 @@ public struct LLMProviderConfig: Codable, Equatable, Sendable {
 
 /// Known fast inference providers.
 public enum LLMProviderPreset: String, CaseIterable, Codable, Sendable {
+	case local
 	case groq
 	case openrouter
 	case custom
 
 	public var displayName: String {
 		switch self {
+		case .local: return "Local (Core ML)"
 		case .groq: return "Groq"
 		case .openrouter: return "OpenRouter"
 		case .custom: return "Custom"
@@ -88,6 +92,8 @@ public enum LLMProviderPreset: String, CaseIterable, Codable, Sendable {
 
 	public var defaultConfig: LLMProviderConfig {
 		switch self {
+		case .local:
+			return LLMProviderConfig(baseURL: "", modelName: "kol-cleanup-360m")
 		case .groq:
 			return LLMProviderConfig(
 				baseURL: "https://api.groq.com/openai/v1",

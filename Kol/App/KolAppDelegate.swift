@@ -23,6 +23,39 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 
 	func applicationDidFinishLaunching(_: Notification) {
 		#if DEBUG
+        if LocalCleanupBenchmark.startIfRequested() { return }
+        if ProcessInfo.processInfo.arguments.contains("--local-cleanup") {
+            $kolSettings.withLock {
+                $0.llmPostProcessingEnabled = true
+                $0.llmProviderPreset = LLMProviderPreset.local.rawValue
+                $0.llmProviderBaseURL = LLMProviderPreset.local.defaultConfig.baseURL
+                $0.llmModelName = LLMProviderPreset.local.defaultConfig.modelName
+            }
+        }
+        if ProcessInfo.processInfo.arguments.contains("--local-cleanup-smoke") {
+            Task {
+                do {
+                    let cases: [(PostProcessingContext, String)] = [
+                        (PostProcessingContext(text: "um can you send the report to Carlos tomorrow", resolvedCategory: .messaging), "Can you send the report to Carlos tomorrow?"),
+                        (PostProcessingContext(text: "git checkout compile hyphen cache", resolvedCategory: .code), "git checkout compile-cache"),
+                        (PostProcessingContext(text: "Please check fern buffer before the next review.", vocabularyHints: ["FernBuffer"], resolvedCategory: .messaging), "Please check FernBuffer before the next review."),
+                    ]
+                    var reports: [[String: Any]] = []
+                    for (context, expected) in cases {
+                        let result = try await CoreMLCleanup.shared.process(context)
+                        reports.append(["passed": result.text == expected, "actual": result.text, "expected": expected, "latency_ms": result.metadata.latencyMs ?? 0])
+                    }
+                    let data = try JSONSerialization.data(withJSONObject: ["passed": reports.allSatisfy { $0["passed"] as? Bool == true }, "cases": reports], options: [.sortedKeys])
+                    FileHandle.standardOutput.write(data)
+                    FileHandle.standardOutput.write(Data("\n".utf8))
+                    NSApp.terminate(nil)
+                } catch {
+                    FileHandle.standardError.write(Data("Local cleanup smoke failed: \(error.localizedDescription)\n".utf8))
+                    NSApp.terminate(nil)
+                }
+            }
+            return
+        }
 		if ProcessInfo.processInfo.arguments.contains("--preview-appearance=light") {
 			NSApp.appearance = NSAppearance(named: .aqua)
 		} else if ProcessInfo.processInfo.arguments.contains("--preview-appearance=dark") {
@@ -43,6 +76,13 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 			appLogger.debug("Running in testing mode")
 			return
 		}
+        if kolSettings.llmPostProcessingEnabled,
+           kolSettings.llmProviderPreset == LLMProviderPreset.local.rawValue {
+            Task {
+                do { try await CoreMLCleanup.shared.warmUp() }
+                catch { appLogger.error("Local cleanup warm-up failed: \(error.localizedDescription, privacy: .private)") }
+            }
+        }
 		launchedAtLogin = wasLaunchedAtLogin()
 		appLogger.info("Application did finish launching")
 		appLogger.notice("launchedAtLogin = \(self.launchedAtLogin)")

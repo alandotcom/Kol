@@ -26,6 +26,10 @@ extension LLMPostProcessingClient: DependencyKey {
 	public static var liveValue: Self {
 		Self(
 			process: { context, config, apiKey in
+				if config.isLocal {
+					@Dependency(\.localCleanup) var localCleanup
+					return try await localCleanup.process(context)
+				}
 				let systemPrompt = PromptAssembler.systemPrompt(
 					language: context.inputLanguage,
 					sourceApp: context.sourceApp,

@@ -69,6 +69,56 @@ struct TranscriptionContextPrivacyTests {
     return state
   }
 
+  @Test("Local cleanup runs without loading an API key")
+  func localCleanupWithoutKey() async {
+    var settings = settings()
+    settings.llmProviderPreset = LLMProviderPreset.local.rawValue
+    settings.llmProviderBaseURL = LLMProviderPreset.local.defaultConfig.baseURL
+    settings.llmModelName = LLMProviderPreset.local.defaultConfig.modelName
+    let called = LockIsolated(false)
+    let store = TestStore(initialState: completedCapture(settings)) { TranscriptionFeature() } withDependencies: {
+      Self.testDependencies(&$0)
+      $0.keychain.load = { _ in Issue.record("Local cleanup must not load an API key"); return nil }
+      $0.llmPostProcessing.process = { context, config, key in
+        #expect(config.isLocal)
+        #expect(key.isEmpty)
+        called.setValue(true)
+        return LLMProcessingResult(text: context.text, metadata: LLMMetadata(originalText: context.text, model: "local"))
+      }
+    }
+    store.exhaustivity = .off
+    await store.send(.transcriptionResult(generation: store.state.contextSession!.id, "use current item", audioURL, asrMs: 1))
+    await store.finish()
+    #expect(called.value)
+  }
+
+  @Test("Timed-out local cleanup pastes the original once and discards late output")
+  func localTimeoutPastesOnce() async {
+    var settings = settings()
+    settings.llmProviderPreset = LLMProviderPreset.local.rawValue
+    settings.llmProviderBaseURL = LLMProviderPreset.local.defaultConfig.baseURL
+    settings.llmModelName = LLMProviderPreset.local.defaultConfig.modelName
+    let late = ContextTestGate<String>()
+    let pasted = LockIsolated<[String]>([])
+    let store = TestStore(initialState: completedCapture(settings)) { TranscriptionFeature() } withDependencies: {
+      Self.testDependencies(&$0)
+      $0.pasteboard.paste = { text, _ in pasted.withValue { $0.append(text) } }
+      $0.llmPostProcessing.process = { context, _, _ in
+        try await LocalCleanupDeadline.run(timeout: .milliseconds(20)) {
+          let text = await late.wait()
+          return LLMProcessingResult(text: text, metadata: LLMMetadata(originalText: context.text, model: "local"))
+        }
+      }
+    }
+    store.exhaustivity = .off
+    await store.send(.transcriptionResult(generation: store.state.contextSession!.id, "Is this working?", audioURL, asrMs: 1))
+    await store.finish()
+    #expect(pasted.value == ["Is this working?"])
+    await late.release("Incorrect late output.")
+    await Task.yield()
+    #expect(pasted.value == ["Is this working?"])
+  }
+
   @Test("Replacing screen capture with a context-disabled recording stops the old timer")
   func replacementStopsCaptureEffects() async throws {
     let clock = TestClock()

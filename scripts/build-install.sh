@@ -94,6 +94,15 @@ if [[ "$DISTRIBUTION" == true ]]; then
   exit 0
 fi
 
+if [[ -n "${KOL_LOCAL_CLEANUP_MODEL:-}" ]]; then
+  if [[ "$CONFIG" != "Debug" || ! -d "$KOL_LOCAL_CLEANUP_MODEL/Cleanup.mlmodelc" ]]; then
+    echo "ERROR: A compiled local cleanup model is required for this debug build." >&2
+    exit 1
+  fi
+  mkdir -p "$APP_PATH/Contents/Resources/LocalCleanupModel"
+  rsync -a --delete --delete-excluded --exclude="*.mlpackage" "$KOL_LOCAL_CLEANUP_MODEL/" "$APP_PATH/Contents/Resources/LocalCleanupModel/"
+fi
+
 echo "Signing..."
 codesign --deep --force --sign "Developer ID Application: Alan Cohen (G365XP38PA)" "$APP_PATH"
 

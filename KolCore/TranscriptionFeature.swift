@@ -668,7 +668,8 @@ private extension TranscriptionFeature {
           ))
           guard let text = vocabText, !text.isEmpty,
                 Self.acceptsContext(session, settings, generation: generation),
-                settings.wrappedValue.llmPostProcessingEnabled else { return }
+                settings.wrappedValue.llmPostProcessingEnabled,
+                !provider.config.isLocal else { return }
           let apiKey = await keychain.loadLLMAPIKey(for: provider.preset)
           guard Self.acceptsContext(session, settings, generation: generation),
                 settings.wrappedValue.llmPostProcessingEnabled,
@@ -907,12 +908,12 @@ private extension TranscriptionFeature {
         var llmMetadata: LLMMetadata?
 
         if llmEnabled, settings.wrappedValue.llmPostProcessingEnabled {
-          let apiKey = await keychain.loadLLMAPIKey(for: provider.preset)
+          let apiKey = provider.config.isLocal ? nil : await keychain.loadLLMAPIKey(for: provider.preset)
           let liveSettings = settings.wrappedValue
           if session.wrappedValue?.id == generation,
              liveSettings.llmPostProcessingEnabled,
              provider == ContextProvider(settings: liveSettings),
-             let apiKey, !apiKey.isEmpty {
+             provider.config.isLocal || !(apiKey ?? "").isEmpty {
             let targetMatches = sourceAppPID.map { workspace.frontmostApplication()?.processIdentifier == $0 } ?? false
             let contextAllowed = targetMatches && liveSettings.llmScreenContextEnabled && capturedProvider == provider
             let conversationAllowed = contextAllowed && liveSettings.conversationContextEnabled
@@ -946,7 +947,7 @@ private extension TranscriptionFeature {
               atMentionEnabled: conversationAllowed && liveSettings.atMentionInsertionEnabled
             )
             do {
-              let result = try await llmPostProcessing.process(context, provider.config, apiKey)
+              let result = try await llmPostProcessing.process(context, provider.config, apiKey ?? "")
               let currentSettings = settings.wrappedValue
               let consentStillValid = (!contextAllowed || currentSettings.llmScreenContextEnabled)
                 && (!conversationAllowed || currentSettings.conversationContextEnabled)

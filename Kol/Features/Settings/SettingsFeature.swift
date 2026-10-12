@@ -152,6 +152,7 @@ struct SettingsFeature {
   @Dependency(\.permissions) var permissions
   @Dependency(\.transcriptPersistence) var transcriptPersistence
   @Dependency(\.keychain) var keychain
+  @Dependency(\.localCleanup) var localCleanup
 
   private func beginCapture(_ target: HotKeyCaptureTarget, state: inout State) {
     endCapture(.recording, state: &state)
@@ -604,6 +605,9 @@ struct SettingsFeature {
 
       case let .setLLMEnabled(enabled):
         state.$kolSettings.withLock { $0.llmPostProcessingEnabled = enabled }
+        if enabled, state.kolSettings.llmProviderPreset == LLMProviderPreset.local.rawValue {
+          return .run { [localCleanup] _ in await localCleanup.warmUp() }
+        }
         return .none
 
       case let .setLLMPreset(preset):
@@ -618,6 +622,15 @@ struct SettingsFeature {
           if let p = LLMProviderPreset(rawValue: preset), p != .custom {
             settings.llmProviderBaseURL = p.defaultConfig.baseURL
             settings.llmModelName = p.defaultConfig.modelName
+          }
+        }
+        if preset == LLMProviderPreset.local.rawValue {
+          state.isLLMApiKeyLoaded = true
+          return .run { [keychain, localCleanup] _ in
+            if !currentKey.isEmpty {
+              try? await keychain.save("llmApiKey_\(oldPreset)", currentKey)
+            }
+            await localCleanup.warmUp()
           }
         }
         // Save current key under old provider, load key for new provider

@@ -56,6 +56,7 @@
 		C84995FA9130723B621B5575 /* KolCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7F7962AB52729F8E987112D /* KolCore.framework */; };
 		E1A2B3C4D5E6F70812345678 /* KolCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = B7F7962AB52729F8E987112D /* KolCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		FCDB5A11B2A3B902784F1FA1 /* KolCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B7F7962AB52729F8E987112D /* KolCore.framework */; };
+		C01300000000000000000001 /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = C01300000000000000000002 /* Tokenizers */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -182,6 +183,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C01300000000000000000001 /* Tokenizers in Frameworks */,
 				A76B0A5E2FE1000300000001 /* Sparkle in Frameworks */,
 				A76B0A5E2FE1000200000001 /* OrderedCollections in Frameworks */,
 				37798B872F7A4B2000FAAFD1 /* SwiftNavigation in Frameworks */,
@@ -316,6 +318,7 @@
 			);
 			name = Kol;
 			packageProductDependencies = (
+				C01300000000000000000002 /* Tokenizers */,
 				A76B0A5E2FE1000300000002 /* Sparkle */,
 				A76B0A5E2FE1000200000002 /* OrderedCollections */,
 				47E05E012D444EE900D26DA6 /* ComposableArchitecture */,
@@ -407,6 +410,7 @@
 			mainGroup = 47E05DE52D444EC600D26DA6;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				C01300000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				A76B0A5E2FE1000300000003 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				A76B0A5E2FE1000200000003 /* XCRemoteSwiftPackageReference "swift-collections" */,
 				A76B0A5E2FE1000100000008 /* XCRemoteSwiftPackageReference "swift-issue-reporting" */,
@@ -1046,6 +1050,7 @@
 				minimumVersion = 2.4.1;
 			};
 		};
+		C01300000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/huggingface/swift-transformers.git"; requirement = {kind = revision; revision = 48473106a93b2d8dfb114b82f0628ebbb71734e7; }; };
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1251,6 +1256,7 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = ConcurrencyExtras;
 		};
+		C01300000000000000000002 /* Tokenizers */ = {isa = XCSwiftPackageProductDependency; package = C01300000000000000000003 /* XCRemoteSwiftPackageReference "swift-transformers" */; productName = Tokenizers; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 47E05DE62D444EC600D26DA6 /* Project object */;
