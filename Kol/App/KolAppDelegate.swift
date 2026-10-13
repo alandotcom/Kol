@@ -83,7 +83,8 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
         if kolSettings.llmPostProcessingEnabled,
-           kolSettings.llmProviderPreset == LLMProviderPreset.local.rawValue {
+           kolSettings.llmProviderPreset == LLMProviderPreset.local.rawValue,
+           CoreMLCleanup.modelFolder != nil {
             Task {
                 do { try await CoreMLCleanup.shared.warmUp() }
                 catch { appLogger.error("Local cleanup warm-up failed: \(error.localizedDescription, privacy: .private)") }

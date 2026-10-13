@@ -101,6 +101,10 @@ if [[ -n "${KOL_LOCAL_CLEANUP_MODEL:-}" ]]; then
   fi
   mkdir -p "$APP_PATH/Contents/Resources/LocalCleanupModel"
   rsync -a --delete --delete-excluded --exclude="*.mlpackage" "$KOL_LOCAL_CLEANUP_MODEL/" "$APP_PATH/Contents/Resources/LocalCleanupModel/"
+else
+  # Without a bundled model the app downloads the pinned one from Hugging Face (LocalCleanupModelStore). Incremental
+  # builds reuse the previous bundle, so a model bundled by an earlier build is removed.
+  rm -rf "$APP_PATH/Contents/Resources/LocalCleanupModel"
 fi
 
 echo "Signing..."

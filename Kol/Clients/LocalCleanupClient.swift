@@ -8,7 +8,9 @@ extension LocalCleanupClient: DependencyKey {
     public static var liveValue: Self {
         Self(process: { context in
             try await LocalCleanupDeadline.run(timeout: CoreMLCleanup.deadline) { try await CoreMLCleanup.shared.process(context) }
-        }, warmUp: { try? await CoreMLCleanup.shared.warmUp() }, prime: { await CoreMLCleanup.shared.prime() })
+        }, warmUp: { try? await CoreMLCleanup.shared.warmUp() }, prime: { await CoreMLCleanup.shared.prime() },
+        isModelAvailable: { CoreMLCleanup.modelFolder != nil },
+        downloadModel: { progress in try await LocalCleanupModelStore.ensure(progress: progress) })
     }
 }
 
@@ -38,10 +40,22 @@ actor CoreMLCleanup {
         return value
     }
 
+    /// The model folder: one bundled into a Debug build with KOL_LOCAL_CLEANUP_MODEL, otherwise the model
+    /// LocalCleanupModelStore downloaded from Hugging Face. Nil until one of them exists.
+    static var modelFolder: URL? {
+        if let bundled = Bundle.main.resourceURL?.appendingPathComponent("LocalCleanupModel"),
+           FileManager.default.fileExists(atPath: bundled.appendingPathComponent("Cleanup.mlmodelc").path) {
+            return bundled
+        }
+        return LocalCleanupModelStore.isReady ? LocalCleanupModelStore.folder : nil
+    }
+
+    /// Whether Settings should offer the download (read on the main thread by the view).
+    nonisolated static var isModelAvailableForSettings: Bool { modelFolder != nil }
+
     private func loadResources() async throws -> (MLModel, any Tokenizer) {
-        guard let folder = Bundle.main.resourceURL?.appendingPathComponent("LocalCleanupModel"),
-              FileManager.default.fileExists(atPath: folder.appendingPathComponent("Cleanup.mlmodelc").path) else {
-            throw LLMError.invalidConfiguration("The local cleanup model is not included in this build")
+        guard let folder = Self.modelFolder else {
+            throw LLMError.invalidConfiguration("The local cleanup model has not been downloaded")
         }
         let configuration = MLModelConfiguration()
         configuration.computeUnits = .cpuAndGPU

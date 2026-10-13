@@ -49,6 +49,9 @@ struct SettingsFeature {
     var showingPromptCustomization: Bool = false
     var openRouterModels = OpenRouterModelsFeature.State()
     var showingOpenRouterModels = false
+    /// Download of the on-device cleanup model: nil when idle, a fraction from 0 to 1 while downloading.
+    var localCleanupDownloadProgress: Double?
+    var localCleanupDownloadError: String?
 
     /// Preview of scratchpad text after applying word removals and remappings.
     /// Lives here (not in the view) so the pipeline logic is testable.
@@ -123,6 +126,9 @@ struct SettingsFeature {
     // LLM Post-Processing
     case setLLMEnabled(Bool)
     case setLLMPreset(String)
+    case downloadLocalCleanupModel
+    case localCleanupDownloadProgressed(Double)
+    case localCleanupDownloadFinished(String?)
     case showOpenRouterModels
     case dismissOpenRouterModels
     case openRouterModels(OpenRouterModelsFeature.Action)
@@ -606,8 +612,33 @@ struct SettingsFeature {
       case let .setLLMEnabled(enabled):
         state.$kolSettings.withLock { $0.llmPostProcessingEnabled = enabled }
         if enabled, state.kolSettings.llmProviderPreset == LLMProviderPreset.local.rawValue {
-          return .run { [localCleanup] _ in await localCleanup.warmUp() }
+          return localCleanup.isModelAvailable() ? .run { [localCleanup] _ in await localCleanup.warmUp() } : .send(.downloadLocalCleanupModel)
         }
+        return .none
+
+      case .downloadLocalCleanupModel:
+        guard state.localCleanupDownloadProgress == nil, !localCleanup.isModelAvailable() else { return .none }
+        state.localCleanupDownloadProgress = 0
+        state.localCleanupDownloadError = nil
+        return .run { [localCleanup] send in
+          do {
+            try await localCleanup.downloadModel { fraction in
+              Task { await send(.localCleanupDownloadProgressed(fraction)) }
+            }
+            await send(.localCleanupDownloadFinished(nil))
+            await localCleanup.warmUp()
+          } catch {
+            await send(.localCleanupDownloadFinished(error.localizedDescription))
+          }
+        }
+
+      case let .localCleanupDownloadProgressed(fraction):
+        if state.localCleanupDownloadProgress != nil { state.localCleanupDownloadProgress = fraction }
+        return .none
+
+      case let .localCleanupDownloadFinished(error):
+        state.localCleanupDownloadProgress = nil
+        state.localCleanupDownloadError = error
         return .none
 
       case let .setLLMPreset(preset):
@@ -626,12 +657,16 @@ struct SettingsFeature {
         }
         if preset == LLMProviderPreset.local.rawValue {
           state.isLLMApiKeyLoaded = true
-          return .run { [keychain, localCleanup] _ in
-            if !currentKey.isEmpty {
-              try? await keychain.save("llmApiKey_\(oldPreset)", currentKey)
-            }
-            await localCleanup.warmUp()
-          }
+          let available = localCleanup.isModelAvailable()
+          return .merge(
+            .run { [keychain, localCleanup] _ in
+              if !currentKey.isEmpty {
+                try? await keychain.save("llmApiKey_\(oldPreset)", currentKey)
+              }
+              if available { await localCleanup.warmUp() }
+            },
+            available ? .none : .send(.downloadLocalCleanupModel)
+          )
         }
         // Save current key under old provider, load key for new provider
         return .run { [keychain] send in

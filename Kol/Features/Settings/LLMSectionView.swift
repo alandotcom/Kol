@@ -14,13 +14,21 @@ struct LLMSectionContent: View {
                 get: { store.kolSettings.llmProviderPreset },
                 set: { store.send(.setLLMPreset($0)) }
             )) {
-                ForEach(LLMProviderPreset.allCases.filter {
-                    $0 != .local || Bundle.main.url(forResource: "Cleanup", withExtension: "mlmodelc", subdirectory: "LocalCleanupModel") != nil
-                }, id: \.rawValue) { preset in
+                ForEach(LLMProviderPreset.allCases, id: \.rawValue) { preset in
                     Text(preset.displayName).tag(preset.rawValue)
                 }
             }
             if store.kolSettings.llmProviderPreset == LLMProviderPreset.local.rawValue {
+                if let progress = store.localCleanupDownloadProgress {
+                    ProgressView(value: progress) {
+                        Text("Downloading the cleanup model (700 MB)…")
+                    }
+                } else if !CoreMLCleanup.isModelAvailableForSettings {
+                    Button("Download the cleanup model (700 MB)") { store.send(.downloadLocalCleanupModel) }
+                    if let error = store.localCleanupDownloadError {
+                        Text(error).settingsCaption()
+                    }
+                }
                 Text("Cleans English dictation on this Mac. No API key is needed.").settingsCaption()
             } else {
                 SecureField("API key", text: Binding(
