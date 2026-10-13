@@ -7,7 +7,24 @@ import Tokenizers
 extension LocalCleanupClient: DependencyKey {
     public static var liveValue: Self {
         Self(process: { context in
+            #if DEBUG
+            let start = ContinuousClock.now
+            do {
+                let result = try await LocalCleanupDeadline.run(timeout: CoreMLCleanup.deadline) { try await CoreMLCleanup.shared.process(context) }
+                if !CommandLine.arguments.contains(where: { $0.hasPrefix("--local-cleanup-benchmark=") }) {
+                    LocalCleanupRecorder.record(context, output: result.text, outcome: "ok", elapsed: start.duration(to: .now))
+                }
+                return result
+            } catch {
+                if !CommandLine.arguments.contains(where: { $0.hasPrefix("--local-cleanup-benchmark=") }) {
+                    let outcome = (error as? URLError)?.code == .timedOut ? "timeout" : "error: \(error.localizedDescription)"
+                    LocalCleanupRecorder.record(context, output: nil, outcome: outcome, elapsed: start.duration(to: .now))
+                }
+                throw error
+            }
+            #else
             try await LocalCleanupDeadline.run(timeout: CoreMLCleanup.deadline) { try await CoreMLCleanup.shared.process(context) }
+            #endif
         }, warmUp: { try? await CoreMLCleanup.shared.warmUp() }, prime: { await CoreMLCleanup.shared.prime() },
         isModelAvailable: { CoreMLCleanup.modelFolder != nil },
         downloadModel: { progress in try await LocalCleanupModelStore.ensure(progress: progress) })
@@ -19,8 +36,17 @@ actor CoreMLCleanup {
     static let capacity = 1024
     /// Longest a cleanup may take before the transcript is pasted unchanged. A replay of 135 real
     /// dictations with no limit finished every cleanup within 800 ms (median 236 ms); the slowest
-    /// were short dictations during load spikes, which a 450 ms limit pasted raw.
-    static let deadline: Duration = .milliseconds(800)
+    /// were short dictations during load spikes, which a 450 ms limit pasted raw. Debug builds
+    /// accept --cleanup-deadline-ms=N so replays can measure completion times past it.
+    static let deadline: Duration = {
+        #if DEBUG
+        if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--cleanup-deadline-ms=") }),
+           let milliseconds = Int(argument.dropFirst("--cleanup-deadline-ms=".count)) {
+            return .milliseconds(milliseconds)
+        }
+        #endif
+        return .milliseconds(800)
+    }()
     private var resources: (MLModel, any Tokenizer)?
     private var loading: Task<(MLModel, any Tokenizer), Error>?
     private var warming: Task<Void, Error>?
@@ -136,17 +162,31 @@ actor CoreMLCleanup {
         // already carries the right names, so it does not drop or mangle them; matching again
         // catches names the model's own edits exposed (for example a web address it joined).
         let contextNames = (context.vocabularyHints ?? []) + [context.conversationContext?.conversationName].compactMap { $0 }
-        let matchedTranscript = LocalCleanupNameMatcher.apply(to: context.text, terms: contextNames, isKnownWord: VocabularyExtractor.isKnownWord)
+        let matchStart = ContinuousClock.now
+        #if DEBUG
+        // Replay experiments compare the pipeline with and without the matcher.
+        let matcherEnabled = !ProcessInfo.processInfo.arguments.contains("--cleanup-no-matcher")
+        #else
+        let matcherEnabled = true
+        #endif
+        let matchedTranscript = matcherEnabled ? LocalCleanupNameMatcher.apply(to: context.text, terms: contextNames, isKnownWord: VocabularyExtractor.isKnownWord) : context.text
+        KolLog.llm.debug("Local cleanup name matching took \(matchStart.duration(to: .now), privacy: .public)")
         let modelContext = PostProcessingContext(text: matchedTranscript, inputLanguage: context.inputLanguage,
             sourceApp: context.sourceApp, customRules: context.customRules,
             appContextOverrides: context.appContextOverrides, ideContext: context.ideContext,
             focusedText: context.focusedText, vocabularyHints: context.vocabularyHints,
             conversationContext: context.conversationContext, resolvedCategory: context.resolvedCategory,
             atMentionEnabled: context.atMentionEnabled)
+        let generationStart = ContinuousClock.now
         let generated = try await generate(chatText: LocalCleanupPrompt.chatText(modelContext))
+        KolLog.llm.debug("Local cleanup generation took \(generationStart.duration(to: .now), privacy: .public) (\(generated.modelCalls, privacy: .public) calls, prefill \(Int(generated.prefillSeconds * 1000), privacy: .public) ms, decode \(Int(generated.decodeSeconds * 1000), privacy: .public) ms)")
         var trimmed = generated.text.trimmingCharacters(in: .whitespacesAndNewlines)
         trimmed = LocalCleanupAddressFormatter.apply(trimmed)
-        trimmed = LocalCleanupNameMatcher.apply(to: trimmed, terms: contextNames, isKnownWord: VocabularyExtractor.isKnownWord)
+        let secondMatchStart = ContinuousClock.now
+        defer { KolLog.llm.debug("Local cleanup output checks took \(secondMatchStart.duration(to: .now), privacy: .public)") }
+        if matcherEnabled {
+            trimmed = LocalCleanupNameMatcher.apply(to: trimmed, terms: contextNames, isKnownWord: VocabularyExtractor.isKnownWord)
+        }
         trimmed = LocalCleanupFormatting.mentions(in: trimmed, vocabulary: context.vocabularyHints ?? [], focusedText: context.focusedText?.plainText, enabled: context.atMentionEnabled)
         if trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"") && trimmed.count > 1 {
             trimmed = String(trimmed.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)

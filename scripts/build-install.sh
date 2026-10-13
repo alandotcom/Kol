@@ -110,6 +110,12 @@ fi
 echo "Signing..."
 codesign --deep --force --sign "Developer ID Application: Alan Cohen (G365XP38PA)" "$APP_PATH"
 
+# KOL_SKIP_INSTALL=1 leaves the signed app in DerivedData, for benchmarking a build while the installed app runs.
+if [[ -n "${KOL_SKIP_INSTALL:-}" ]]; then
+  echo "Done. Built app (not installed): $APP_PATH"
+  exit 0
+fi
+
 if [[ "$CONFIG" == "Debug" ]]; then
   echo "Installing to /Applications/Kol Debug.app..."
   rsync -a --delete "$APP_PATH/" "/Applications/Kol Debug.app/"

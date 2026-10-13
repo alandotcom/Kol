@@ -12,6 +12,16 @@ enum LocalCleanupBenchmark {
     private struct Input: Decodable {
         let id: String
         let messages: [Message]
+        /// Replay timing (pipeline mode): idle time before the dictation starts, and how long the speaker talks.
+        /// Recording start primes the models, as TranscriptionFeature does, then the cleanup runs after the speech.
+        var gapSeconds: Double?
+        var speechSeconds: Double?
+
+        enum CodingKeys: String, CodingKey {
+            case id, messages
+            case gapSeconds = "gap_seconds"
+            case speechSeconds = "speech_seconds"
+        }
     }
     private struct Prediction: Encodable {
         let id: String
@@ -54,7 +64,9 @@ enum LocalCleanupBenchmark {
             resolvedCategory: (record["category"] as? String).flatMap(AppContextCategory.init(rawValue:)),
             atMentionEnabled: record["mentions_enabled"] as? Bool ?? false)
         let reconstructed = try JSONSerialization.jsonObject(with: Data(LocalCleanupPrompt.userMessage(context).utf8)) as? NSDictionary
-        guard reconstructed == record as NSDictionary, row.messages.first(where: { $0.role == "system" })?.content == LocalCleanupPrompt.system else {
+        // A row without a system message (a replay of recorded dictations) uses the app's current prompt.
+        let system = row.messages.first(where: { $0.role == "system" })?.content
+        guard reconstructed == record as NSDictionary, system == nil || system == LocalCleanupPrompt.system else {
             throw CocoaError(.fileReadCorruptFile)
         }
         return context
@@ -90,9 +102,21 @@ enum LocalCleanupBenchmark {
                     try encoder.encode(["seconds": seconds]).write(to: output.appendingPathComponent("warmup.json"))
                 }
                 for row in inputs {
-                    let chat = row.messages.map { "<|im_start|>\($0.role)\n\($0.content)<|im_end|>\n" }.joined() + "<|im_start|>assistant\n"
+                    let messages = row.messages.contains(where: { $0.role == "system" }) ? row.messages : [Message(role: "system", content: LocalCleanupPrompt.system)] + row.messages
+                    let chat = messages.map { "<|im_start|>\($0.role)\n\($0.content)<|im_end|>\n" }.joined() + "<|im_start|>assistant\n"
                     let response: String
                     let pipeline = arguments.contains("--benchmark-pipeline")
+                    if pipeline, row.gapSeconds != nil || row.speechSeconds != nil {
+                        try await Task.sleep(for: .seconds(row.gapSeconds ?? 0))
+                        // Like TranscriptionFeature: prime at recording start and every 3 seconds until it stops.
+                        var remaining = row.speechSeconds ?? 0
+                        await LocalCleanupClient.liveValue.prime()
+                        while remaining > 0 {
+                            try await Task.sleep(for: .seconds(min(3, remaining)))
+                            remaining -= 3
+                            if remaining > 0 { await LocalCleanupClient.liveValue.prime() }
+                        }
+                    }
                     let start = ContinuousClock.now
                     do {
                         if pipeline {
