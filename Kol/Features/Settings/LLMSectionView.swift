@@ -126,13 +126,6 @@ struct ContextPrivacySettingsContent: View {
                 set: { store.send(.setConversationContextEnabled($0)) }
             ))
             Text("Reads conversation and channel information in messaging and email apps.").settingsCaption()
-            Toggle("Mention people addressed by name in Slack", isOn: Binding(
-                get: { store.kolSettings.slackDirectMentionsEnabled },
-                set: { store.send(.setSlackDirectMentionsEnabled($0)) }
-            ))
-            .disabled(!store.kolSettings.llmPostProcessingEnabled)
-            Text("With AI post-processing, adds @ to visible names in direct requests, such as \"Yuki, can you review this?\". Other references to people stay unchanged.")
-                .settingsCaption()
             if store.kolSettings.conversationContextEnabled {
                 Toggle("Insert explicitly spoken @-mentions", isOn: Binding(
                     get: { store.kolSettings.atMentionInsertionEnabled },

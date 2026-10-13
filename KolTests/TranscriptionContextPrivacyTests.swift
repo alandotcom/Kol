@@ -69,66 +69,29 @@ struct TranscriptionContextPrivacyTests {
     return state
   }
 
-  @Test("Direct mentions are opt-in, Slack-only, and require accepted cleanup and screen consent", arguments: [
-    (true, true, true, "com.tinyspeck.slackmacgap", "local", true),
-    (true, true, true, "com.tinyspeck.slackmacgap", "groq", true),
-    (false, true, true, "com.tinyspeck.slackmacgap", "local", false),
-    (true, false, true, "com.tinyspeck.slackmacgap", "local", false),
-    (true, true, false, "com.tinyspeck.slackmacgap", "local", false),
-    (true, true, true, "example.editor", "local", false)
+  @Test("Slack direct address stays plain after accepted cleanup", arguments: [
+    "Yuki, can you review this?", "Hey Yuki.", "I have a question, Yuki, can you check this?"
   ])
-  func slackDirectMentions(_ sample: (Bool, Bool, Bool, String, String, Bool)) async {
-    let (enabled, screen, ai, bundleID, preset, shouldMention) = sample
-    var settings = settings(ai: ai, screen: screen)
-    settings.llmProviderPreset = preset
-    settings.slackDirectMentionsEnabled = enabled
-    // Direct mentions need visible-name consent, not conversation-title consent.
-    settings.conversationContextEnabled = false
-    settings.atMentionInsertionEnabled = false
+  func slackDirectAddressStaysPlain(_ text: String) async {
+    var settings = settings()
+    settings.llmProviderPreset = LLMProviderPreset.local.rawValue
+    settings.llmProviderBaseURL = LLMProviderPreset.local.defaultConfig.baseURL
+    settings.llmModelName = LLMProviderPreset.local.defaultConfig.modelName
+    settings.atMentionInsertionEnabled = true
+    settings.conversationContextEnabled = true
     var initial = completedCapture(settings)
-    initial.sourceAppBundleID = bundleID
+    initial.sourceAppBundleID = "com.tinyspeck.slackmacgap"
     initial.capturedVocabulary = ["Yuki Tanaka"]
     initial.capturedFocusedText = nil
     let pasted = LockIsolated<[String]>([])
     let store = TestStore(initialState: initial) { TranscriptionFeature() } withDependencies: {
       Self.testDependencies(&$0)
-      $0.keychain.load = { _ in "synthetic-key" }
-      $0.workspace.frontmostApplication = { FrontmostApp(bundleIdentifier: bundleID, localizedName: "Example App", processIdentifier: 101) }
       $0.pasteboard.paste = { text, _ in pasted.withValue { $0.append(text) } }
     }
     store.exhaustivity = .off
-    await store.send(.transcriptionResult(generation: store.state.contextSession!.id, "Yuki, can you review this?", audioURL, asrMs: 1))
+    await store.send(.transcriptionResult(generation: store.state.contextSession!.id, text, audioURL, asrMs: 1))
     await store.finish()
-    #expect(pasted.value == [shouldMention ? "@Yuki, can you review this?" : "Yuki, can you review this?"])
-  }
-
-  @Test("Turning off direct mentions during cleanup prevents the prefix")
-  func disableSlackMentionsDuringCleanup() async {
-    var settings = settings()
-    settings.llmProviderPreset = LLMProviderPreset.local.rawValue
-    settings.llmProviderBaseURL = LLMProviderPreset.local.defaultConfig.baseURL
-    settings.llmModelName = LLMProviderPreset.local.defaultConfig.modelName
-    settings.slackDirectMentionsEnabled = true
-    var initial = completedCapture(settings)
-    initial.sourceAppBundleID = "com.tinyspeck.slackmacgap"
-    initial.capturedVocabulary = ["Yuki Tanaka"]
-    let response = ContextTestGate<String>()
-    let pasted = LockIsolated<[String]>([])
-    let store = TestStore(initialState: initial) { TranscriptionFeature() } withDependencies: {
-      Self.testDependencies(&$0)
-      $0.pasteboard.paste = { text, _ in pasted.withValue { $0.append(text) } }
-      $0.llmPostProcessing.process = { context, _, _ in
-        let text = await response.wait()
-        return LLMProcessingResult(text: text, metadata: LLMMetadata(originalText: context.text, model: "local"))
-      }
-    }
-    store.exhaustivity = .off
-    await store.send(.transcriptionResult(generation: store.state.contextSession!.id, "Yuki, can you review this?", audioURL, asrMs: 1))
-    await response.waitUntilRequested()
-    store.state.$kolSettings.withLock { $0.slackDirectMentionsEnabled = false }
-    await response.release("Yuki, can you review this?")
-    await store.finish()
-    #expect(pasted.value == ["Yuki, can you review this?"])
+    #expect(pasted.value == [text])
   }
 
   @Test("Local cleanup runs without loading an API key")

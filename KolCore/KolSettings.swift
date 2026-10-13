@@ -66,7 +66,6 @@ public struct KolSettings: Codable, Equatable, Sendable {
 	public var llmScreenContextEnabled: Bool
 	public var conversationContextEnabled: Bool
 	public var atMentionInsertionEnabled: Bool
-	public var slackDirectMentionsEnabled: Bool
 	public var vadSilenceDetectionEnabled: Bool
 	public var ocrContextEnabled: Bool
 
@@ -113,7 +112,6 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		llmScreenContextEnabled: Bool = false,
 		conversationContextEnabled: Bool = false,
 		atMentionInsertionEnabled: Bool = false,
-		slackDirectMentionsEnabled: Bool = false,
 		vadSilenceDetectionEnabled: Bool = true,
 		ocrContextEnabled: Bool = false
 	) {
@@ -153,7 +151,6 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		self.llmScreenContextEnabled = llmScreenContextEnabled
 		self.conversationContextEnabled = conversationContextEnabled
 		self.atMentionInsertionEnabled = atMentionInsertionEnabled
-		self.slackDirectMentionsEnabled = slackDirectMentionsEnabled
 		self.vadSilenceDetectionEnabled = vadSilenceDetectionEnabled
 		self.ocrContextEnabled = ocrContextEnabled
 		normalizeDoubleTapSettings()
@@ -216,7 +213,6 @@ private enum KolSettingKey: String, CodingKey, CaseIterable {
 	case llmScreenContextEnabled
 	case conversationContextEnabled
 	case atMentionInsertionEnabled
-	case slackDirectMentionsEnabled
 	case vadSilenceDetectionEnabled
 	case ocrContextEnabled
 }
@@ -429,7 +425,6 @@ private enum KolSettingsSchema {
 		SettingsField(.llmScreenContextEnabled, keyPath: \.llmScreenContextEnabled, default: defaults.llmScreenContextEnabled).eraseToAny(),
 		SettingsField(.conversationContextEnabled, keyPath: \.conversationContextEnabled, default: defaults.conversationContextEnabled).eraseToAny(),
 		SettingsField(.atMentionInsertionEnabled, keyPath: \.atMentionInsertionEnabled, default: defaults.atMentionInsertionEnabled).eraseToAny(),
-		SettingsField(.slackDirectMentionsEnabled, keyPath: \.slackDirectMentionsEnabled, default: defaults.slackDirectMentionsEnabled).eraseToAny(),
 		SettingsField(.vadSilenceDetectionEnabled, keyPath: \.vadSilenceDetectionEnabled, default: defaults.vadSilenceDetectionEnabled).eraseToAny(),
 		SettingsField(.ocrContextEnabled, keyPath: \.ocrContextEnabled, default: defaults.ocrContextEnabled).eraseToAny(),
 	]
