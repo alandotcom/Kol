@@ -73,20 +73,39 @@ actor CoreMLCleanup {
 
     func process(_ context: PostProcessingContext) async throws -> LLMProcessingResult {
         let start = ContinuousClock.now
-        let mentionVocabulary = context.vocabularyHints ?? []
-        let context = LocalCleanupContext.includingAppVocabulary(context)
+        KolLog.llm.debug("Local cleanup context: category \(String(describing: context.resolvedCategory), privacy: .public), conversation \(context.conversationContext?.conversationName ?? "none", privacy: .private), vocabulary \((context.vocabularyHints ?? []).joined(separator: ", "), privacy: .private), focused text \(context.focusedText != nil, privacy: .public), custom rules \(!(context.customRules ?? "").isEmpty, privacy: .public)")
         guard context.inputLanguage == nil || context.inputLanguage?.lowercased().hasPrefix("en") == true else {
             throw LLMError.invalidConfiguration("Local cleanup currently supports English dictation")
         }
         if let warming { try await warming.value }
         try Task.checkCancellation()
-        let generated = try await generate(chatText: LocalCleanupPrompt.chatText(context))
+        // Names are fixed on both sides of the model. Matching first gives the model text that
+        // already carries the right names, so it does not drop or mangle them; matching again
+        // catches names the model's own edits exposed (for example a web address it joined).
+        let contextNames = (context.vocabularyHints ?? []) + [context.conversationContext?.conversationName].compactMap { $0 }
+        let matchedTranscript = LocalCleanupNameMatcher.apply(to: context.text, terms: contextNames, isKnownWord: VocabularyExtractor.isKnownWord)
+        let modelContext = PostProcessingContext(text: matchedTranscript, inputLanguage: context.inputLanguage,
+            sourceApp: context.sourceApp, customRules: context.customRules,
+            appContextOverrides: context.appContextOverrides, ideContext: context.ideContext,
+            focusedText: context.focusedText, vocabularyHints: context.vocabularyHints,
+            conversationContext: context.conversationContext, resolvedCategory: context.resolvedCategory,
+            atMentionEnabled: context.atMentionEnabled)
+        let generated = try await generate(chatText: LocalCleanupPrompt.chatText(modelContext))
         var trimmed = generated.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        trimmed = LocalCleanupFormatting.mentions(in: trimmed, vocabulary: mentionVocabulary, focusedText: context.focusedText?.plainText, enabled: context.atMentionEnabled)
+        trimmed = LocalCleanupAddressFormatter.apply(trimmed)
+        trimmed = LocalCleanupNameMatcher.apply(to: trimmed, terms: contextNames, isKnownWord: VocabularyExtractor.isKnownWord)
+        trimmed = LocalCleanupFormatting.mentions(in: trimmed, vocabulary: context.vocabularyHints ?? [], focusedText: context.focusedText?.plainText, enabled: context.atMentionEnabled)
         if trimmed.hasPrefix("\"") && trimmed.hasSuffix("\"") && trimmed.count > 1 {
             trimmed = String(trimmed.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         if trimmed == "EMPTY" { trimmed = "" }
+        // Custom rules are part of the prompt too ("I work at Example Labs"), so their capitalized
+        // names get the same check: the model may use one only where the speech sounds like it.
+        let guardedNames = contextNames + [context.customRules].compactMap { $0 }
+        guard LocalCleanupNameGuard.accepts(transcript: context.text, cleaned: trimmed, names: guardedNames) else {
+            KolLog.llm.info("Local cleanup inserted a context name that does not match the speech; using the transcript")
+            throw LLMError.invalidResponse
+        }
         return LLMProcessingResult(text: trimmed.isEmpty ? context.text : trimmed, metadata: LLMMetadata(originalText: context.text, model: "kol-cleanup-360m-coreml", latencyMs: Int(Self.seconds(start) * 1000), promptTokens: generated.promptTokens, completionTokens: generated.completionTokens))
     }
 
