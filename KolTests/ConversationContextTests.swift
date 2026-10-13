@@ -59,4 +59,20 @@ struct ConversationContextTests {
 		let name = ConversationContext.conversationName(fromWindowTitle: "Messages - +1 (555) 123-4567")
 		#expect(name == "+1 (555) 123-4567")
 	}
+
+	@Test
+	func messagesTitleIsTheConversationName() {
+		#expect(ConversationContext.conversationName(fromWindowTitle: "Yuki Tanaka", bundleID: "com.apple.MobileSMS") == "Yuki Tanaka")
+		#expect(ConversationContext.conversationName(fromWindowTitle: "Open Source Weekly", bundleID: "com.apple.MobileSMS") == "Open Source Weekly")
+	}
+
+	@Test
+	func messagesAppTitleAloneIsNotAConversation() {
+		#expect(ConversationContext.conversationName(fromWindowTitle: "Messages", bundleID: "com.apple.MobileSMS") == nil)
+	}
+
+	@Test
+	func separatorFreeTitleFromOtherAppsIsStillIgnored() {
+		#expect(ConversationContext.conversationName(fromWindowTitle: "Yuki Tanaka", bundleID: "com.tinyspeck.slackmacgap") == nil)
+	}
 }

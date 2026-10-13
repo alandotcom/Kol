@@ -146,4 +146,18 @@ struct AppContextResolverTests {
 		#expect(web == .email)
 		#expect(native == web)
 	}
+
+	@Test("Browser window title names the web app when the URL is unreadable")
+	func webAppFromWindowTitle() {
+		#expect(AppContextResolver.resolve(bundleID: "com.brave.Browser", appName: "Brave Browser",
+			windowTitle: "(5) WhatsApp - High memory usage - 882 MB - Brave") == .messaging)
+		#expect(AppContextResolver.resolve(bundleID: "com.google.Chrome", appName: "Google Chrome",
+			windowTitle: "Inbox (3) - someone@example.com - Gmail") == .email)
+	}
+
+	@Test("Browser window title without a known web app stays unresolved")
+	func unknownWindowTitle() {
+		#expect(AppContextResolver.resolve(bundleID: "com.brave.Browser", appName: "Brave Browser",
+			windowTitle: "Weather forecast - Brave") == nil)
+	}
 }

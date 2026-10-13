@@ -657,7 +657,8 @@ private extension TranscriptionFeature {
           if settings.wrappedValue.conversationContextEnabled, let pid,
              resolvedCategory == .messaging || resolvedCategory == .email {
             let title = await withMainActorTimeout { windowContext.windowTitle(pid) } ?? nil
-            conversation = ConversationContext(conversationName: ConversationContext.conversationName(fromWindowTitle: title))
+            conversation = ConversationContext(conversationName: ConversationContext.conversationName(fromWindowTitle: title, bundleID: bundleID))
+            KolLog.conversation.debug("Window title \(title ?? "none", privacy: .private) -> conversation \(conversation?.conversationName ?? "none", privacy: .private)")
           }
           guard Self.acceptsContext(session, settings, generation: generation) else { return }
           await send(.recordingContextCaptured(

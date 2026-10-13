@@ -22,6 +22,12 @@ class KolAppDelegate: NSObject, NSApplicationDelegate {
 	@Shared(.kolSettings) var kolSettings: KolSettings
 
 	func applicationDidFinishLaunching(_: Notification) {
+		// Screen vocabulary keeps words the system dictionary does not know (product, project and
+		// person names). Extraction runs off the main thread; the spell checker is used on it.
+		VocabularyExtractor.isKnownWord = { word in
+			let check = { NSSpellChecker.shared.checkSpelling(of: word, startingAt: 0, language: "en", wrap: false, inSpellDocumentWithTag: 0, wordCount: nil).location == NSNotFound }
+			return Thread.isMainThread ? check() : DispatchQueue.main.sync(execute: check)
+		}
 		#if DEBUG
         if LocalCleanupBenchmark.startIfRequested() { return }
         if ProcessInfo.processInfo.arguments.contains("--local-cleanup") {

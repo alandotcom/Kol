@@ -24,7 +24,30 @@ public enum AppContextResolver {
 		if let category = PromptLayers.appContextCategory(for: appName) {
 			return category
 		}
+		if let windowTitle, let category = categoryFromWindowTitle(windowTitle) {
+			return category
+		}
 
+		return nil
+	}
+
+	/// Web apps whose name appears as one " - " part of a browser window title, such as
+	/// "(5) WhatsApp - Brave" or "Inbox (3) - user@example.com - Gmail". Used when the browser's
+	/// URL cannot be read through Accessibility.
+	private static let webAppTitleNames: [String: AppContextCategory] = [
+		"whatsapp": .messaging, "slack": .messaging, "discord": .messaging, "telegram": .messaging,
+		"messenger": .messaging, "google chat": .messaging, "microsoft teams": .messaging,
+		"gmail": .email, "outlook": .email,
+		"google docs": .document, "notion": .document,
+	]
+
+	private static func categoryFromWindowTitle(_ title: String) -> AppContextCategory? {
+		for part in title.components(separatedBy: " - ") {
+			// Drop an unread counter such as "(5) " at the start of a part.
+			let name = part.replacingOccurrences(of: #"^\(\d+\)\s*"#, with: "", options: .regularExpression)
+				.trimmingCharacters(in: .whitespaces).lowercased()
+			if let category = webAppTitleNames[name] { return category }
+		}
 		return nil
 	}
 

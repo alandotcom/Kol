@@ -220,4 +220,46 @@ struct VocabularyExtractorTests {
 		#expect(!result.allTerms.contains("dlscLntrWt"))
 		#expect(result.allTerms.contains("Jane Smith"))
 	}
+
+	@Test("Extracts repeated one-word names used mid-sentence")
+	func singleWordNames() {
+		let text = "The build of Nox is ready. I tested it with Nox this morning, and Yuki liked it. Ask Yuki later."
+		let result = VocabularyExtractor.extract(from: text)
+		#expect(result.properNouns.contains("Nox"))
+		#expect(result.properNouns.contains("Yuki"))
+	}
+
+	@Test("Ignores one-word capitals that appear once, start sentences, or also appear lowercase")
+	func singleWordNameFilters() {
+		let result = VocabularyExtractor.extract(from: "Open the panel. Settings are saved in Settings today, and the settings sync. We mentioned Orbit once.")
+		#expect(!result.properNouns.contains("Settings"))
+		#expect(!result.properNouns.contains("Orbit"))
+		#expect(!result.properNouns.contains("Open"))
+	}
+
+	@Test("Keeps words the dictionary does not know, wherever they appear")
+	func unknownWords() {
+		let known: Set<String> = ["is", "clean", "now", "the", "real", "scan", "into", "staging", "from", "settings"]
+		let result = VocabularyExtractor.extract(from: "Knip is clean. Now the real scan into staging from Settings", isKnownWord: { known.contains($0) })
+		#expect(result.properNouns.contains("Knip"))
+		#expect(!result.properNouns.contains("Settings"))
+		#expect(!result.properNouns.contains("staging"))
+	}
+
+	@Test("Drops hash-like path fragments")
+	func hashFragments() {
+		let result = VocabularyExtractor.extract(from: "see tasks/a0a85166-8ee6-4c9.output and docs/decisions")
+		#expect(!result.allTerms.contains { $0.contains("a0a85166") })
+		#expect(result.allTerms.contains("docs/decisions"))
+	}
+
+	@Test("Drops lowercase recognition merges and one-off lowercase noise")
+	func recognitionNoise() {
+		let known: Set<String> = ["the", "he", "reads", "as", "is", "clean", "and", "it", "kin", "taro"]
+		let result = VocabularyExtractor.extract(from: "thehe readsas contare is clean and Kintaro is clean", isKnownWord: { known.contains($0) })
+		#expect(!result.properNouns.contains("thehe"))
+		#expect(!result.properNouns.contains("readsas"))
+		#expect(!result.properNouns.contains("contare"))
+		#expect(result.properNouns.contains("Kintaro"))
+	}
 }
