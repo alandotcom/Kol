@@ -13,7 +13,15 @@ public struct KolSettings: Codable, Equatable, Sendable {
 		.init(pattern: "uh+"),
 		.init(pattern: "um+"),
 		.init(pattern: "er+"),
-		.init(pattern: "hm+")
+		.init(pattern: "hm+"),
+		// Words some people drop as filler and others mean. The local cleanup model keeps them, so
+		// they are listed here switched off for anyone who wants them removed.
+		.init(isEnabled: false, pattern: "literally"),
+		.init(isEnabled: false, pattern: "honestly"),
+		.init(isEnabled: false, pattern: "actually"),
+		.init(isEnabled: false, pattern: "basically"),
+		.init(isEnabled: false, pattern: "seriously"),
+		.init(isEnabled: false, pattern: "totally")
 	]
 
 	public static var defaultPasteLastTranscriptHotkeyDescription: String {
