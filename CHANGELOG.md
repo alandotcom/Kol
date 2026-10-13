@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.0
+
+### Minor Changes
+
+- The on-device English cleanup is available in every build: choosing Local in AI post-processing downloads the 700 MB model from Hugging Face, with progress and a retry button
+
+### Patch Changes
+
+- Read more context for AI cleanup: web chat apps in the browser are recognized by window title, Messages conversations by their window, and one-word names and unrecognized words from the screen join the vocabulary
+- Word removals now list literally, honestly, actually, basically, seriously and totally, switched off, for anyone who wants those words removed before cleanup
+- Local cleanup times out far less often: its models are prepared for every input size at launch, kept awake while you record, and given 800 ms instead of 450 ms
+- Add an English cleanup provider that runs locally with Core ML, verifies transcript words in parallel, warms the model at startup, inserts contextual mentions, and falls back promptly when cleanup exceeds its deadline.
+- Local cleanup corrects misheard names from the screen and the conversation title (for example a product name heard as ordinary words), formats spoken web addresses, and pastes the transcript instead when the model inserts a name the speech does not support
+
 ## 1.4.1
 
 ### Patch Changes
