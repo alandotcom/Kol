@@ -5,13 +5,17 @@ Kol (קול, Hebrew for "voice") is a fork of [kitlangton/Hex](https://github.co
 ## Features
 
 - **On-device transcription** via [Parakeet TDT](https://github.com/FluidInference/FluidAudio) — fast, accurate, multilingual, runs entirely on Apple Silicon
-- **AI post-processing** — optional LLM cleanup via [Groq](https://groq.com), [Cerebras](https://cerebras.ai), or any OpenAI-compatible API (~80ms latency):
-  - Fixes punctuation, removes filler words, corrects ASR errors
-  - Formats lists as bullet points in docs, keeps casual tone in messaging
-  - Adapts to the target app (Terminal, Slack, Notes, etc.)
-  - Composable prompt architecture: core rules + language-specific + app-context + your custom rules
+- **AI post-processing** fixes punctuation, removes filler words and corrects speech-recognition errors. Choose a provider in Settings:
+  - **Local (on-device)** runs an English cleanup model on your Mac with Core ML, with no API key and nothing sent over the network. Kol downloads the model (about 700 MB) from [Hugging Face](https://huggingface.co/alandotcom/kol-cleanup-360m-coreml) the first time you choose it. A typical cleanup takes about 250 ms on Apple Silicon. It corrects names it sees on screen or in the conversation title, and pastes your transcript unchanged when it is unsure.
+  - **[Groq](https://groq.com)**, **[OpenRouter](https://openrouter.ai)**, or any **OpenAI-compatible API** use a cloud model with your API key, stored in the macOS Keychain. These adapt to the target app (for example, bullet lists in documents and a casual tone in messaging) through a composable prompt: core rules, language rules, app context and your custom rules.
+- **Word removals and remappings**: remove words you never want (um, uh) or optional ones such as "literally" and "basically", and replace words with your own spellings
 - **Context-aware** — captures screen text, IDE file names, and vocabulary near the cursor to improve transcription accuracy
 - **Press-and-hold** or **double-tap** hotkey recording modes
+- **Automatic updates** through Sparkle, which you can turn off under Settings → General → Updates
+
+## Install
+
+Download `Kol-vX.Y.Z.zip` from the [latest release](https://github.com/alandotcom/Kol/releases/latest), unzip it and move `Kol.app` to Applications. Releases are signed and notarized, and later versions update in place.
 
 ## Building from source
 
