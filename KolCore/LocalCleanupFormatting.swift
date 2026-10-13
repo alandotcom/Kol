@@ -31,7 +31,7 @@ public enum LocalCleanupFormatting {
         return result
     }
 
-    private static func isQuoted(_ text: String, before index: String.Index) -> Bool {
+    static func isQuoted(_ text: String, before index: String.Index) -> Bool {
         var closing: Character?
         var escaped = false
         var previous: Character?

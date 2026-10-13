@@ -975,6 +975,12 @@ private extension TranscriptionFeature {
                  currentSettings.llmPostProcessingEnabled,
                  provider == ContextProvider(settings: currentSettings), consentStillValid {
                 finalText = SpokenDottedNumberFormatter.apply(result.text)
+                if contextAllowed, currentSettings.slackDirectMentionsEnabled,
+                   sourceAppBundleID == "com.tinyspeck.slackmacgap" {
+                  finalText = SlackMentionFormatter.apply(
+                    to: finalText, vocabulary: vocabulary ?? [], focusedText: capturedFocusedText?.plainText
+                  )
+                }
                 llmMetadata = result.metadata
                 transcriptionFeatureLogger.info("LLM output: '\(result.text, privacy: .private)' (\(result.metadata.latencyMs ?? 0)ms)")
               }

@@ -141,6 +141,7 @@ struct SettingsFeature {
     case setLLMScreenContextEnabled(Bool)
     case setConversationContextEnabled(Bool)
     case setAtMentionInsertionEnabled(Bool)
+    case setSlackDirectMentionsEnabled(Bool)
     case setOCRContextEnabled(Bool)
     case openScreenRecordingSettings
     case setLLMPromptCode(String?)
@@ -751,6 +752,10 @@ struct SettingsFeature {
 
       case let .setAtMentionInsertionEnabled(enabled):
         state.$kolSettings.withLock { $0.atMentionInsertionEnabled = enabled }
+        return .none
+
+      case let .setSlackDirectMentionsEnabled(enabled):
+        state.$kolSettings.withLock { $0.slackDirectMentionsEnabled = enabled }
         return .none
 
       case let .setOCRContextEnabled(enabled):
