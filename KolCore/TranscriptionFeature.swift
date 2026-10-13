@@ -154,6 +154,7 @@ public struct TranscriptionFeature {
   public enum CancelID: Hashable {
     case metering
     case contextRefresh(UUID)
+    case cleanupKeepAlive(UUID)
     case initialContextCapture(UUID)
     case refreshCapture(UUID)
     case ocrCapture(UUID)
@@ -167,6 +168,7 @@ public struct TranscriptionFeature {
   @Dependency(\.date.now) var now
   @Dependency(\.transcriptPersistence) var transcriptPersistence
   @Dependency(\.llmPostProcessing) var llmPostProcessing
+  @Dependency(\.localCleanup) var localCleanup
   @Dependency(\.keychain) var keychain
   @Dependency(\.screenContext) var screenContext
   @Dependency(\.ideContext) var ideContext
@@ -609,7 +611,21 @@ private extension TranscriptionFeature {
     transcriptionFeatureLogger.notice("Recording started at \(startTime.ISO8601Format())")
 
     let session = state.$contextSession
+    let primesLocalCleanup = state.kolSettings.llmPostProcessingEnabled
+      && state.kolSettings.llmProviderPreset == LLMProviderPreset.local.rawValue
     let startRecordingEffect: Effect<Action> = .merge(
+      // The on-device cleanup models slow down after several seconds idle on the GPU (a real-timing
+      // replay timed out 5 of 27 dictations spoken after 30+ seconds idle when they were primed only
+      // at recording start). They are woken every 3 seconds until the recording stops.
+      primesLocalCleanup
+        ? .run { [localCleanup, clock] _ in
+            while !Task.isCancelled {
+              await localCleanup.prime()
+              try await clock.sleep(for: .seconds(3))
+            }
+          }
+          .cancellable(id: CancelID.cleanupKeepAlive(contextSession.id), cancelInFlight: true)
+        : .none,
       previous.map { id in
         .merge(
           .cancel(id: CancelID.session(id)),
@@ -808,6 +824,7 @@ private extension TranscriptionFeature {
   func cancelCaptures(_ generation: UUID) -> Effect<Action> {
     .merge(
       .cancel(id: CancelID.contextRefresh(generation)),
+      .cancel(id: CancelID.cleanupKeepAlive(generation)),
       .cancel(id: CancelID.refreshCapture(generation)),
       .cancel(id: CancelID.ocrCapture(generation)),
       .cancel(id: CancelID.initialContextCapture(generation))

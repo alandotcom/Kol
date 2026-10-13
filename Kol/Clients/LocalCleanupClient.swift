@@ -7,14 +7,18 @@ import Tokenizers
 extension LocalCleanupClient: DependencyKey {
     public static var liveValue: Self {
         Self(process: { context in
-            try await LocalCleanupDeadline.run { try await CoreMLCleanup.shared.process(context) }
-        }, warmUp: { try? await CoreMLCleanup.shared.warmUp() })
+            try await LocalCleanupDeadline.run(timeout: CoreMLCleanup.deadline) { try await CoreMLCleanup.shared.process(context) }
+        }, warmUp: { try? await CoreMLCleanup.shared.warmUp() }, prime: { await CoreMLCleanup.shared.prime() })
     }
 }
 
 actor CoreMLCleanup {
     static let shared = CoreMLCleanup()
     static let capacity = 1024
+    /// Longest a cleanup may take before the transcript is pasted unchanged. A replay of 135 real
+    /// dictations with no limit finished every cleanup within 800 ms (median 236 ms); the slowest
+    /// were short dictations during load spikes, which a 450 ms limit pasted raw.
+    static let deadline: Duration = .milliseconds(800)
     private var resources: (MLModel, any Tokenizer)?
     private var loading: Task<(MLModel, any Tokenizer), Error>?
     private var warming: Task<Void, Error>?
@@ -63,12 +67,47 @@ actor CoreMLCleanup {
         guard !warmed else { return }
         if let warming { return try await warming.value }
         let task = Task {
-            _ = try await generate(chatText: LocalCleanupPrompt.chatText(PostProcessingContext(text: "")))
+            // Shapes come first so they are compiled even if the sample generation fails.
+            try await compileAllShapes()
+            // A short real sentence runs the whole generation path once. An empty dictation is not
+            // a valid sample: the model may never end its output for one.
+            try await runSample()
         }
         warming = task
         defer { warming = nil }
         try await task.value
         warmed = true
+    }
+
+    /// Runs the cleanup model once if it is already warm (see LocalCleanupClient.prime). Never loads anything; a cold
+    /// app warms through warmUp.
+    func prime() async {
+        guard warmed else { return }
+        try? await runSample()
+    }
+
+    /// Cleans a short real sentence, running the whole generation path once.
+    func runSample() async throws {
+        _ = try await generate(chatText: LocalCleanupPrompt.chatText(PostProcessingContext(text: "thanks see you tomorrow")))
+    }
+
+    /// Runs one prediction at every padded query length. With the `.infrequent` reshape hint,
+    /// Core ML builds each length's GPU plan on first use, which can take longer than the
+    /// cleanup deadline. Building them all during warm-up keeps that cost off the first
+    /// dictations. The throwaway session's cache contents are never read.
+    private func compileAllShapes() async throws {
+        let (model, _) = try await load()
+        guard model.modelDescription.outputDescriptionsByName["token_ids"] != nil else { return }
+        let session = PredictionSession(state: model.makeState())
+        for queryLength in Set(LocalCleanupShapes.prefillLengths + LocalCleanupShapes.stepLengths).sorted() {
+            try Task.checkCancellation()
+            let buffers = try session.buffers(queryLength: queryLength, capacity: Self.capacity, parallel: true)
+            buffers.offset[0] = 0
+            let input = try MLDictionaryFeatureProvider(dictionary: ["input_ids": buffers.ids, "cache_position": buffers.offset, "causal_mask": buffers.mask])
+            let options = MLPredictionOptions()
+            if let tokenOutput = buffers.tokenOutput { options.outputBackings = ["token_ids": tokenOutput] }
+            _ = try await model.prediction(from: input, using: session.state, options: options)
+        }
     }
 
     func process(_ context: PostProcessingContext) async throws -> LLMProcessingResult {
